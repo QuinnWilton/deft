@@ -21,13 +21,13 @@ defmodule Deft.Helpers do
     Enum.map(es, &type_of/1)
   end
 
-  def subtype?(t1, t2) do
-    Deft.Type.subtype?(t1, t2)
+  def subtype_of?(t1, t2) do
+    Deft.Type.subtype_of?(t1, t2)
   end
 
   def subtypes?(t1s, t2s) do
     Enum.zip(t1s, t2s)
-    |> Enum.all?(fn {t1, t2} -> subtype?(t1, t2) end)
+    |> Enum.all?(fn {t1, t2} -> subtype_of?(t1, t2) end)
   end
 
   def compute_type(e, env) do

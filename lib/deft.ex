@@ -41,6 +41,37 @@ defmodule Deft do
   end
 
   def parse_type_annotation({:"::", _, [e, t]}) do
-    annotate(e, t)
+    annotate(e, parse_type(t))
+  end
+
+  def parse_type(t) do
+    case t do
+      {:atom, _, _} ->
+        Type.Atom.new()
+
+      {:boolean, _, _} ->
+        Type.Boolean.new()
+
+      {:float, _, _} ->
+        Type.Float.new()
+
+      {:integer, _, _} ->
+        Type.Integer.new()
+
+      {:number, _, _} ->
+        Type.Number.new()
+
+      {:top, _, _} ->
+        Type.Top.new()
+
+      {:bottom, _, _} ->
+        Type.Bottom.new()
+
+      [{:->, _, [inputs, output]}] ->
+        inputs = Enum.map(inputs, &parse_type/1)
+        output = parse_type(output)
+
+        Type.Fn.new(inputs, output)
+    end
   end
 end
