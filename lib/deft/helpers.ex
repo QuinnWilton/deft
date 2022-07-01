@@ -1,4 +1,6 @@
 defmodule Deft.Helpers do
+  alias Deft.Type
+
   def annotate(e, t) do
     Macro.update_meta(e, &Keyword.put(&1, :__deft_type__, t))
   end
@@ -13,8 +15,33 @@ defmodule Deft.Helpers do
         raise Deft.MissingTypeError, expr: e
 
       {:ok, type} ->
+        unless type_well_formed?(type) do
+          raise Deft.MalformedTypedError, expr: type
+        end
+
         type
     end
+  end
+
+  # is_boolean/1 must be checked before is_atom/1
+  def type_of(e) when is_boolean(e), do: Type.Boolean.new()
+  def type_of(e) when is_atom(e), do: Type.Atom.new()
+  def type_of(e) when is_float(e), do: Type.Float.new()
+  def type_of(e) when is_integer(e), do: Type.Integer.new()
+  def type_of(e) when is_number(e), do: Type.Number.new()
+
+  def type_of(e) do
+    raise Deft.MissingTypeError, expr: e
+  end
+
+  def type_well_formed?(t) when is_struct(t) do
+    {:consolidated, impls} = Type.__protocol__(:impls)
+
+    t.__struct__ in impls
+  end
+
+  def type_well_formed?(_) do
+    false
   end
 
   def types_of(es) do
@@ -25,7 +52,7 @@ defmodule Deft.Helpers do
     Deft.Type.subtype_of?(t1, t2)
   end
 
-  def subtypes?(t1s, t2s) do
+  def subtypes_of?(t1s, t2s) do
     Enum.zip(t1s, t2s)
     |> Enum.all?(fn {t1, t2} -> subtype_of?(t1, t2) end)
   end

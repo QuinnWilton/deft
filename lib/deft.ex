@@ -25,6 +25,16 @@ defmodule Deft do
         fn_type = Type.Fn.new(input_types, output_type)
 
         annotate({:fn, fn_meta, [{:->, arrow_meta, [args, body]}]}, fn_type)
+
+      {{:., dot_meta, [e_fn]}, meta, args} ->
+        {e_fn, t_fn} = compute_and_erase_type(e_fn, __CALLER__)
+        {args, t_args} = compute_and_erase_types(args, __CALLER__)
+
+        unless length(t_fn.inputs) == length(t_args) and subtypes_of?(t_fn.inputs, t_args) do
+          raise Deft.TypecheckingError, expected: t_fn.inputs, actual: t_args
+        end
+
+        annotate({{:., dot_meta, [e_fn]}, meta, args}, t_fn.output)
     end
   end
 
@@ -34,6 +44,9 @@ defmodule Deft do
         args = Enum.map(args, &parse_type_annotation/1)
 
         {:type_rule, [], [{:fn, fn_meta, [:->, arrow_meta, [args, body]]}]}
+
+      {{:., dot_meta, [dot_args]}, meta, args} ->
+        {:type_rule, [], [{{:., dot_meta, [dot_args]}, meta, args}]}
 
       e ->
         e
@@ -46,11 +59,11 @@ defmodule Deft do
 
   def parse_type(t) do
     case t do
-      {:atom, _, _} ->
-        Type.Atom.new()
-
       {:boolean, _, _} ->
         Type.Boolean.new()
+
+      {:atom, _, _} ->
+        Type.Atom.new()
 
       {:float, _, _} ->
         Type.Float.new()
