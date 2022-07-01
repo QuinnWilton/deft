@@ -17,6 +17,10 @@ defmodule Deft.Helpers do
     end
   end
 
+  def subtype?(t1, t2) do
+    Deft.Type.subtype?(t1, t2)
+  end
+
   def compute_type(e, env) do
     e
     |> local_expand(env)
