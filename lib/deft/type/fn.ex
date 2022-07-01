@@ -1,6 +1,4 @@
 defmodule Deft.Type.Fn do
-  alias Deft.Type
-
   @enforce_keys [:inputs, :output]
   defstruct @enforce_keys
 
@@ -12,15 +10,15 @@ defmodule Deft.Type.Fn do
   end
 
   defimpl Deft.Type do
-    def subtype_of?(t1, t2) when is_struct(t2, Type.Fn) do
+    def subtype_of?(t1, %Deft.Type.Fn{} = t2) do
       inputs = Enum.zip(t1.inputs, t2.inputs)
 
       inputs_subtype? =
         Enum.all?(inputs, fn {ti1, ti2} ->
-          subtype_of?(ti2, ti1)
+          Deft.Type.subtype_of?(ti2, ti1)
         end)
 
-      output_subtype? = subtype_of?(t1.output, t2.output)
+      output_subtype? = Deft.Type.subtype_of?(t1.output, t2.output)
 
       inputs_subtype? and output_subtype?
     end

@@ -23,6 +23,13 @@ defmodule Deft.Helpers do
     end
   end
 
+  def type_of({elem0, elem1}) do
+    elem0 = type_of(elem0)
+    elem1 = type_of(elem1)
+
+    Type.Tuple.new([elem0, elem1])
+  end
+
   # is_boolean/1 must be checked before is_atom/1
   def type_of(e) when is_boolean(e), do: Type.Boolean.new()
   def type_of(e) when is_atom(e), do: Type.Atom.new()
@@ -86,16 +93,20 @@ defmodule Deft.Helpers do
   def compute_and_erase_type_in_context(e, context, env) do
     e =
       Enum.reduce(context, e, fn {x_f, x_m, x_a} = x, acc ->
-        Macro.postwalk(acc, fn {a_f, a_m, a_a} = a ->
-          # TODO: Is this necessary?
-          x_counter = Keyword.take(x_m, [:counter])
-          a_counter = Keyword.take(a_m, [:counter])
+        Macro.postwalk(acc, fn
+          {a_f, a_m, a_a} = a ->
+            # TODO: Is this necessary?
+            x_counter = Keyword.take(x_m, [:counter])
+            a_counter = Keyword.take(a_m, [:counter])
 
-          if x_f == a_f and x_counter == a_counter and x_a == a_a do
-            annotate(a, type_of(x))
-          else
-            a
-          end
+            if x_f == a_f and x_counter == a_counter and x_a == a_a do
+              annotate(a, type_of(x))
+            else
+              a
+            end
+
+          e ->
+            e
         end)
       end)
 
