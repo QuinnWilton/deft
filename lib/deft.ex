@@ -3,18 +3,21 @@ defmodule Deft do
 
   alias Deft.Type
 
-  defmacro deft(ast) do
-    ast =
-      ast
-      |> Macro.postwalk(&handle_annotations/1)
-      |> Macro.postwalk(&wrap_type_rule/1)
-      |> IO.inspect(label: :wrapped)
-
-    {e, t} = compute_and_erase_type(ast, __CALLER__)
-
-    IO.inspect(t, label: :final_type)
-
+  defmacro compile(e) do
     e
+    |> Macro.postwalk(&handle_annotations/1)
+    |> Macro.postwalk(&wrap_type_rule/1)
+    |> compute_and_erase_type(__CALLER__)
+    |> elem(0)
+  end
+
+  defmacro type(e) do
+    e
+    |> Macro.postwalk(&handle_annotations/1)
+    |> Macro.postwalk(&wrap_type_rule/1)
+    |> compute_and_erase_type(__CALLER__)
+    |> elem(1)
+    |> inspect()
   end
 
   defmacro type_rule(e) do
