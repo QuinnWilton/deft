@@ -37,6 +37,20 @@ defmodule Deft do
 
         annotate({{:., dot_meta, [e_fn]}, meta, args}, t_fn.output)
 
+      {:elem, meta, [tuple, index]} ->
+        {tuple, tuple_t} = compute_and_erase_type(tuple, __CALLER__)
+        {index, index_t} = compute_and_erase_type(index, __CALLER__)
+
+        unless is_struct(tuple_t, Type.Tuple) do
+          raise "Expected a tuple"
+        end
+
+        unless subtype_of?(Type.Integer.new(), index_t) do
+          raise Deft.TypecheckingError, expected: Type.Integer.new(), actual: index_t
+        end
+
+        annotate({:elem, meta, [tuple, index]}, Type.Union.new(tuple_t.elements))
+
       {:{}, tuple_meta, es} ->
         {es, e_ts} = compute_and_erase_types(es, __CALLER__)
 
@@ -54,6 +68,9 @@ defmodule Deft do
 
       {:{}, tuple_meta, es} ->
         {:type_rule, [], [{:{}, tuple_meta, es}]}
+
+      {:elem = f, meta, a} ->
+        {:type_rule, [], [{f, meta, a}]}
 
       e ->
         e
@@ -103,6 +120,14 @@ defmodule Deft do
         elements = Enum.map(elements, &parse_type/1)
 
         Type.Tuple.new(elements)
+
+      {:|, _, [t1, t2]} ->
+        t1 = parse_type(t1)
+        t2 = parse_type(t2)
+
+        [t1]
+        |> Type.Union.new()
+        |> Type.Union.put_type(t2)
 
       [{:->, _, [inputs, output]}] ->
         inputs = Enum.map(inputs, &parse_type/1)
