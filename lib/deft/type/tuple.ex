@@ -8,6 +8,14 @@ defmodule Deft.Type.Tuple do
     }
   end
 
+  def elements(%__MODULE__{} = tuple) do
+    tuple.elements
+  end
+
+  def unique_types(%__MODULE__{} = tuple) do
+    MapSet.new(tuple.elements)
+  end
+
   defimpl Deft.Type do
     def subtype_of?(t1, %Deft.Type.Tuple{} = t2) do
       elements = Enum.zip(t1.elements, t2.elements)

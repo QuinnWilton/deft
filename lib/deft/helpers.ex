@@ -56,7 +56,9 @@ defmodule Deft.Helpers do
   end
 
   def subtype_of?(t1, %Type.Union{} = t2) do
-    Enum.all?(t2.elements, fn te2 ->
+    t2
+    |> Type.Union.types()
+    |> Enum.all?(fn te2 ->
       Deft.Type.subtype_of?(t1, te2)
     end)
   end

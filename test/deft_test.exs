@@ -262,7 +262,8 @@ defmodule DeftTest do
   end
 
   def tuple_inhabitant(type) do
-    type.elements
+    type
+    |> Type.Tuple.elements()
     |> Enum.map(&inhabitant_of/1)
     |> fixed_list()
     |> map(fn elements ->
@@ -271,7 +272,8 @@ defmodule DeftTest do
   end
 
   def union_inhabitant(type) do
-    type.elements
+    type
+    |> Type.Union.types()
     |> Enum.map(&inhabitant_of/1)
     |> one_of()
   end
@@ -313,12 +315,15 @@ defmodule DeftTest do
         {:top, [], nil}
 
       %Type.Tuple{} ->
-        elements = Enum.map(type.elements, &annotation_for/1)
+        elements =
+          type
+          |> Type.Tuple.elements()
+          |> Enum.map(&annotation_for/1)
 
         {:{}, [], elements}
 
       %Type.Union{} ->
-        [first | rest] = Enum.to_list(type.elements)
+        [first | rest] = Type.Union.types(type)
 
         Enum.reduce(rest, annotation_for(first), fn t, acc ->
           {:|, [], [annotation_for(t), acc]}

@@ -68,7 +68,12 @@ defmodule Deft do
           raise Deft.TypecheckingError, expected: Type.Integer.new(), actual: index_t
         end
 
-        annotate({:elem, meta, [tuple, index]}, Type.Union.new(tuple_t.elements))
+        type =
+          tuple_t
+          |> Type.Tuple.unique_types()
+          |> Type.Union.new()
+
+        annotate({:elem, meta, [tuple, index]}, type)
 
       {:{}, tuple_meta, es} ->
         {es, e_ts} = compute_and_erase_types(es, __CALLER__)
@@ -95,20 +100,7 @@ defmodule Deft do
         {do_branch, do_branch_t} = compute_and_erase_type(do_branch, __CALLER__)
         {else_branch, else_branch_t} = compute_and_erase_type(else_branch, __CALLER__)
 
-        type =
-          cond do
-            do_branch_t == else_branch_t ->
-              do_branch_t
-
-            subtype_of?(do_branch_t, else_branch_t) ->
-              do_branch_t
-
-            subtype_of?(else_branch_t, do_branch_t) ->
-              else_branch_t
-
-            :else ->
-              Type.Union.new([do_branch_t, else_branch_t])
-          end
+        type = Type.Union.new([do_branch_t, else_branch_t])
 
         annotate({:if, meta, [predicate, [do: do_branch, else: else_branch]]}, type)
 
