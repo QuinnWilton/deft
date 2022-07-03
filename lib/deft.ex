@@ -22,7 +22,7 @@ defmodule Deft do
 
   defmacro type_rule(e) do
     case e do
-      {:->, meta, [args, body]} ->
+      {:fn, fn_meta, [{:->, meta, [args, body]}]} ->
         {args, input_types} = compute_and_erase_types(args, __CALLER__)
 
         {body, output_type} =
@@ -30,31 +30,18 @@ defmodule Deft do
 
         fn_type = Type.Fn.new(input_types, output_type)
 
-        annotate({:->, meta, [args, body]}, fn_type)
+        annotate({:fn, fn_meta, [{:->, meta, [args, body]}]}, fn_type)
 
-      {:fn, meta, [arrow]} ->
-        {arrow, arrow_type} = compute_and_erase_type(arrow, __CALLER__)
-
-        annotate({:fn, meta, [arrow]}, arrow_type)
-
-      {:., meta, [e]} ->
+      {{:., dot_meta, [e]}, meta, args} ->
         {e, e_t} = compute_and_erase_type(e, __CALLER__)
 
-        annotate({:., meta, [e]}, e_t)
+        {args, args_t} = compute_and_erase_types(args, __CALLER__)
 
-      {{:type_rule, _, _} = e, meta, args} ->
-        {e, e_t} = compute_and_erase_type(e, __CALLER__)
-
-        case e do
-          {:., dot_meta, [e_fn]} ->
-            {args, args_t} = compute_and_erase_types(args, __CALLER__)
-
-            unless length(e_t.inputs) == length(args_t) and subtypes_of?(e_t.inputs, args_t) do
-              raise Deft.TypecheckingError, expected: e_t.inputs, actual: args_t
-            end
-
-            annotate({{:., dot_meta, [e_fn]}, meta, args}, e_t.output)
+        unless length(e_t.inputs) == length(args_t) and subtypes_of?(e_t.inputs, args_t) do
+          raise Deft.TypecheckingError, expected: e_t.inputs, actual: args_t
         end
+
+        annotate({{:., dot_meta, [e]}, meta, args}, e_t.output)
 
       {:elem, meta, [tuple, index]} ->
         {tuple, tuple_t} = compute_and_erase_type(tuple, __CALLER__)
@@ -92,17 +79,34 @@ defmodule Deft do
         else_branch = branches[:else]
 
         {predicate, predicate_t} = compute_and_erase_type(predicate, __CALLER__)
+        {do_branch, do_branch_t} = compute_and_erase_type(do_branch, __CALLER__)
+        {else_branch, else_branch_t} = compute_and_erase_type(else_branch, __CALLER__)
 
         unless subtype_of?(Type.Boolean.new(), predicate_t) do
           raise Deft.TypecheckingError, expected: Type.Boolean.new(), actual: predicate_t
         end
 
-        {do_branch, do_branch_t} = compute_and_erase_type(do_branch, __CALLER__)
-        {else_branch, else_branch_t} = compute_and_erase_type(else_branch, __CALLER__)
-
         type = Type.Union.new([do_branch_t, else_branch_t])
 
         annotate({:if, meta, [predicate, [do: do_branch, else: else_branch]]}, type)
+
+      {:cond, meta, [[do: branches]]} ->
+        {branches, branches_t} =
+          Enum.map(branches, fn {:->, meta, [[predicate], body]} ->
+            {predicate, predicate_t} = compute_and_erase_type(predicate, __CALLER__)
+            {body, body_t} = compute_and_erase_type(body, __CALLER__)
+
+            unless subtype_of?(Type.Boolean.new(), predicate_t) do
+              raise Deft.TypecheckingError, expected: Type.Boolean.new(), actual: predicate_t
+            end
+
+            {{:->, meta, [[predicate], body]}, body_t}
+          end)
+          |> Enum.unzip()
+
+        type = Type.Union.new(branches_t)
+
+        annotate({:cond, meta, [[do: branches]]}, type)
 
       {name, meta, context} ->
         {name, meta, context}
@@ -111,6 +115,15 @@ defmodule Deft do
 
   def wrap_type_rule(e) do
     case e do
+      {:->, meta, [args, body]} ->
+        {:->, meta, [args, body]}
+
+      {:fn, fn_meta, [arrow]} ->
+        {:type_rule, [], [{:fn, fn_meta, [arrow]}]}
+
+      {:., meta, args} ->
+        {:., meta, args}
+
       {f, m, a} ->
         {:type_rule, [], [{f, m, a}]}
 
