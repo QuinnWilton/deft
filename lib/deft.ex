@@ -82,6 +82,36 @@ defmodule Deft do
 
         annotate({:-, meta, [e]}, e_t)
 
+      {:if, meta, [predicate, branches]} ->
+        do_branch = branches[:do]
+        else_branch = branches[:else]
+
+        {predicate, predicate_t} = compute_and_erase_type(predicate, __CALLER__)
+
+        unless subtype_of?(Type.Boolean.new(), predicate_t) do
+          raise Deft.TypecheckingError, expected: Type.Boolean.new(), actual: predicate_t
+        end
+
+        {do_branch, do_branch_t} = compute_and_erase_type(do_branch, __CALLER__)
+        {else_branch, else_branch_t} = compute_and_erase_type(else_branch, __CALLER__)
+
+        type =
+          cond do
+            do_branch_t == else_branch_t ->
+              do_branch_t
+
+            subtype_of?(do_branch_t, else_branch_t) ->
+              do_branch_t
+
+            subtype_of?(else_branch_t, do_branch_t) ->
+              else_branch_t
+
+            :else ->
+              Type.Union.new([do_branch_t, else_branch_t])
+          end
+
+        annotate({:if, meta, [predicate, [do: do_branch, else: else_branch]]}, type)
+
       {name, meta, context} ->
         {name, meta, context}
     end
