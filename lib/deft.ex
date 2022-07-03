@@ -138,21 +138,47 @@ defmodule Deft do
 
       {:cond, meta, [[do: branches]]} ->
         {branches, branches_t} =
-          Enum.map(branches, fn {:->, meta, [[predicate], body]} ->
-            {predicate, predicate_t} = compute_and_erase_type(predicate, __CALLER__)
-            {body, body_t} = compute_and_erase_type(body, __CALLER__)
+          Enum.map(branches, fn
+            {:->, meta, [[predicate], body]} ->
+              {predicate, predicate_t} = compute_and_erase_type(predicate, __CALLER__)
+              {body, body_t} = compute_and_erase_type(body, __CALLER__)
 
-            unless subtype_of?(Type.Boolean.new(), predicate_t) do
-              raise Deft.TypecheckingError, expected: Type.Boolean.new(), actual: predicate_t
-            end
+              unless subtype_of?(Type.Boolean.new(), predicate_t) do
+                raise Deft.TypecheckingError, expected: Type.Boolean.new(), actual: predicate_t
+              end
 
-            {{:->, meta, [[predicate], body]}, body_t}
+              {{:->, meta, [[predicate], body]}, body_t}
           end)
           |> Enum.unzip()
 
         type = Type.Union.new(branches_t)
 
         annotate({:cond, meta, [[do: branches]]}, type)
+
+      {:case, meta, args} when is_list(args) ->
+        {subjects, [[do: branches]]} = Enum.split(args, -1)
+        {subjects, subject_ts} = compute_and_erase_types(subjects, __CALLER__)
+
+        {branches, branches_t} =
+          Enum.map(branches, fn
+            # TODO: Pattern matching. Most uses of case will fail.
+            {:->, meta, [patterns, body]} when is_list(patterns) ->
+              patterns = erase_types(patterns, __CALLER__)
+
+              {body, body_t} =
+                compute_and_erase_type_in_context(
+                  body,
+                  Enum.zip(patterns, subject_ts),
+                  __CALLER__
+                )
+
+              {{:->, meta, [patterns, body]}, body_t}
+          end)
+          |> Enum.unzip()
+
+        type = Type.Union.new(branches_t)
+
+        annotate({:case, meta, subjects ++ [do: branches]}, type)
 
       {name, meta, args} when is_list(args) ->
         if Enum.member?(@supported_guards, {name, length(args)}) do

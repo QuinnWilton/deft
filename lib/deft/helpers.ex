@@ -84,6 +84,10 @@ defmodule Deft.Helpers do
     |> delete_annotation()
   end
 
+  def erase_types(es, env) do
+    Enum.map(es, &erase_type(&1, env))
+  end
+
   def compute_and_erase_type(e, env) do
     e = local_expand(e, env)
     erased = delete_annotation(e)
