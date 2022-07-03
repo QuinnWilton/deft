@@ -1,7 +1,61 @@
 defmodule Deft do
   import Deft.Helpers
 
+  alias Deft.Guards
   alias Deft.Type
+
+  @supported_guards [
+    !=: 2,
+    !==: 2,
+    *: 2,
+    +: 1,
+    +: 2,
+    -: 1,
+    -: 2,
+    /: 2,
+    <: 2,
+    <=: 2,
+    ==: 2,
+    ===: 2,
+    >: 2,
+    >=: 2,
+    abs: 1,
+    # binary_part: 3,
+    # bit_size: 1,
+    # byte_size: 1,
+    ceil: 1,
+    div: 2,
+    elem: 2,
+    floor: 1,
+    # hd: 1,
+    is_atom: 1,
+    # is_binary: 1,
+    # is_bitstring: 1,
+    is_boolean: 1,
+    is_float: 1,
+    is_function: 1,
+    is_function: 2,
+    is_integer: 1,
+    # is_list: 1,
+    # is_map: 1,
+    # is_map_key: 2,
+    is_number: 1,
+    # is_pid: 1,
+    # is_port: 1,
+    # is_reference: 1,
+    is_tuple: 1,
+    # length: 1,
+    # map_size: 1,
+    # node: 0,
+    # node: 1,
+    not: 1,
+    rem: 2,
+    round: 1,
+    # self: 0,
+    # tl: 1,
+    trunc: 1,
+    tuple_size: 1
+  ]
 
   defmacro compile(e) do
     e
@@ -43,36 +97,10 @@ defmodule Deft do
 
         annotate({{:., dot_meta, [e]}, meta, args}, e_t.output)
 
-      {:elem, meta, [tuple, index]} ->
-        {tuple, tuple_t} = compute_and_erase_type(tuple, __CALLER__)
-        {index, index_t} = compute_and_erase_type(index, __CALLER__)
-
-        unless is_struct(tuple_t, Type.Tuple) do
-          raise "Expected a tuple"
-        end
-
-        unless subtype_of?(Type.Integer.new(), index_t) do
-          raise Deft.TypecheckingError, expected: Type.Integer.new(), actual: index_t
-        end
-
-        type =
-          tuple_t
-          |> Type.Tuple.unique_types()
-          |> Type.Union.new()
-
-        annotate({:elem, meta, [tuple, index]}, type)
-
       {:{}, tuple_meta, es} ->
         {es, e_ts} = compute_and_erase_types(es, __CALLER__)
 
         annotate({:{}, tuple_meta, es}, Type.Tuple.new(e_ts))
-
-      # HACK? Macro.expand_once(quote do -1 end) expands to 1, but
-      #       Macro.expand_once(quote do -1.0 end) does not
-      {:-, meta, [e]} ->
-        {e, e_t} = compute_and_erase_type(e, __CALLER__)
-
-        annotate({:-, meta, [e]}, e_t)
 
       {:if, meta, [predicate, branches]} ->
         do_branch = branches[:do]
@@ -108,8 +136,17 @@ defmodule Deft do
 
         annotate({:cond, meta, [[do: branches]]}, type)
 
-      {name, meta, context} ->
-        {name, meta, context}
+      {name, meta, args} when is_list(args) ->
+        if Enum.member?(@supported_guards, {name, length(args)}) do
+          {args, t} = Guards.handle_guard(name, args, __CALLER__)
+
+          annotate({name, meta, args}, t)
+        else
+          {name, meta, args}
+        end
+
+      {name, meta, args} ->
+        {name, meta, args}
     end
   end
 
