@@ -76,6 +76,24 @@ defmodule Deft do
 
   defmacro type_rule(e) do
     case e do
+      {:__block__, meta, exprs} ->
+        {exprs, _ctx, block_t} =
+          Enum.reduce(exprs, {[], [], nil}, fn
+            # TODO: Only simple assignment so far, no pattern matching
+            {:=, meta, [a, b]}, {exprs, ctx, _} ->
+              a = erase_type(a, __CALLER__)
+              {b, b_t} = compute_and_erase_type_in_context(b, ctx, __CALLER__)
+
+              {exprs ++ [{:=, meta, [a, b]}], ctx ++ [{a, b_t}], b_t}
+
+            expr, {exprs, ctx, _} ->
+              {expr, expr_t} = compute_and_erase_type_in_context(expr, ctx, __CALLER__)
+
+              {exprs ++ [expr], ctx, expr_t}
+          end)
+
+        annotate({:__block__, meta, exprs}, block_t)
+
       {:fn, fn_meta, [{:->, meta, [args, body]}]} ->
         {args, input_types} = compute_and_erase_types(args, __CALLER__)
 
@@ -152,6 +170,9 @@ defmodule Deft do
 
   def wrap_type_rule(e) do
     case e do
+      {:=, meta, [left, right]} ->
+        {:=, meta, [left, right]}
+
       {:->, meta, [args, body]} ->
         {:->, meta, [args, body]}
 
