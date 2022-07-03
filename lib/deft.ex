@@ -57,16 +57,16 @@ defmodule Deft do
     tuple_size: 1
   ]
 
-  defmacro compile(e) do
-    e
+  defmacro compile(do: block) do
+    block
     |> Macro.postwalk(&Deft.handle_annotations/1)
     |> Macro.postwalk(&Deft.wrap_type_rule/1)
     |> Deft.Helpers.compute_and_erase_type(__ENV__)
     |> elem(0)
   end
 
-  defmacro type(e) do
-    e
+  defmacro type(do: block) do
+    block
     |> Macro.postwalk(&Deft.handle_annotations/1)
     |> Macro.postwalk(&Deft.wrap_type_rule/1)
     |> Deft.Helpers.compute_and_erase_type(__ENV__)

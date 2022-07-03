@@ -13,7 +13,10 @@ defmodule DeftTest do
       Code.eval_quoted(
         quote do
           require Deft
-          Deft.compile(unquote(ast))
+
+          Deft.compile do
+            unquote(ast)
+          end
         end
       )
 
@@ -25,7 +28,10 @@ defmodule DeftTest do
       Code.eval_quoted(
         quote do
           require Deft
-          Deft.type(unquote(ast))
+
+          Deft.type do
+            unquote(ast)
+          end
         end
       )
 
