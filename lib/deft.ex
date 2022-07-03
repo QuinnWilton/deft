@@ -4,13 +4,11 @@ defmodule Deft do
   alias Deft.Type
 
   defmacro compile(e) do
-    quote do
-      Macro.escape(unquote(e), unquote: true)
-      |> Macro.postwalk(&Deft.handle_annotations/1)
-      |> Macro.postwalk(&Deft.wrap_type_rule/1)
-      |> Deft.Helpers.compute_and_erase_type(__ENV__)
-      |> elem(0)
-    end
+    e
+    |> Macro.postwalk(&Deft.handle_annotations/1)
+    |> Macro.postwalk(&Deft.wrap_type_rule/1)
+    |> Deft.Helpers.compute_and_erase_type(__ENV__)
+    |> elem(0)
   end
 
   defmacro type(e) do

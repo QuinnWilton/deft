@@ -8,6 +8,18 @@ defmodule DeftTest do
 
   alias Deft.Type
 
+  def compile(ast) do
+    {result, _} =
+      Code.eval_quoted(
+        quote do
+          require Deft
+          Deft.compile(unquote(ast))
+        end
+      )
+
+    result
+  end
+
   def get_type(ast) do
     {type, _} =
       Code.eval_quoted(
@@ -18,6 +30,23 @@ defmodule DeftTest do
       )
 
     type
+  end
+
+  property "compile/1 succeeds when the AST is correctly typed" do
+    check(
+      all(
+        fn_type <- fn_type(),
+        fn_code <- inhabitant_of(fn_type),
+        args <- fixed_list(Enum.map(fn_type.inputs, &inhabitant_of/1))
+      ) do
+        ast =
+          quote do
+            unquote(fn_code).(unquote_splicing(args))
+          end
+
+        compile(ast)
+      end
+    )
   end
 
   property "type/1 returns the type of an expression" do
@@ -72,33 +101,22 @@ defmodule DeftTest do
   end
 
   def fn_type() do
-    bind(positive_integer(), fn arity ->
-      inputs = list_of(primitive_type(), length: arity - 1)
-      output = primitive_type()
-
-      map({inputs, output}, fn {inputs, output} ->
+    bind(list_of(primitive_type(), max_length: 8), fn inputs ->
+      map(primitive_type(), fn output ->
         Type.Fn.new(inputs, output)
       end)
     end)
   end
 
   def tuple_type() do
-    bind(positive_integer(), fn arity ->
-      elements = list_of(primitive_type(), length: arity - 1)
-
-      map(elements, fn elements ->
-        Type.Tuple.new(elements)
-      end)
+    bind(list_of(primitive_type(), max_length: 8), fn elements ->
+      constant(Type.Tuple.new(elements))
     end)
   end
 
   def union_type() do
-    bind(positive_integer(), fn number_of_elements ->
-      elements = list_of(primitive_type(), length: number_of_elements)
-
-      map(elements, fn elements ->
-        Type.Union.new(elements)
-      end)
+    bind(list_of(primitive_type(), min_length: 1, max_length: 8), fn elements ->
+      constant(Type.Union.new(elements))
     end)
   end
 
