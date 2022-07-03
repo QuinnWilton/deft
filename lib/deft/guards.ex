@@ -7,7 +7,6 @@ defmodule Deft.Guards do
   @unary_math [:-, :abs, :ceil, :floor, :round, :trunc]
   @binary_math [:*, :+, :-]
   @integer_division [:rem, :div]
-  @size_guards [:tuple_size]
 
   @type_guards [
     :is_atom,
@@ -16,7 +15,8 @@ defmodule Deft.Guards do
     :is_function,
     :is_integer,
     :is_number,
-    :is_tuple
+    :is_tuple,
+    :is_list
   ]
 
   def handle_guard(name, [a, b], env) when name in @comparisons do
@@ -100,10 +100,26 @@ defmodule Deft.Guards do
     {[a, b], Type.Float.new()}
   end
 
-  def handle_guard(name, [term], env) when name in @size_guards do
-    term = erase_type(term, env)
+  def handle_guard(:tuple_size, [term], env) do
+    {term, term_t} = compute_and_erase_type(term, env)
+
+    unless is_struct(term_t, Type.Tuple) do
+      # TODO This doesn't handle unions. I need a way of checking if a type
+      # subtypes any tuple
+      raise Deft.TypecheckingError, expected: Type.Tuple.new([Type.Top.new()]), actual: term_t
+    end
 
     {[term], Type.Integer.new()}
+  end
+
+  def handle_guard(:length, [term], env) do
+    {term, term_t} = compute_and_erase_type(term, env)
+
+    unless subtype_of?(Type.List.new(Type.Top.new()), term_t) do
+      raise Deft.TypecheckingError, expected: Type.List.new(Type.Top.new()), actual: term_t
+    end
+
+    {[term], term_t}
   end
 
   def handle_guard(name, [term], env) when name in @type_guards do
@@ -128,6 +144,26 @@ defmodule Deft.Guards do
 
     unless subtype_of?(Type.Boolean.new(), term_t) do
       raise Deft.TypecheckingError, expected: Type.Integer.new(), actual: term_t
+    end
+
+    {[term], term_t}
+  end
+
+  def handle_guard(:hd, [term], env) do
+    {term, term_t} = compute_and_erase_type(term, env)
+
+    unless subtype_of?(Type.List.new(Type.Top.new()), term_t) do
+      raise Deft.TypecheckingError, expected: Type.List.new(Type.Top.new()), actual: term_t
+    end
+
+    {[term], Type.List.contents(term_t)}
+  end
+
+  def handle_guard(:tl, [term], env) do
+    {term, term_t} = compute_and_erase_type(term, env)
+
+    unless subtype_of?(Type.List.new(Type.Top.new()), term_t) do
+      raise Deft.TypecheckingError, expected: Type.List.new(Type.Top.new()), actual: term_t
     end
 
     {[term], term_t}

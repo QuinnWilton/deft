@@ -1,4 +1,7 @@
 defmodule Deft.Type.Tuple do
+  alias Deft.Helpers
+  alias Deft.Type
+
   @enforce_keys [:elements]
   defstruct @enforce_keys
 
@@ -17,11 +20,11 @@ defmodule Deft.Type.Tuple do
   end
 
   defimpl Deft.Type do
-    def subtype_of?(t1, %Deft.Type.Tuple{} = t2) do
+    def subtype_of?(t1, %Type.Tuple{} = t2) do
       elements = Enum.zip(t1.elements, t2.elements)
 
       Enum.all?(elements, fn {te1, te2} ->
-        Deft.Type.subtype_of?(te1, te2)
+        Helpers.subtype_of?(te1, te2)
       end)
     end
 

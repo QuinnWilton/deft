@@ -27,7 +27,7 @@ defmodule Deft do
     div: 2,
     elem: 2,
     floor: 1,
-    # hd: 1,
+    hd: 1,
     is_atom: 1,
     # is_binary: 1,
     # is_bitstring: 1,
@@ -36,7 +36,7 @@ defmodule Deft do
     is_function: 1,
     is_function: 2,
     is_integer: 1,
-    # is_list: 1,
+    is_list: 1,
     # is_map: 1,
     # is_map_key: 2,
     is_number: 1,
@@ -44,7 +44,7 @@ defmodule Deft do
     # is_port: 1,
     # is_reference: 1,
     is_tuple: 1,
-    # length: 1,
+    length: 1,
     # map_size: 1,
     # node: 0,
     # node: 1,
@@ -52,7 +52,7 @@ defmodule Deft do
     rem: 2,
     round: 1,
     # self: 0,
-    # tl: 1,
+    tl: 1,
     trunc: 1,
     tuple_size: 1
   ]
@@ -95,6 +95,7 @@ defmodule Deft do
         annotate({:__block__, meta, exprs}, block_t)
 
       {:fn, fn_meta, [{:->, meta, [args, body]}]} ->
+        args = local_expand(args, __CALLER__)
         {args, input_types} = compute_and_erase_types(args, __CALLER__)
 
         {body, output_type} =
@@ -115,12 +116,8 @@ defmodule Deft do
 
         annotate({{:., dot_meta, [e]}, meta, args}, e_t.output)
 
-      {:{}, tuple_meta, es} ->
-        {es, e_ts} = compute_and_erase_types(es, __CALLER__)
-
-        annotate({:{}, tuple_meta, es}, Type.Tuple.new(e_ts))
-
       {:if, meta, [predicate, branches]} ->
+        branches = local_expand(branches, __CALLER__)
         do_branch = branches[:do]
         else_branch = branches[:else]
 
@@ -136,10 +133,14 @@ defmodule Deft do
 
         annotate({:if, meta, [predicate, [do: do_branch, else: else_branch]]}, type)
 
-      {:cond, meta, [[do: branches]]} ->
+      {:cond, meta, [branches]} ->
+        [do: branches] = local_expand(branches, __CALLER__)
+        branches = local_expand(branches, __CALLER__)
+
         {branches, branches_t} =
           Enum.map(branches, fn
-            {:->, meta, [[predicate], body]} ->
+            {:->, meta, [predicate, body]} ->
+              [predicate] = local_expand(predicate, __CALLER__)
               {predicate, predicate_t} = compute_and_erase_type(predicate, __CALLER__)
               {body, body_t} = compute_and_erase_type(body, __CALLER__)
 
@@ -155,30 +156,44 @@ defmodule Deft do
 
         annotate({:cond, meta, [[do: branches]]}, type)
 
-      {:case, meta, args} when is_list(args) ->
-        {subjects, [[do: branches]]} = Enum.split(args, -1)
-        {subjects, subject_ts} = compute_and_erase_types(subjects, __CALLER__)
+      {:case, meta, [subject, branches]} ->
+        [do: branches] = local_expand(branches, __CALLER__)
+        {subject, subject_t} = compute_and_erase_type(subject, __CALLER__)
 
         {branches, branches_t} =
           Enum.map(branches, fn
             # TODO: Pattern matching. Most uses of case will fail.
-            {:->, meta, [patterns, body]} when is_list(patterns) ->
-              patterns = erase_types(patterns, __CALLER__)
+            {:->, meta, [pattern, body]} ->
+              [pattern] = local_expand(pattern, __CALLER__)
 
               {body, body_t} =
                 compute_and_erase_type_in_context(
                   body,
-                  Enum.zip(patterns, subject_ts),
+                  [{pattern, subject_t}],
                   __CALLER__
                 )
 
-              {{:->, meta, [patterns, body]}, body_t}
+              {{:->, meta, [[pattern], body]}, body_t}
           end)
           |> Enum.unzip()
 
         type = Type.Union.new(branches_t)
 
-        annotate({:case, meta, subjects ++ [do: branches]}, type)
+        annotate({:case, meta, [subject, [do: branches]]}, type)
+
+      {:{}, tuple_meta, es} ->
+        {es, e_ts} = compute_and_erase_types(es, __CALLER__)
+
+        annotate({:{}, tuple_meta, es}, Type.Tuple.new(e_ts))
+
+      {a, b} ->
+        a = local_expand(a, __CALLER__)
+        b = local_expand(b, __CALLER__)
+
+        {a, b}
+
+      es when is_list(e) ->
+        Enum.map(es, &local_expand(&1, __CALLER__))
 
       {name, meta, args} when is_list(args) ->
         if Enum.member?(@supported_guards, {name, length(args)}) do
@@ -210,6 +225,12 @@ defmodule Deft do
 
       {f, m, a} ->
         {:type_rule, [], [{f, m, a}]}
+
+      {a, b} ->
+        {:type_rule, [], [{a, b}]}
+
+      e when is_list(e) ->
+        {:type_rule, [], [e]}
 
       e ->
         e
@@ -273,6 +294,9 @@ defmodule Deft do
         output = parse_type(output)
 
         Type.Fn.new(inputs, output)
+
+      [type] ->
+        Type.List.new(parse_type(type))
     end
   end
 end

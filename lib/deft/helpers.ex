@@ -37,6 +37,12 @@ defmodule Deft.Helpers do
   def type_of(e) when is_float(e), do: Type.Float.new()
   def type_of(e) when is_number(e), do: Type.Number.new()
 
+  def type_of(e) when is_list(e) do
+    e_ts = types_of(e)
+
+    Type.List.new(Type.Union.new(e_ts))
+  end
+
   def type_of(e) do
     raise Deft.MissingTypeError, expr: e
   end
@@ -76,6 +82,10 @@ defmodule Deft.Helpers do
     e
     |> local_expand(env)
     |> type_of()
+  end
+
+  def compute_types(es, env) do
+    Enum.map(es, &compute_type(&1, env))
   end
 
   def erase_type(e, env) do

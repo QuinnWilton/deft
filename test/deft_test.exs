@@ -123,7 +123,8 @@ defmodule DeftTest do
     one_of([
       fn_type(),
       tuple_type(),
-      union_type()
+      union_type(),
+      list_type()
     ])
   end
 
@@ -160,6 +161,12 @@ defmodule DeftTest do
   def union_type() do
     bind(list_of(primitive_type(), min_length: 1, max_length: 8), fn elements ->
       constant(Type.Union.new(elements))
+    end)
+  end
+
+  def list_type() do
+    bind(primitive_type(), fn type ->
+      constant(Type.List.new(type))
     end)
   end
 
@@ -203,6 +210,9 @@ defmodule DeftTest do
 
       %Type.Union{} ->
         union_inhabitant(type)
+
+      %Type.List{} ->
+        list_inhabitant(type)
     end
   end
 
@@ -284,6 +294,13 @@ defmodule DeftTest do
     |> one_of()
   end
 
+  def list_inhabitant(type) do
+    type
+    |> Type.List.contents()
+    |> inhabitant_of()
+    |> list_of(min_length: 1)
+  end
+
   def annotation_for(type) do
     case type do
       %Type.Atom{} ->
@@ -334,6 +351,9 @@ defmodule DeftTest do
         Enum.reduce(rest, annotation_for(first), fn t, acc ->
           {:|, [], [annotation_for(t), acc]}
         end)
+
+      %Type.List{} ->
+        [annotation_for(Type.List.contents(type))]
     end
   end
 
