@@ -4,20 +4,22 @@ defmodule Deft do
   alias Deft.Type
 
   defmacro compile(e) do
-    e
-    |> Macro.postwalk(&handle_annotations/1)
-    |> Macro.postwalk(&wrap_type_rule/1)
-    |> compute_and_erase_type(__CALLER__)
-    |> elem(0)
+    quote do
+      Macro.escape(unquote(e), unquote: true)
+      |> Macro.postwalk(&Deft.handle_annotations/1)
+      |> Macro.postwalk(&Deft.wrap_type_rule/1)
+      |> Deft.Helpers.compute_and_erase_type(__ENV__)
+      |> elem(0)
+    end
   end
 
   defmacro type(e) do
     e
-    |> Macro.postwalk(&handle_annotations/1)
-    |> Macro.postwalk(&wrap_type_rule/1)
-    |> compute_and_erase_type(__CALLER__)
+    |> Macro.postwalk(&Deft.handle_annotations/1)
+    |> Macro.postwalk(&Deft.wrap_type_rule/1)
+    |> Deft.Helpers.compute_and_erase_type(__ENV__)
     |> elem(1)
-    |> inspect()
+    |> Macro.escape()
   end
 
   defmacro type_rule(e) do
@@ -72,8 +74,8 @@ defmodule Deft do
       {:{}, tuple_meta, es} ->
         {:type_rule, [], [{:{}, tuple_meta, es}]}
 
-      {:elem = f, meta, a} ->
-        {:type_rule, [], [{f, meta, a}]}
+      {:elem, meta, a} ->
+        {:type_rule, [], [{:elem, meta, a}]}
 
       e ->
         e

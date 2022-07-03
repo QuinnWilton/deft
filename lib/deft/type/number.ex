@@ -10,6 +10,7 @@ defmodule Deft.Type.Number do
 
   defimpl Deft.Type do
     def subtype_of?(_t1, t2)
+        when is_struct(t2, Type.Number)
         when is_struct(t2, Type.Integer)
         when is_struct(t2, Type.Float) do
       true
