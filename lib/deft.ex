@@ -58,6 +58,13 @@ defmodule Deft do
         {es, e_ts} = compute_and_erase_types(es, __CALLER__)
 
         annotate({:{}, tuple_meta, es}, Type.Tuple.new(e_ts))
+
+      # HACK? Macro.expand_once(quote do -1 end) expands to 1, but
+      #       Macro.expand_once(quote do -1.0 end) does not
+      {:-, meta, [e]} ->
+        {e, e_t} = compute_and_erase_type(e, __CALLER__)
+
+        annotate({:-, meta, [e]}, e_t)
     end
   end
 
@@ -74,6 +81,9 @@ defmodule Deft do
 
       {:elem, meta, a} ->
         {:type_rule, [], [{:elem, meta, a}]}
+
+      {:-, meta, a} ->
+        {:type_rule, [], [{:-, meta, a}]}
 
       e ->
         e

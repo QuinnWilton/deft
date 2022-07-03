@@ -49,6 +49,43 @@ defmodule DeftTest do
     )
   end
 
+  property "compile/1 fails when the AST is incorrectly typed" do
+    check(
+      all(
+        fn_type <- fn_type(),
+        fn_code <- inhabitant_of(fn_type),
+        arg_types <- list_of(type(), length: length(fn_type.inputs)),
+        args <- fixed_list(Enum.map(arg_types, &inhabitant_of/1))
+      ) do
+        arg_functions =
+          Enum.zip(args, arg_types)
+          |> Enum.map(fn {x, t} ->
+            f = identity_fn(t)
+
+            quote do
+              unquote(f).(unquote(x))
+            end
+          end)
+
+        ast =
+          quote do
+            unquote(fn_code).(unquote_splicing(arg_functions))
+          end
+
+        subtypes? =
+          Enum.all?(Enum.zip(fn_type.inputs, arg_types), fn {fn_type, arg_type} ->
+            Deft.Helpers.subtype_of?(fn_type, arg_type)
+          end)
+
+        unless subtypes? do
+          assert_raise(Deft.TypecheckingError, fn ->
+            compile(ast)
+          end)
+        end
+      end
+    )
+  end
+
   property "type/1 returns the type of an expression" do
     check all(
             type <- type(),
@@ -193,6 +230,16 @@ defmodule DeftTest do
     end)
   end
 
+  def identity_fn(type) do
+    args = [{:"::", [], [{:x, [], __MODULE__}, annotation_for(type)]}]
+
+    quote do
+      fn unquote_splicing(args) ->
+        x
+      end
+    end
+  end
+
   def integer_inhabitant(_) do
     integer()
   end
@@ -217,10 +264,9 @@ defmodule DeftTest do
   def tuple_inhabitant(type) do
     type.elements
     |> Enum.map(&inhabitant_of/1)
-    |> List.to_tuple()
-    |> tuple()
-    |> map(fn tuple ->
-      Macro.escape(tuple)
+    |> fixed_list()
+    |> map(fn elements ->
+      {:{}, [], elements}
     end)
   end
 
@@ -246,11 +292,8 @@ defmodule DeftTest do
 
       %Type.Fn{} ->
         inputs =
-          length(type.inputs)
-          |> Macro.generate_unique_arguments(__MODULE__)
-          |> Enum.zip(type.inputs)
-          |> Enum.map(fn {x, t} ->
-            {:"::", [], [x, annotation_for(t)]}
+          Enum.map(type.inputs, fn t ->
+            annotation_for(t)
           end)
 
         output = annotation_for(type.output)
@@ -270,14 +313,15 @@ defmodule DeftTest do
         {:top, [], nil}
 
       %Type.Tuple{} ->
-        type.elements
-        |> Enum.map(&annotation_for/1)
-        |> List.to_tuple()
-        |> Macro.escape()
+        elements = Enum.map(type.elements, &annotation_for/1)
+
+        {:{}, [], elements}
 
       %Type.Union{} ->
-        Enum.reduce(type.elements, fn t, acc ->
-          {:|, [], [t, acc]}
+        [first | rest] = Enum.to_list(type.elements)
+
+        Enum.reduce(rest, annotation_for(first), fn t, acc ->
+          {:|, [], [annotation_for(t), acc]}
         end)
     end
   end

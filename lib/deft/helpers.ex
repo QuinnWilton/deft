@@ -33,8 +33,8 @@ defmodule Deft.Helpers do
   # is_boolean/1 must be checked before is_atom/1
   def type_of(e) when is_boolean(e), do: Type.Boolean.new()
   def type_of(e) when is_atom(e), do: Type.Atom.new()
-  def type_of(e) when is_float(e), do: Type.Float.new()
   def type_of(e) when is_integer(e), do: Type.Integer.new()
+  def type_of(e) when is_float(e), do: Type.Float.new()
   def type_of(e) when is_number(e), do: Type.Number.new()
 
   def type_of(e) do
@@ -53,6 +53,12 @@ defmodule Deft.Helpers do
 
   def types_of(es) do
     Enum.map(es, &type_of/1)
+  end
+
+  def subtype_of?(t1, %Type.Union{} = t2) do
+    Enum.all?(t2.elements, fn te2 ->
+      Deft.Type.subtype_of?(t1, te2)
+    end)
   end
 
   def subtype_of?(t1, t2) do

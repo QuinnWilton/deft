@@ -1,4 +1,6 @@
 defmodule Deft.Type.Integer do
+  alias Deft.Type
+
   @enforce_keys []
   defstruct @enforce_keys
 
@@ -7,11 +9,11 @@ defmodule Deft.Type.Integer do
   end
 
   defimpl Deft.Type do
-    def subtype_of?(t, t) do
+    def subtype_of?(_, t) when is_struct(t, Type.Integer) do
       true
     end
 
-    def subtype_of?(_t1, _t2) do
+    def subtype_of?(_, _) do
       false
     end
   end

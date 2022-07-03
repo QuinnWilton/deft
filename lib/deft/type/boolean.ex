@@ -1,4 +1,6 @@
 defmodule Deft.Type.Boolean do
+  alias Deft.Type
+
   @enforce_keys []
   defstruct @enforce_keys
 
@@ -7,8 +9,12 @@ defmodule Deft.Type.Boolean do
   end
 
   defimpl Deft.Type do
-    def subtype_of?(t1, t2) do
-      t1 == t2
+    def subtype_of?(_, t) when is_struct(t, Type.Boolean) do
+      true
+    end
+
+    def subtype_of?(_, _) do
+      false
     end
   end
 
