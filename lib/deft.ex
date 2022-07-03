@@ -22,23 +22,39 @@ defmodule Deft do
 
   defmacro type_rule(e) do
     case e do
-      {:fn, fn_meta, [:->, arrow_meta, [args, body]]} ->
-        {body, output_type} = compute_and_erase_type_in_context(body, args, __CALLER__)
+      {:->, meta, [args, body]} ->
         {args, input_types} = compute_and_erase_types(args, __CALLER__)
+
+        {body, output_type} =
+          compute_and_erase_type_in_context(body, Enum.zip(args, input_types), __CALLER__)
 
         fn_type = Type.Fn.new(input_types, output_type)
 
-        annotate({:fn, fn_meta, [{:->, arrow_meta, [args, body]}]}, fn_type)
+        annotate({:->, meta, [args, body]}, fn_type)
 
-      {{:., dot_meta, [e_fn]}, meta, args} ->
-        {e_fn, t_fn} = compute_and_erase_type(e_fn, __CALLER__)
-        {args, t_args} = compute_and_erase_types(args, __CALLER__)
+      {:fn, meta, [arrow]} ->
+        {arrow, arrow_type} = compute_and_erase_type(arrow, __CALLER__)
 
-        unless length(t_fn.inputs) == length(t_args) and subtypes_of?(t_fn.inputs, t_args) do
-          raise Deft.TypecheckingError, expected: t_fn.inputs, actual: t_args
+        annotate({:fn, meta, [arrow]}, arrow_type)
+
+      {:., meta, [e]} ->
+        {e, e_t} = compute_and_erase_type(e, __CALLER__)
+
+        annotate({:., meta, [e]}, e_t)
+
+      {{:type_rule, _, _} = e, meta, args} ->
+        {e, e_t} = compute_and_erase_type(e, __CALLER__)
+
+        case e do
+          {:., dot_meta, [e_fn]} ->
+            {args, args_t} = compute_and_erase_types(args, __CALLER__)
+
+            unless length(e_t.inputs) == length(args_t) and subtypes_of?(e_t.inputs, args_t) do
+              raise Deft.TypecheckingError, expected: e_t.inputs, actual: args_t
+            end
+
+            annotate({{:., dot_meta, [e_fn]}, meta, args}, e_t.output)
         end
-
-        annotate({{:., dot_meta, [e_fn]}, meta, args}, t_fn.output)
 
       {:elem, meta, [tuple, index]} ->
         {tuple, tuple_t} = compute_and_erase_type(tuple, __CALLER__)
@@ -65,25 +81,16 @@ defmodule Deft do
         {e, e_t} = compute_and_erase_type(e, __CALLER__)
 
         annotate({:-, meta, [e]}, e_t)
+
+      {name, meta, context} ->
+        {name, meta, context}
     end
   end
 
   def wrap_type_rule(e) do
     case e do
-      {:fn, fn_meta, [{:->, arrow_meta, [args, body]}]} ->
-        {:type_rule, [], [{:fn, fn_meta, [:->, arrow_meta, [args, body]]}]}
-
-      {{:., dot_meta, [dot_args]}, meta, args} ->
-        {:type_rule, [], [{{:., dot_meta, [dot_args]}, meta, args}]}
-
-      {:{}, tuple_meta, es} ->
-        {:type_rule, [], [{:{}, tuple_meta, es}]}
-
-      {:elem, meta, a} ->
-        {:type_rule, [], [{:elem, meta, a}]}
-
-      {:-, meta, a} ->
-        {:type_rule, [], [{:-, meta, a}]}
+      {f, m, a} ->
+        {:type_rule, [], [{f, m, a}]}
 
       e ->
         e

@@ -98,18 +98,10 @@ defmodule Deft.Helpers do
 
   def compute_and_erase_type_in_context(e, context, env) do
     e =
-      Enum.reduce(context, e, fn {x_f, x_m, x_a} = x, acc ->
+      Enum.reduce(context, e, fn {{x, _, x_a}, t}, acc ->
         Macro.postwalk(acc, fn
-          {a_f, a_m, a_a} = a ->
-            # TODO: Is this necessary?
-            x_counter = Keyword.take(x_m, [:counter])
-            a_counter = Keyword.take(a_m, [:counter])
-
-            if x_f == a_f and x_counter == a_counter and x_a == a_a do
-              annotate(a, type_of(x))
-            else
-              a
-            end
+          {^x, _, ^x_a} = a ->
+            annotate(a, t)
 
           e ->
             e
