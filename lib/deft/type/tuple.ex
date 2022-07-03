@@ -19,20 +19,6 @@ defmodule Deft.Type.Tuple do
     MapSet.new(tuple.elements)
   end
 
-  defimpl Deft.Type do
-    def subtype_of?(t1, %Type.Tuple{} = t2) do
-      elements = Enum.zip(t1.elements, t2.elements)
-
-      Enum.all?(elements, fn {te1, te2} ->
-        Helpers.subtype_of?(te1, te2)
-      end)
-    end
-
-    def subtype_of(_, _) do
-      false
-    end
-  end
-
   defimpl Inspect do
     import Inspect.Algebra
 

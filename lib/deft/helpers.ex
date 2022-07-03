@@ -1,6 +1,21 @@
 defmodule Deft.Helpers do
   alias Deft.Type
 
+  @type_modules [
+    Type.Atom,
+    Type.Boolean,
+    Type.Bottom,
+    Type.Float,
+    Type.Fn,
+    Type.Integer,
+    Type.List,
+    Type.Number,
+    Type.Number,
+    Type.Top,
+    Type.Tuple,
+    Type.Union
+  ]
+
   def annotate(e, t) do
     Macro.update_meta(e, &Keyword.put(&1, :__deft_type__, t))
   end
@@ -48,9 +63,7 @@ defmodule Deft.Helpers do
   end
 
   def type_well_formed?(t) when is_struct(t) do
-    {:consolidated, impls} = Type.__protocol__(:impls)
-
-    t.__struct__ in impls
+    t.__struct__ in @type_modules
   end
 
   def type_well_formed?(_) do
@@ -59,23 +72,6 @@ defmodule Deft.Helpers do
 
   def types_of(es) do
     Enum.map(es, &type_of/1)
-  end
-
-  def subtype_of?(t1, %Type.Union{} = t2) do
-    t2
-    |> Type.Union.types()
-    |> Enum.all?(fn te2 ->
-      Deft.Type.subtype_of?(t1, te2)
-    end)
-  end
-
-  def subtype_of?(t1, t2) do
-    Deft.Type.subtype_of?(t1, t2)
-  end
-
-  def subtypes_of?(t1s, t2s) do
-    Enum.zip(t1s, t2s)
-    |> Enum.all?(fn {t1, t2} -> subtype_of?(t1, t2) end)
   end
 
   def compute_type(e, env) do

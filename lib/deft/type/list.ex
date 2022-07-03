@@ -15,16 +15,6 @@ defmodule Deft.Type.List do
     list.contents
   end
 
-  defimpl Deft.Type do
-    def subtype_of?(t1, %Type.List{} = t2) do
-      Helpers.subtype_of?(@for.contents(t1), @for.contents(t2))
-    end
-
-    def subtype_of?(_, _) do
-      false
-    end
-  end
-
   defimpl Inspect do
     import Inspect.Algebra
 

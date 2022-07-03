@@ -110,7 +110,7 @@ defmodule Deft do
 
         {args, args_t} = compute_and_erase_types(args, __CALLER__)
 
-        unless length(e_t.inputs) == length(args_t) and subtypes_of?(e_t.inputs, args_t) do
+        unless length(e_t.inputs) == length(args_t) and Type.subtypes_of?(e_t.inputs, args_t) do
           raise Deft.TypecheckingError, expected: e_t.inputs, actual: args_t
         end
 
@@ -125,7 +125,7 @@ defmodule Deft do
         {do_branch, do_branch_t} = compute_and_erase_type(do_branch, __CALLER__)
         {else_branch, else_branch_t} = compute_and_erase_type(else_branch, __CALLER__)
 
-        unless subtype_of?(Type.Boolean.new(), predicate_t) do
+        unless Type.subtype_of?(Type.Boolean.new(), predicate_t) do
           raise Deft.TypecheckingError, expected: Type.Boolean.new(), actual: predicate_t
         end
 
@@ -144,7 +144,7 @@ defmodule Deft do
               {predicate, predicate_t} = compute_and_erase_type(predicate, __CALLER__)
               {body, body_t} = compute_and_erase_type(body, __CALLER__)
 
-              unless subtype_of?(Type.Boolean.new(), predicate_t) do
+              unless Type.subtype_of?(Type.Boolean.new(), predicate_t) do
                 raise Deft.TypecheckingError, expected: Type.Boolean.new(), actual: predicate_t
               end
 

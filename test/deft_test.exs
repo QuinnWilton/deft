@@ -80,7 +80,7 @@ defmodule DeftTest do
 
         subtypes? =
           Enum.all?(Enum.zip(fn_type.inputs, arg_types), fn {fn_type, arg_type} ->
-            Deft.Helpers.subtype_of?(fn_type, arg_type)
+            Deft.Type.subtype_of?(fn_type, arg_type)
           end)
 
         unless subtypes? do

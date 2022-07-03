@@ -29,7 +29,7 @@ defmodule Deft.Guards do
   def handle_guard(name, [a], env) when name in @unary_math do
     {a, a_t} = compute_and_erase_type(a, env)
 
-    unless subtype_of?(Type.Number.new(), a_t) do
+    unless Type.subtype_of?(Type.Number.new(), a_t) do
       raise Deft.TypecheckingError, expected: Type.Number.new(), actual: a_t
     end
 
@@ -40,11 +40,11 @@ defmodule Deft.Guards do
     {a, a_t} = compute_and_erase_type(a, env)
     {b, b_t} = compute_and_erase_type(b, env)
 
-    unless subtype_of?(Type.Number.new(), a_t) do
+    unless Type.subtype_of?(Type.Number.new(), a_t) do
       raise Deft.TypecheckingError, expected: Type.Number.new(), actual: a_t
     end
 
-    unless subtype_of?(Type.Number.new(), b_t) do
+    unless Type.subtype_of?(Type.Number.new(), b_t) do
       raise Deft.TypecheckingError, expected: Type.Number.new(), actual: b_t
     end
 
@@ -74,11 +74,11 @@ defmodule Deft.Guards do
     {a, a_t} = compute_and_erase_type(a, env)
     {b, b_t} = compute_and_erase_type(b, env)
 
-    unless subtype_of?(Type.Integer.new(), a_t) do
+    unless Type.subtype_of?(Type.Integer.new(), a_t) do
       raise Deft.TypecheckingError, expected: Type.Integer.new(), actual: a_t
     end
 
-    unless subtype_of?(Type.Integer.new(), b_t) do
+    unless Type.subtype_of?(Type.Integer.new(), b_t) do
       raise Deft.TypecheckingError, expected: Type.Integer.new(), actual: b_t
     end
 
@@ -89,11 +89,11 @@ defmodule Deft.Guards do
     {a, a_t} = compute_and_erase_type(a, env)
     {b, b_t} = compute_and_erase_type(b, env)
 
-    unless subtype_of?(Type.Number.new(), a_t) do
+    unless Type.subtype_of?(Type.Number.new(), a_t) do
       raise Deft.TypecheckingError, expected: Type.Number.new(), actual: a_t
     end
 
-    unless subtype_of?(Type.Number.new(), b_t) do
+    unless Type.subtype_of?(Type.Number.new(), b_t) do
       raise Deft.TypecheckingError, expected: Type.Number.new(), actual: b_t
     end
 
@@ -115,7 +115,7 @@ defmodule Deft.Guards do
   def handle_guard(:length, [term], env) do
     {term, term_t} = compute_and_erase_type(term, env)
 
-    unless subtype_of?(Type.List.new(Type.Top.new()), term_t) do
+    unless Type.subtype_of?(Type.List.new(Type.Top.new()), term_t) do
       raise Deft.TypecheckingError, expected: Type.List.new(Type.Top.new()), actual: term_t
     end
 
@@ -132,7 +132,7 @@ defmodule Deft.Guards do
     fun = erase_type(fun, env)
     {arity, arity_t} = compute_and_erase_type(arity, env)
 
-    unless subtype_of?(Type.Integer.new(), arity_t) do
+    unless Type.subtype_of?(Type.Integer.new(), arity_t) do
       raise Deft.TypecheckingError, expected: Type.Integer.new(), actual: arity_t
     end
 
@@ -142,7 +142,7 @@ defmodule Deft.Guards do
   def handle_guard(:not, [term], env) do
     {term, term_t} = compute_and_erase_type(term, env)
 
-    unless subtype_of?(Type.Boolean.new(), term_t) do
+    unless Type.subtype_of?(Type.Boolean.new(), term_t) do
       raise Deft.TypecheckingError, expected: Type.Integer.new(), actual: term_t
     end
 
@@ -152,7 +152,7 @@ defmodule Deft.Guards do
   def handle_guard(:hd, [term], env) do
     {term, term_t} = compute_and_erase_type(term, env)
 
-    unless subtype_of?(Type.List.new(Type.Top.new()), term_t) do
+    unless Type.subtype_of?(Type.List.new(Type.Top.new()), term_t) do
       raise Deft.TypecheckingError, expected: Type.List.new(Type.Top.new()), actual: term_t
     end
 
@@ -162,7 +162,7 @@ defmodule Deft.Guards do
   def handle_guard(:tl, [term], env) do
     {term, term_t} = compute_and_erase_type(term, env)
 
-    unless subtype_of?(Type.List.new(Type.Top.new()), term_t) do
+    unless Type.subtype_of?(Type.List.new(Type.Top.new()), term_t) do
       raise Deft.TypecheckingError, expected: Type.List.new(Type.Top.new()), actual: term_t
     end
 
@@ -177,7 +177,7 @@ defmodule Deft.Guards do
       raise "Expected a tuple"
     end
 
-    unless subtype_of?(Type.Integer.new(), index_t) do
+    unless Type.subtype_of?(Type.Integer.new(), index_t) do
       raise Deft.TypecheckingError, expected: Type.Integer.new(), actual: index_t
     end
 
