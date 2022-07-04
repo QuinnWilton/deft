@@ -42,18 +42,18 @@ defmodule Deft.ExampleTest do
         ]
       end
 
-    assert Type.List.new(
-             Type.Union.new([
-               Type.Tuple.new([
-                 Type.Union.new([
-                   Type.Tuple.new([
-                     Type.Atom.new(),
-                     Type.Atom.new(),
-                     Type.Integer.new()
+    assert Type.list(
+             Type.union([
+               Type.tuple([
+                 Type.union([
+                   Type.tuple([
+                     Type.atom(),
+                     Type.atom(),
+                     Type.integer()
                    ])
                  ]),
-                 Type.Union.new([
-                   Type.Atom.new()
+                 Type.union([
+                   Type.atom()
                  ])
                ])
              ])

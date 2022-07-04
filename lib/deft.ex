@@ -140,36 +140,36 @@ defmodule Deft do
   def parse_type(t) do
     case t do
       {:boolean, _, _} ->
-        Type.Boolean.new()
+        Type.boolean()
 
       {:atom, _, _} ->
-        Type.Atom.new()
+        Type.atom()
 
       {:float, _, _} ->
-        Type.Float.new()
+        Type.float()
 
       {:integer, _, _} ->
-        Type.Integer.new()
+        Type.integer()
 
       {:number, _, _} ->
-        Type.Number.new()
+        Type.number()
 
       {:top, _, _} ->
-        Type.Top.new()
+        Type.top()
 
       {:bottom, _, _} ->
-        Type.Bottom.new()
+        Type.bottom()
 
       {elem0, elem1} ->
         elem0 = parse_type(elem0)
         elem1 = parse_type(elem1)
 
-        Type.Tuple.new([elem0, elem1])
+        Type.tuple([elem0, elem1])
 
       {:{}, _, elements} ->
         elements = Enum.map(elements, &parse_type/1)
 
-        Type.Tuple.new(elements)
+        Type.tuple(elements)
 
       {:|, _, [t1, t2]} ->
         t1 = parse_type(t1)
@@ -183,10 +183,10 @@ defmodule Deft do
         inputs = Enum.map(inputs, &parse_type/1)
         output = parse_type(output)
 
-        Type.Fn.new(inputs, output)
+        Type.fun(inputs, output)
 
       [type] ->
-        Type.List.new(parse_type(type))
+        Type.list(parse_type(type))
     end
   end
 end

@@ -101,20 +101,20 @@ defmodule Deft.Helpers do
     elem0 = type_of(elem0)
     elem1 = type_of(elem1)
 
-    Type.Tuple.new([elem0, elem1])
+    Type.tuple([elem0, elem1])
   end
 
   # is_boolean/1 must be checked before is_atom/1
-  def type_of(e) when is_boolean(e), do: Type.Boolean.new()
-  def type_of(e) when is_atom(e), do: Type.Atom.new()
-  def type_of(e) when is_integer(e), do: Type.Integer.new()
-  def type_of(e) when is_float(e), do: Type.Float.new()
-  def type_of(e) when is_number(e), do: Type.Number.new()
+  def type_of(e) when is_boolean(e), do: Type.boolean()
+  def type_of(e) when is_atom(e), do: Type.atom()
+  def type_of(e) when is_integer(e), do: Type.integer()
+  def type_of(e) when is_float(e), do: Type.float()
+  def type_of(e) when is_number(e), do: Type.number()
 
   def type_of(e) when is_list(e) do
     e_ts = types_of(e)
 
-    Type.List.new(Type.Union.new(e_ts))
+    Type.list(Type.union(e_ts))
   end
 
   def type_of(e) do
@@ -225,7 +225,7 @@ defmodule Deft.Helpers do
         {body, output_type} =
           compute_and_erase_type_in_context(fun.body, Enum.zip(args, input_types), env)
 
-        type = Type.Fn.new(input_types, output_type)
+        type = Type.fun(input_types, output_type)
 
         annotate({:fn, fun.fn_meta, [{:->, fun.arrow_meta, [args, body]}]}, type)
 
@@ -247,8 +247,8 @@ defmodule Deft.Helpers do
         {do_branch, do_branch_t} = compute_and_erase_types(if_ast.do, env)
         {else_branch, else_branch_t} = compute_and_erase_types(if_ast.else, env)
 
-        unless Type.subtype_of?(Type.Boolean.new(), predicate_t) do
-          raise Deft.TypecheckingError, expected: Type.Boolean.new(), actual: predicate_t
+        unless Type.subtype_of?(Type.boolean(), predicate_t) do
+          raise Deft.TypecheckingError, expected: Type.boolean(), actual: predicate_t
         end
 
         type = Type.Union.new([do_branch_t, else_branch_t])
@@ -262,8 +262,8 @@ defmodule Deft.Helpers do
               {predicate, predicate_t} = compute_and_erase_types(branch.predicate, env)
               {body, body_t} = compute_and_erase_types(branch.body, env)
 
-              unless Type.subtype_of?(Type.Boolean.new(), predicate_t) do
-                raise Deft.TypecheckingError, expected: Type.Boolean.new(), actual: predicate_t
+              unless Type.subtype_of?(Type.boolean(), predicate_t) do
+                raise Deft.TypecheckingError, expected: Type.boolean(), actual: predicate_t
               end
 
               {{:->, branch.meta, [[predicate], body]}, body_t}
@@ -301,7 +301,7 @@ defmodule Deft.Helpers do
       %AST.Tuple{} = tuple ->
         {elements, element_ts} = compute_and_erase_types(tuple.elements, env)
 
-        annotate({:{}, tuple.meta, elements}, Type.Tuple.new(element_ts))
+        annotate({:{}, tuple.meta, elements}, Type.tuple(element_ts))
 
       %AST.Pair{} = pair ->
         fst = local_expand(pair.fst, env)

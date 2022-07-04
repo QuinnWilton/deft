@@ -129,57 +129,57 @@ defmodule DeftTest do
   end
 
   def atom_type() do
-    constant(Type.Atom.new())
+    constant(Type.atom())
   end
 
   def boolean_type() do
-    constant(Type.Boolean.new())
+    constant(Type.boolean())
   end
 
   def bottom_type() do
-    constant(Type.Bottom.new())
+    constant(Type.bottom())
   end
 
   def float_type() do
-    constant(Type.Float.new())
+    constant(Type.float())
   end
 
   def fn_type() do
     bind(list_of(primitive_type(), max_length: 8), fn inputs ->
       map(primitive_type(), fn output ->
-        Type.Fn.new(inputs, output)
+        Type.fun(inputs, output)
       end)
     end)
   end
 
   def tuple_type() do
     bind(list_of(primitive_type(), max_length: 8), fn elements ->
-      constant(Type.Tuple.new(elements))
+      constant(Type.tuple(elements))
     end)
   end
 
   def union_type() do
     bind(list_of(primitive_type(), min_length: 1, max_length: 8), fn elements ->
-      constant(Type.Union.new(elements))
+      constant(Type.union(elements))
     end)
   end
 
   def list_type() do
     bind(primitive_type(), fn type ->
-      constant(Type.List.new(type))
+      constant(Type.list(type))
     end)
   end
 
   def integer_type() do
-    constant(Type.Integer.new())
+    constant(Type.integer())
   end
 
   def number_type() do
-    constant(Type.Number.new())
+    constant(Type.number())
   end
 
   def top_type() do
-    constant(Type.Top.new())
+    constant(Type.top())
   end
 
   def inhabitant_of(type) do
