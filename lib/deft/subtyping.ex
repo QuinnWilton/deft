@@ -28,9 +28,10 @@ defmodule Deft.Subtyping do
     inputs = Enum.zip(t1.inputs, t2.inputs)
 
     inputs_subtype? =
-      Enum.all?(inputs, fn {ti1, ti2} ->
-        subtype_of?(ti2, ti1)
-      end)
+      length(t1.inputs) == length(t2.inputs) and
+        Enum.all?(inputs, fn {ti1, ti2} ->
+          subtype_of?(ti2, ti1)
+        end)
 
     output_subtype? = subtype_of?(t1.output, t2.output)
 
@@ -44,9 +45,10 @@ defmodule Deft.Subtyping do
   def subtype_of?(%Type.Tuple{} = t1, %Type.Tuple{} = t2) do
     elements = Enum.zip(t1.elements, t2.elements)
 
-    Enum.all?(elements, fn {te1, te2} ->
-      subtype_of?(te1, te2)
-    end)
+    length(t1.elements) == length(t2.elements) and
+      Enum.all?(elements, fn {te1, te2} ->
+        subtype_of?(te1, te2)
+      end)
   end
 
   def subtype_of?(t1, %Type.Union{} = t2) do

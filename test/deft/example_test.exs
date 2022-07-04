@@ -5,9 +5,9 @@ defmodule Deft.ExampleTest do
 
   alias Deft.Type
 
-  test "example type checks" do
-    type =
-      Deft.type do
+  test "medium example" do
+    {result, type} =
+      Deft.compile do
         people = [
           {:alice, :f, 24},
           {:bob, :m, 15},
@@ -32,8 +32,8 @@ defmodule Deft.ExampleTest do
         end
 
         alice = hd(people)
-        bob = hd(tl(people))
-        eve = hd(tl(tl(people)))
+        [_, bob | eve_list = [_]] = people
+        eve = hd(eve_list)
 
         [
           {alice, category.(alice)},
@@ -42,21 +42,61 @@ defmodule Deft.ExampleTest do
         ]
       end
 
-    assert Type.list(
-             Type.union([
-               Type.tuple([
-                 Type.union([
-                   Type.tuple([
-                     Type.atom(),
-                     Type.atom(),
-                     Type.integer()
+    assert result == [
+             {{:alice, :f, 24}, :female_adult},
+             {{:bob, :m, 15}, :minor},
+             {{:eve, :f, 17}, :hacker}
+           ]
+
+    assert type ==
+             Type.list(
+               Type.union([
+                 Type.tuple([
+                   Type.union([
+                     Type.tuple([
+                       Type.atom(),
+                       Type.atom(),
+                       Type.integer()
+                     ])
+                   ]),
+                   Type.union([
+                     Type.Atom.new()
                    ])
-                 ]),
-                 Type.union([
-                   Type.Atom.new()
                  ])
                ])
+             )
+  end
+
+  test "pattern matching" do
+    {result, type} =
+      Deft.compile do
+        f = fn x :: [integer] ->
+          case x do
+            [] ->
+              0
+
+            [x] ->
+              x
+
+            [x, y] ->
+              x + y
+
+            [x, y | rest] ->
+              x + y + length(rest)
+          end
+        end
+
+        {f.([]), f.([1]), f.([1, 2]), f.([1, 2, 3])}
+      end
+
+    assert result == {0, 1, 3, 4}
+
+    assert type ==
+             Type.tuple([
+               Type.union([Type.integer()]),
+               Type.union([Type.integer()]),
+               Type.union([Type.integer()]),
+               Type.union([Type.integer()])
              ])
-           ) == type
   end
 end

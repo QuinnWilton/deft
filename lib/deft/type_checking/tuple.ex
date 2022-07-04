@@ -5,8 +5,10 @@ defmodule Deft.TypeChecking.Tuple do
   alias Deft.Type
 
   def type_check(%AST.Tuple{} = tuple, env) do
-    {elements, element_ts} = compute_and_erase_types(tuple.elements, env)
+    {elements, element_ts, bindings} = compute_and_erase_types(tuple.elements, env)
 
-    annotate({:{}, tuple.meta, elements}, Type.tuple(element_ts))
+    {:{}, tuple.meta, elements}
+    |> annotate_type(Type.tuple(element_ts))
+    |> annotate_bindings(bindings)
   end
 end

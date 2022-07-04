@@ -4,24 +4,24 @@ defmodule Deft do
   defmacro compile(do: block) do
     block = Compiler.compile(block)
 
-    {block, _type} =
+    {block, type, _bindings} =
       Deft.Helpers.compute_and_erase_types(
         block,
         __CALLER__
       )
 
-    block
+    {block, Macro.escape(type)}
   end
 
-  defmacro type(do: block) do
+  defmacro bindings(do: block) do
     block = Compiler.compile(block)
 
-    {_block, type} =
+    {_block, type, bindings} =
       Deft.Helpers.compute_and_erase_types(
         block,
         __CALLER__
       )
 
-    Macro.escape(type)
+    Macro.escape({type, bindings})
   end
 end

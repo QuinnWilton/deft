@@ -37,3 +37,17 @@ defmodule Deft.TypecheckingError do
     "Typechecking failed: expected #{inspect(exception.expected)}, got #{inspect(exception.actual)}"
   end
 end
+
+defmodule Deft.UnreachableBranchError do
+  defexception [:expected, :actual]
+
+  @type t() :: %__MODULE__{
+          expected: term(),
+          actual: term()
+        }
+
+  @impl true
+  def message(exception) do
+    "Branch unreachable: value has type #{inspect(exception.expected)}, but pattern has type #{inspect(exception.actual)}"
+  end
+end

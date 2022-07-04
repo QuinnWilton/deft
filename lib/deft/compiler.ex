@@ -54,6 +54,7 @@ defmodule Deft.Compiler do
       Enum.map(branches, fn
         {:->, branch_meta, [[pattern], body]} ->
           pattern = compile_pattern(pattern)
+          body = compile(body)
 
           AST.CaseBranch.new(pattern, body, branch_meta)
       end)
@@ -114,7 +115,49 @@ defmodule Deft.Compiler do
     AST.Annotation.new(name, type, meta)
   end
 
+  def compile_pattern(literal)
+      when is_atom(literal)
+      when is_boolean(literal)
+      when is_float(literal)
+      when is_integer(literal)
+      when is_number(literal) do
+    AST.Literal.new(literal)
+  end
+
+  def compile_pattern({:|, meta, [head, rest]}) do
+    head = compile_pattern(head)
+    rest = compile_pattern(rest)
+
+    AST.Cons.new(head, rest, meta)
+  end
+
+  def compile_pattern({:{}, meta, elements}) do
+    elements = Enum.map(elements, &compile_pattern/1)
+
+    AST.Tuple.new(elements, meta)
+  end
+
+  def compile_pattern({:=, meta, [pattern, value]}) do
+    pattern = compile_pattern(pattern)
+    value = compile_pattern(value)
+
+    AST.Match.new(pattern, value, meta)
+  end
+
   def compile_pattern({name, meta, context}) when is_atom(context) do
     AST.Local.new(name, context, meta)
+  end
+
+  def compile_pattern(elements) when is_list(elements) do
+    elements = Enum.map(elements, &compile_pattern/1)
+
+    AST.List.new(elements)
+  end
+
+  def compile_pattern({fst, snd}) do
+    fst = compile_pattern(fst)
+    snd = compile_pattern(snd)
+
+    AST.Pair.new(fst, snd)
   end
 end

@@ -53,9 +53,11 @@ defmodule Deft.TypeChecking do
 
   def type_check(%AST.LocalCall{} = ast, env) do
     if TypeChecking.Guards.supported?(ast.name, length(ast.args)) do
-      {args, t} = TypeChecking.Guards.handle_guard(ast.name, ast.args, env)
+      {args, t, bindings} = TypeChecking.Guards.handle_guard(ast.name, ast.args, env)
 
-      annotate({ast.name, ast.meta, args}, t)
+      {ast.name, ast.meta, args}
+      |> annotate_type(t)
+      |> annotate_bindings(bindings)
     else
       # TODO: Maybe raise because of an unsupported function call?
       {ast.name, ast.meta, ast.args}

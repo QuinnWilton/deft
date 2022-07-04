@@ -9,8 +9,8 @@ defmodule Deft.TypeChecking.Cond do
     {branches, branch_ts} =
       Enum.map(cond_ast.branches, fn
         %AST.CondBranch{} = branch ->
-          {predicate, predicate_t} = compute_and_erase_types(branch.predicate, env)
-          {body, body_t} = compute_and_erase_types(branch.body, env)
+          {predicate, predicate_t, _} = compute_and_erase_types(branch.predicate, env)
+          {body, body_t, _} = compute_and_erase_types(branch.body, env)
 
           unless Subtyping.subtype_of?(Type.boolean(), predicate_t) do
             raise Deft.TypecheckingError, expected: Type.boolean(), actual: predicate_t
@@ -22,6 +22,7 @@ defmodule Deft.TypeChecking.Cond do
 
     type = Type.Union.new(branch_ts)
 
-    annotate({:cond, cond_ast.meta, [[do: branches]]}, type)
+    {:cond, cond_ast.meta, [[do: branches]]}
+    |> annotate_type(type)
   end
 end

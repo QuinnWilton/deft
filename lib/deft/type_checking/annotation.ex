@@ -4,8 +4,12 @@ defmodule Deft.TypeChecking.Annotation do
   alias Deft.AST
 
   def type_check(%AST.Annotation{} = annotation, env) do
-    local = erase_types(annotation.name, env)
+    {local, _, local_bindings} = compute_and_erase_types(annotation.name, env)
 
-    annotate(local, annotation.type)
+    bindings = local_bindings ++ [{annotation.name, annotation.type}]
+
+    local
+    |> annotate_type(annotation.type)
+    |> annotate_bindings(bindings)
   end
 end

@@ -6,9 +6,25 @@ defmodule Deft.TypeChecking.If do
   alias Deft.Type
 
   def type_check(%AST.If{} = if_ast, env) do
-    {predicate, predicate_t} = compute_and_erase_types(if_ast.predicate, env)
-    {do_branch, do_branch_t} = compute_and_erase_types(if_ast.do, env)
-    {else_branch, else_branch_t} = compute_and_erase_types(if_ast.else, env)
+    {predicate, predicate_t, bindings} =
+      compute_and_erase_types(
+        if_ast.predicate,
+        env
+      )
+
+    {do_branch, do_branch_t, _} =
+      compute_and_erase_type_in_context(
+        if_ast.do,
+        bindings,
+        env
+      )
+
+    {else_branch, else_branch_t, _} =
+      compute_and_erase_type_in_context(
+        if_ast.else,
+        bindings,
+        env
+      )
 
     unless Subtyping.subtype_of?(Type.boolean(), predicate_t) do
       raise Deft.TypecheckingError, expected: Type.boolean(), actual: predicate_t
@@ -16,6 +32,8 @@ defmodule Deft.TypeChecking.If do
 
     type = Type.Union.new([do_branch_t, else_branch_t])
 
-    annotate({:if, if_ast.meta, [predicate, [do: do_branch, else: else_branch]]}, type)
+    {:if, if_ast.meta, [predicate, [do: do_branch, else: else_branch]]}
+    |> annotate_type(type)
+    |> annotate_bindings(bindings)
   end
 end
