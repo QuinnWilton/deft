@@ -2,283 +2,40 @@ defmodule DeftTest do
   use ExUnit.Case
   use ExUnitProperties
 
-  import StreamData
-
-  require Deft
-
   alias Deft.Generators
   alias Deft.Subtyping
   alias Deft.Type
 
-  def compile(ast) do
-    {result, _} =
-      Code.eval_quoted(
-        quote do
-          require Deft
+  property "computes the type for an expression" do
+    check all({expr, expected} <- Generators.Code.expression()) do
+      assert actual = Deft.Helpers.compute_types(expr, __ENV__)
+      assert Type.well_formed?(actual)
 
-          Deft.compile do
-            unquote(ast)
-          end
-        end
-      )
+      # HACK: It isn't enough to check subtyping.
+      # Consider this case:
+      #
+      # if true do
+      #   5
+      # else
+      #   :foo
+      # end
+      #
+      # If the type checker only checked one branch,
+      # and returned `integer` as the type, then
+      # this would pass a simple subtype test.
+      #
+      # Instead, we need to verify that each type
+      # in `expected` has at least one subtype in
+      # `actual`
+      if is_struct(expected, Type.Union) and is_struct(actual, Type.Union) do
+        for type <- Type.Union.types(expected) do
+          actual_types = Type.Union.types(actual)
 
-    result
-  end
-
-  def get_type(ast) do
-    {type, _} =
-      Code.eval_quoted(
-        quote do
-          require Deft
-
-          Deft.type do
-            unquote(ast)
-          end
-        end
-      )
-
-    type
-  end
-
-  property "compile/1 succeeds when the AST is correctly typed" do
-    check(
-      all(
-        fn_type <- Generators.Types.fn_type(),
-        fn_code <- inhabitant_of(fn_type),
-        args <- fixed_list(Enum.map(fn_type.inputs, &inhabitant_of/1))
-      ) do
-        ast =
-          quote do
-            unquote(fn_code).(unquote_splicing(args))
-          end
-
-        compile(ast)
-      end
-    )
-  end
-
-  property "compile/1 fails when the AST is incorrectly typed" do
-    check(
-      all(
-        fn_type <- Generators.Types.fn_type(),
-        fn_code <- inhabitant_of(fn_type),
-        arg_types <- list_of(Generators.type(), length: length(fn_type.inputs)),
-        args <- fixed_list(Enum.map(arg_types, &inhabitant_of/1))
-      ) do
-        arg_functions =
-          Enum.zip(args, arg_types)
-          |> Enum.map(fn {x, t} ->
-            f = identity_fn(t)
-
-            quote do
-              unquote(f).(unquote(x))
-            end
-          end)
-
-        ast =
-          quote do
-            unquote(fn_code).(unquote_splicing(arg_functions))
-          end
-
-        subtypes? =
-          Enum.all?(Enum.zip(fn_type.inputs, arg_types), fn {fn_type, arg_type} ->
-            Subtyping.subtype_of?(fn_type, arg_type)
-          end)
-
-        unless subtypes? do
-          assert_raise(Deft.TypecheckingError, fn ->
-            compile(ast)
-          end)
+          assert Enum.any?(actual_types, &Subtyping.subtype_of?(type, &1))
         end
       end
-    )
-  end
 
-  property "type/1 returns the type of an expression" do
-    check all(
-            type <- Generators.type(),
-            ast <- inhabitant_of(type)
-          ) do
-      assert Subtyping.subtype_of?(type, get_type(ast))
+      assert Subtyping.subtype_of?(expected, actual)
     end
-  end
-
-  def inhabitant_of(type) do
-    case type do
-      %Type.Atom{} ->
-        atom_inhabitant(type)
-
-      %Type.Boolean{} ->
-        boolean_inhabitant(type)
-
-      %Type.Float{} ->
-        float_inhabitant(type)
-
-      %Type.Fn{} ->
-        fn_inhabitant(type)
-
-      %Type.Integer{} ->
-        integer_inhabitant(type)
-
-      %Type.Number{} ->
-        number_inhabitant(type)
-
-      %Type.Top{} ->
-        top_inhabitant(type)
-
-      %Type.Tuple{} ->
-        tuple_inhabitant(type)
-
-      %Type.Union{} ->
-        union_inhabitant(type)
-
-      %Type.List{} ->
-        list_inhabitant(type)
-    end
-  end
-
-  def atom_inhabitant(_) do
-    filter(atom(:alphanumeric), &allowed_atom?/1)
-  end
-
-  def boolean_inhabitant(_) do
-    boolean()
-  end
-
-  def float_inhabitant(_) do
-    float()
-  end
-
-  def fn_inhabitant(type) do
-    args =
-      length(type.inputs)
-      |> Macro.generate_unique_arguments(__MODULE__)
-      |> Enum.zip(type.inputs)
-      |> Enum.map(fn {x, t} ->
-        {:"::", [], [x, annotation_for(t)]}
-      end)
-
-    map(inhabitant_of(type.output), fn body ->
-      quote do
-        fn unquote_splicing(args) ->
-          unquote(body)
-        end
-      end
-    end)
-  end
-
-  def identity_fn(type) do
-    args = [{:"::", [], [{:x, [], __MODULE__}, annotation_for(type)]}]
-
-    quote do
-      fn unquote_splicing(args) ->
-        x
-      end
-    end
-  end
-
-  def integer_inhabitant(_) do
-    integer()
-  end
-
-  def number_inhabitant(type) do
-    one_of([
-      float_inhabitant(type),
-      integer_inhabitant(type)
-    ])
-  end
-
-  def top_inhabitant(type) do
-    one_of([
-      atom_inhabitant(type),
-      boolean_inhabitant(type),
-      float_inhabitant(type),
-      integer_inhabitant(type),
-      number_inhabitant(type)
-    ])
-  end
-
-  def tuple_inhabitant(type) do
-    type
-    |> Type.Tuple.elements()
-    |> Enum.map(&inhabitant_of/1)
-    |> fixed_list()
-    |> map(fn elements ->
-      {:{}, [], elements}
-    end)
-  end
-
-  def union_inhabitant(type) do
-    type
-    |> Type.Union.types()
-    |> Enum.map(&inhabitant_of/1)
-    |> one_of()
-  end
-
-  def list_inhabitant(type) do
-    type
-    |> Type.List.contents()
-    |> inhabitant_of()
-    |> list_of(min_length: 1)
-  end
-
-  def annotation_for(type) do
-    case type do
-      %Type.Atom{} ->
-        {:atom, [], nil}
-
-      %Type.Boolean{} ->
-        {:boolean, [], nil}
-
-      %Type.Bottom{} ->
-        {:bottom, [], nil}
-
-      %Type.Float{} ->
-        {:float, [], nil}
-
-      %Type.Fn{} ->
-        inputs =
-          Enum.map(type.inputs, fn t ->
-            annotation_for(t)
-          end)
-
-        output = annotation_for(type.output)
-
-        quote do
-          unquote_splicing(inputs) ->
-            unquote(output)
-        end
-
-      %Type.Integer{} ->
-        {:integer, [], nil}
-
-      %Type.Number{} ->
-        {:number, [], nil}
-
-      %Type.Top{} ->
-        {:top, [], nil}
-
-      %Type.Tuple{} ->
-        elements =
-          type
-          |> Type.Tuple.elements()
-          |> Enum.map(&annotation_for/1)
-
-        {:{}, [], elements}
-
-      %Type.Union{} ->
-        [first | rest] = Type.Union.types(type)
-
-        Enum.reduce(rest, annotation_for(first), fn t, acc ->
-          {:|, [], [annotation_for(t), acc]}
-        end)
-
-      %Type.List{} ->
-        [annotation_for(Type.List.contents(type))]
-    end
-  end
-
-  def allowed_atom?(atom) do
-    atom not in [nil, true, false]
   end
 end

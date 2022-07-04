@@ -12,6 +12,10 @@ defmodule Deft.TypeChecking do
     TypeChecking.Block.type_check(ast, env)
   end
 
+  def type_check(%AST.Match{} = ast, env) do
+    TypeChecking.Match.type_check(ast, env)
+  end
+
   def type_check(%AST.Fn{} = ast, env) do
     TypeChecking.Fn.type_check(ast, env)
   end

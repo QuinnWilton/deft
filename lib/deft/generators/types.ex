@@ -5,6 +5,7 @@ defmodule Deft.Generators.Types do
 
   def type() do
     one_of([
+      top_type(),
       primitive_type(),
       compound_type()
     ])
@@ -16,8 +17,7 @@ defmodule Deft.Generators.Types do
       boolean_type(),
       float_type(),
       integer_type(),
-      number_type(),
-      top_type()
+      number_type()
     ])
   end
 

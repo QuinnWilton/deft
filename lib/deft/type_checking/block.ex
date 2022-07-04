@@ -8,18 +8,22 @@ defmodule Deft.TypeChecking.Block do
       Enum.reduce(block.exprs, {[], [], nil}, fn
         # TODO: Only simple assignment so far, no pattern matching
         %AST.Match{} = match, {exprs, ctx, _} ->
-          pattern = erase_types(match.pattern, env)
-
-          {value, value_t} =
+          {match, match_t} =
             compute_and_erase_type_in_context(
-              match.value,
+              match,
               ctx,
               env
             )
 
-          expr = {:=, match.meta, [pattern, value]}
+          # HACK: Need a better way to propagate bindings
+          # from matches. I thought matches could only
+          # appear in patterns, and within blocks,
+          # but they can appear anywhere. Annotate nodes
+          # with the bindings from further down the AST
+          # maybe?
+          {:=, _, [pattern, _]} = match
 
-          {exprs ++ [expr], ctx ++ [{pattern, value_t}], value_t}
+          {exprs ++ [match], ctx ++ [{pattern, match_t}], match_t}
 
         expr, {exprs, ctx, _} ->
           {expr, expr_t} = compute_and_erase_type_in_context(expr, ctx, env)
