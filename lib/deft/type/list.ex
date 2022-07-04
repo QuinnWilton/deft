@@ -1,7 +1,4 @@
 defmodule Deft.Type.List do
-  alias Deft.Helpers
-  alias Deft.Type
-
   @enforce_keys [:contents]
   defstruct @enforce_keys
 

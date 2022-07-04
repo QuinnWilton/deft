@@ -1,5 +1,5 @@
 defmodule Deft.Guards do
-  import Deft.Helpers
+  import Deft.TypeChecking
 
   alias Deft.Subtyping
   alias Deft.Type

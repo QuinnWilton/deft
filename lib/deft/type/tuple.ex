@@ -1,7 +1,4 @@
 defmodule Deft.Type.Tuple do
-  alias Deft.Helpers
-  alias Deft.Type
-
   @enforce_keys [:elements]
   defstruct @enforce_keys
 

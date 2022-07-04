@@ -5,7 +5,7 @@ defmodule Deft do
     block = Compiler.compile(block)
 
     {block, _type} =
-      Deft.Helpers.compute_and_erase_types(
+      Deft.TypeChecking.compute_and_erase_types(
         block,
         __CALLER__
       )
@@ -17,7 +17,7 @@ defmodule Deft do
     block = Compiler.compile(block)
 
     {_block, type} =
-      Deft.Helpers.compute_and_erase_types(
+      Deft.TypeChecking.compute_and_erase_types(
         block,
         __CALLER__
       )

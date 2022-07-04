@@ -1,7 +1,4 @@
 defmodule Deft.Type.Fn do
-  alias Deft.Helpers
-  alias Deft.Type
-
   @enforce_keys [:inputs, :output]
   defstruct @enforce_keys
 

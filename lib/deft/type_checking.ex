@@ -1,4 +1,4 @@
-defmodule Deft.Helpers do
+defmodule Deft.TypeChecking do
   alias Deft.AST
   alias Deft.Guards
   alias Deft.Subtyping
