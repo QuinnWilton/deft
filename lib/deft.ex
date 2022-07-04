@@ -1,250 +1,140 @@
 defmodule Deft do
-  import Deft.Helpers
-
-  alias Deft.Guards
+  alias Deft.AST
   alias Deft.Type
 
-  @supported_guards [
-    !=: 2,
-    !==: 2,
-    *: 2,
-    +: 1,
-    +: 2,
-    -: 1,
-    -: 2,
-    /: 2,
-    <: 2,
-    <=: 2,
-    ==: 2,
-    ===: 2,
-    >: 2,
-    >=: 2,
-    abs: 1,
-    # binary_part: 3,
-    # bit_size: 1,
-    # byte_size: 1,
-    ceil: 1,
-    div: 2,
-    elem: 2,
-    floor: 1,
-    hd: 1,
-    is_atom: 1,
-    # is_binary: 1,
-    # is_bitstring: 1,
-    is_boolean: 1,
-    is_float: 1,
-    is_function: 1,
-    is_function: 2,
-    is_integer: 1,
-    is_list: 1,
-    # is_map: 1,
-    # is_map_key: 2,
-    is_number: 1,
-    # is_pid: 1,
-    # is_port: 1,
-    # is_reference: 1,
-    is_tuple: 1,
-    length: 1,
-    # map_size: 1,
-    # node: 0,
-    # node: 1,
-    not: 1,
-    rem: 2,
-    round: 1,
-    # self: 0,
-    tl: 1,
-    trunc: 1,
-    tuple_size: 1
-  ]
-
   defmacro compile(do: block) do
+    block = rewrite(block)
+
+    {block, _type} =
+      Deft.Helpers.compute_and_erase_types(
+        block,
+        __CALLER__
+      )
+
     block
-    |> Macro.postwalk(&Deft.handle_annotations/1)
-    |> Macro.postwalk(&Deft.wrap_type_rule/1)
-    |> Deft.Helpers.compute_and_erase_type(__ENV__)
-    |> elem(0)
   end
 
   defmacro type(do: block) do
-    block
-    |> Macro.postwalk(&Deft.handle_annotations/1)
-    |> Macro.postwalk(&Deft.wrap_type_rule/1)
-    |> Deft.Helpers.compute_and_erase_type(__ENV__)
-    |> elem(1)
-    |> Macro.escape()
+    block = rewrite(block)
+
+    {_block, type} =
+      Deft.Helpers.compute_and_erase_types(
+        block,
+        __CALLER__
+      )
+
+    Macro.escape(type)
   end
 
-  defmacro type_rule(e) do
-    case e do
-      {:__block__, meta, exprs} ->
-        {exprs, _ctx, block_t} =
-          Enum.reduce(exprs, {[], [], nil}, fn
-            # TODO: Only simple assignment so far, no pattern matching
-            {:=, meta, [a, b]}, {exprs, ctx, _} ->
-              a = erase_type(a, __CALLER__)
-              {b, b_t} = compute_and_erase_type_in_context(b, ctx, __CALLER__)
+  def rewrite({:__block__, meta, exprs}) do
+    exprs = Enum.map(exprs, &rewrite/1)
 
-              {exprs ++ [{:=, meta, [a, b]}], ctx ++ [{a, b_t}], b_t}
-
-            expr, {exprs, ctx, _} ->
-              {expr, expr_t} = compute_and_erase_type_in_context(expr, ctx, __CALLER__)
-
-              {exprs ++ [expr], ctx, expr_t}
-          end)
-
-        annotate({:__block__, meta, exprs}, block_t)
-
-      {:fn, fn_meta, [{:->, meta, [args, body]}]} ->
-        args = local_expand(args, __CALLER__)
-        {args, input_types} = compute_and_erase_types(args, __CALLER__)
-
-        {body, output_type} =
-          compute_and_erase_type_in_context(body, Enum.zip(args, input_types), __CALLER__)
-
-        fn_type = Type.Fn.new(input_types, output_type)
-
-        annotate({:fn, fn_meta, [{:->, meta, [args, body]}]}, fn_type)
-
-      {{:., dot_meta, [e]}, meta, args} ->
-        {e, e_t} = compute_and_erase_type(e, __CALLER__)
-
-        {args, args_t} = compute_and_erase_types(args, __CALLER__)
-
-        unless length(e_t.inputs) == length(args_t) and Type.subtypes_of?(e_t.inputs, args_t) do
-          raise Deft.TypecheckingError, expected: e_t.inputs, actual: args_t
-        end
-
-        annotate({{:., dot_meta, [e]}, meta, args}, e_t.output)
-
-      {:if, meta, [predicate, branches]} ->
-        branches = local_expand(branches, __CALLER__)
-        do_branch = branches[:do]
-        else_branch = branches[:else]
-
-        {predicate, predicate_t} = compute_and_erase_type(predicate, __CALLER__)
-        {do_branch, do_branch_t} = compute_and_erase_type(do_branch, __CALLER__)
-        {else_branch, else_branch_t} = compute_and_erase_type(else_branch, __CALLER__)
-
-        unless Type.subtype_of?(Type.Boolean.new(), predicate_t) do
-          raise Deft.TypecheckingError, expected: Type.Boolean.new(), actual: predicate_t
-        end
-
-        type = Type.Union.new([do_branch_t, else_branch_t])
-
-        annotate({:if, meta, [predicate, [do: do_branch, else: else_branch]]}, type)
-
-      {:cond, meta, [branches]} ->
-        [do: branches] = local_expand(branches, __CALLER__)
-        branches = local_expand(branches, __CALLER__)
-
-        {branches, branches_t} =
-          Enum.map(branches, fn
-            {:->, meta, [predicate, body]} ->
-              [predicate] = local_expand(predicate, __CALLER__)
-              {predicate, predicate_t} = compute_and_erase_type(predicate, __CALLER__)
-              {body, body_t} = compute_and_erase_type(body, __CALLER__)
-
-              unless Type.subtype_of?(Type.Boolean.new(), predicate_t) do
-                raise Deft.TypecheckingError, expected: Type.Boolean.new(), actual: predicate_t
-              end
-
-              {{:->, meta, [[predicate], body]}, body_t}
-          end)
-          |> Enum.unzip()
-
-        type = Type.Union.new(branches_t)
-
-        annotate({:cond, meta, [[do: branches]]}, type)
-
-      {:case, meta, [subject, branches]} ->
-        [do: branches] = local_expand(branches, __CALLER__)
-        {subject, subject_t} = compute_and_erase_type(subject, __CALLER__)
-
-        {branches, branches_t} =
-          Enum.map(branches, fn
-            # TODO: Pattern matching. Most uses of case will fail.
-            {:->, meta, [pattern, body]} ->
-              [pattern] = local_expand(pattern, __CALLER__)
-
-              {body, body_t} =
-                compute_and_erase_type_in_context(
-                  body,
-                  [{pattern, subject_t}],
-                  __CALLER__
-                )
-
-              {{:->, meta, [[pattern], body]}, body_t}
-          end)
-          |> Enum.unzip()
-
-        type = Type.Union.new(branches_t)
-
-        annotate({:case, meta, [subject, [do: branches]]}, type)
-
-      {:{}, tuple_meta, es} ->
-        {es, e_ts} = compute_and_erase_types(es, __CALLER__)
-
-        annotate({:{}, tuple_meta, es}, Type.Tuple.new(e_ts))
-
-      {a, b} ->
-        a = local_expand(a, __CALLER__)
-        b = local_expand(b, __CALLER__)
-
-        {a, b}
-
-      es when is_list(e) ->
-        Enum.map(es, &local_expand(&1, __CALLER__))
-
-      {name, meta, args} when is_list(args) ->
-        if Enum.member?(@supported_guards, {name, length(args)}) do
-          {args, t} = Guards.handle_guard(name, args, __CALLER__)
-
-          annotate({name, meta, args}, t)
-        else
-          {name, meta, args}
-        end
-
-      {name, meta, args} ->
-        {name, meta, args}
-    end
+    AST.Block.new(exprs, meta)
   end
 
-  def wrap_type_rule(e) do
-    case e do
-      {:=, meta, [left, right]} ->
-        {:=, meta, [left, right]}
+  def rewrite({:fn, fn_meta, [{:->, arrow_meta, [args, body]}]}) do
+    args = Enum.map(args, &rewrite_fn_arg/1)
+    body = rewrite(body)
 
-      {:->, meta, [args, body]} ->
-        {:->, meta, [args, body]}
-
-      {:fn, fn_meta, [arrow]} ->
-        {:type_rule, [], [{:fn, fn_meta, [arrow]}]}
-
-      {:., meta, args} ->
-        {:., meta, args}
-
-      {f, m, a} ->
-        {:type_rule, [], [{f, m, a}]}
-
-      {a, b} ->
-        {:type_rule, [], [{a, b}]}
-
-      e when is_list(e) ->
-        {:type_rule, [], [e]}
-
-      e ->
-        e
-    end
+    AST.Fn.new(body, args, fn_meta, arrow_meta)
   end
 
-  def handle_annotations(e) do
-    case e do
-      {:"::", _, [e, t]} ->
-        annotate(e, parse_type(t))
+  def rewrite({{:., fun_meta, [fun]}, args_meta, args}) do
+    fun = rewrite(fun)
+    args = Enum.map(args, &rewrite/1)
 
-      e ->
-        e
-    end
+    AST.FnApplication.new(fun, args, fun_meta, args_meta)
+  end
+
+  def rewrite({:if, meta, [predicate, branches]}) do
+    predicate = rewrite(predicate)
+    branches = Keyword.map(branches, &rewrite(elem(&1, 1)))
+
+    AST.If.new(
+      predicate,
+      branches[:do],
+      branches[:else],
+      meta
+    )
+  end
+
+  def rewrite({:cond, cond_meta, [[do: branches]]}) do
+    branches =
+      Enum.map(branches, fn
+        {:->, branch_meta, [[predicate], body]} ->
+          predicate = rewrite(predicate)
+          body = rewrite(body)
+
+          AST.CondBranch.new(predicate, body, branch_meta)
+      end)
+
+    AST.Cond.new(branches, cond_meta)
+  end
+
+  def rewrite({:case, case_meta, [subject, [do: branches]]}) do
+    subject = rewrite(subject)
+
+    branches =
+      Enum.map(branches, fn
+        {:->, branch_meta, [[pattern], body]} ->
+          pattern = rewrite_pattern(pattern)
+
+          AST.CaseBranch.new(pattern, body, branch_meta)
+      end)
+
+    AST.Case.new(subject, branches, case_meta)
+  end
+
+  def rewrite({:=, meta, [pattern, value]}) do
+    pattern = rewrite_pattern(pattern)
+    value = rewrite(value)
+
+    AST.Match.new(pattern, value, meta)
+  end
+
+  def rewrite({:{}, meta, elements}) do
+    elements = Enum.map(elements, &rewrite/1)
+
+    AST.Tuple.new(elements, meta)
+  end
+
+  def rewrite({fst, snd}) do
+    fst = rewrite(fst)
+    snd = rewrite(snd)
+
+    AST.Pair.new(fst, snd)
+  end
+
+  def rewrite(elements) when is_list(elements) do
+    elements = Enum.map(elements, &rewrite/1)
+
+    AST.List.new(elements)
+  end
+
+  def rewrite({name, meta, args}) when is_list(args) do
+    args = Enum.map(args, &rewrite/1)
+
+    AST.LocalCall.new(name, args, meta)
+  end
+
+  def rewrite({name, meta, context}) when is_atom(context) do
+    AST.Local.new(name, context, meta)
+  end
+
+  def rewrite(literal) do
+    literal
+  end
+
+  def rewrite_fn_arg({:"::", meta, [name, type]}) do
+    # TODO: handle literals in function heads
+    type = parse_type(type)
+    name = rewrite(name)
+
+    AST.Annotation.new(name, type, meta)
+  end
+
+  def rewrite_pattern({name, meta, context}) when is_atom(context) do
+    AST.Local.new(name, context, meta)
   end
 
   def parse_type(t) do

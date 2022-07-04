@@ -1,4 +1,6 @@
 defmodule Deft.Helpers do
+  alias Deft.AST
+  alias Deft.Guards
   alias Deft.Type
 
   @type_modules [
@@ -16,8 +18,65 @@ defmodule Deft.Helpers do
     Type.Union
   ]
 
+  @supported_guards [
+    !=: 2,
+    !==: 2,
+    *: 2,
+    +: 1,
+    +: 2,
+    -: 1,
+    -: 2,
+    /: 2,
+    <: 2,
+    <=: 2,
+    ==: 2,
+    ===: 2,
+    >: 2,
+    >=: 2,
+    abs: 1,
+    # binary_part: 3,
+    # bit_size: 1,
+    # byte_size: 1,
+    ceil: 1,
+    div: 2,
+    elem: 2,
+    floor: 1,
+    hd: 1,
+    is_atom: 1,
+    # is_binary: 1,
+    # is_bitstring: 1,
+    is_boolean: 1,
+    is_float: 1,
+    is_function: 1,
+    is_function: 2,
+    is_integer: 1,
+    is_list: 1,
+    # is_map: 1,
+    # is_map_key: 2,
+    is_number: 1,
+    # is_pid: 1,
+    # is_port: 1,
+    # is_reference: 1,
+    is_tuple: 1,
+    length: 1,
+    # map_size: 1,
+    # node: 0,
+    # node: 1,
+    not: 1,
+    rem: 2,
+    round: 1,
+    # self: 0,
+    tl: 1,
+    trunc: 1,
+    tuple_size: 1
+  ]
+
+  def annotate(e, t) when is_list(e) do
+    Keyword.put(e, :__deft_type__, t)
+  end
+
   def annotate(e, t) do
-    Macro.update_meta(e, &Keyword.put(&1, :__deft_type__, t))
+    Macro.update_meta(e, &annotate(&1, t))
   end
 
   def delete_annotation(e) do
@@ -74,56 +133,204 @@ defmodule Deft.Helpers do
     Enum.map(es, &type_of/1)
   end
 
-  def compute_type(e, env) do
-    e
-    |> local_expand(env)
-    |> type_of()
+  def compute_types(ast, env) do
+    if is_list(ast) do
+      Enum.map(ast, &compute_types(&1, env))
+    else
+      ast
+      |> local_expand(env)
+      |> type_of()
+    end
   end
 
-  def compute_types(es, env) do
-    Enum.map(es, &compute_type(&1, env))
+  def erase_types(ast, env) do
+    if is_list(ast) do
+      Enum.map(ast, &erase_types(&1, env))
+    else
+      ast
+      |> local_expand(env)
+      |> delete_annotation()
+    end
   end
 
-  def erase_type(e, env) do
-    e
-    |> local_expand(env)
-    |> delete_annotation()
+  def compute_and_erase_types(ast, env) do
+    {ast, t} =
+      if is_list(ast) do
+        ast
+        |> Enum.map(&compute_and_erase_types(&1, env))
+        |> Enum.unzip()
+      else
+        ast = local_expand(ast, env)
+        ast_erased = delete_annotation(ast)
+
+        {ast_erased, type_of(ast)}
+      end
+
+    {ast, t}
   end
 
-  def erase_types(es, env) do
-    Enum.map(es, &erase_type(&1, env))
-  end
+  def compute_and_erase_type_in_context(ast, context, env) do
+    ast =
+      Enum.reduce(context, ast, fn {{name, _, context}, t}, acc ->
+        AST.postwalk(acc, fn
+          %AST.Local{name: ^name, context: ^context} = local ->
+            meta = annotate(local.meta, t)
 
-  def compute_and_erase_type(e, env) do
-    e = local_expand(e, env)
-    erased = delete_annotation(e)
-    type = type_of(e)
+            %{local | meta: meta}
 
-    {erased, type}
-  end
-
-  def compute_and_erase_types(es, env) do
-    es
-    |> Enum.map(&compute_and_erase_type(&1, env))
-    |> Enum.unzip()
-  end
-
-  def compute_and_erase_type_in_context(e, context, env) do
-    e =
-      Enum.reduce(context, e, fn {{x, _, x_a}, t}, acc ->
-        Macro.postwalk(acc, fn
-          {^x, _, ^x_a} = a ->
-            annotate(a, t)
-
-          e ->
-            e
+          ast ->
+            ast
         end)
       end)
 
-    compute_and_erase_type(e, env)
+    compute_and_erase_types(ast, env)
   end
 
-  def local_expand(e, env) do
-    Macro.expand_once(e, env)
+  def local_expand(ast, env) do
+    case ast do
+      %AST.Annotation{} = annotation ->
+        local = erase_types(annotation.name, env)
+
+        annotate(local, annotation.type)
+
+      %AST.Block{} = block ->
+        {exprs, _ctx, type} =
+          Enum.reduce(block.exprs, {[], [], nil}, fn
+            # TODO: Only simple assignment so far, no pattern matching
+            %AST.Match{} = match, {exprs, ctx, _} ->
+              pattern = erase_types(match.pattern, env)
+
+              {value, value_t} =
+                compute_and_erase_type_in_context(
+                  match.value,
+                  ctx,
+                  env
+                )
+
+              expr = {:=, match.meta, [pattern, value]}
+
+              {exprs ++ [expr], ctx ++ [{pattern, value_t}], value_t}
+
+            expr, {exprs, ctx, _} ->
+              {expr, expr_t} = compute_and_erase_type_in_context(expr, ctx, env)
+
+              {exprs ++ [expr], ctx, expr_t}
+          end)
+
+        annotate({:__block__, block.meta, exprs}, type)
+
+      %AST.Fn{} = fun ->
+        {args, input_types} = compute_and_erase_types(fun.args, env)
+
+        {body, output_type} =
+          compute_and_erase_type_in_context(fun.body, Enum.zip(args, input_types), env)
+
+        type = Type.Fn.new(input_types, output_type)
+
+        annotate({:fn, fun.fn_meta, [{:->, fun.arrow_meta, [args, body]}]}, type)
+
+      %AST.FnApplication{} = fn_application ->
+        {fun, fun_t} = compute_and_erase_types(fn_application.fun, env)
+        {args, args_t} = compute_and_erase_types(fn_application.args, env)
+
+        unless length(fun_t.inputs) == length(args_t) and Type.subtypes_of?(fun_t.inputs, args_t) do
+          raise Deft.TypecheckingError, expected: fun_t.inputs, actual: args_t
+        end
+
+        annotate(
+          {{:., fn_application.fun_meta, [fun]}, fn_application.args_meta, args},
+          fun_t.output
+        )
+
+      %AST.If{} = if_ast ->
+        {predicate, predicate_t} = compute_and_erase_types(if_ast.predicate, env)
+        {do_branch, do_branch_t} = compute_and_erase_types(if_ast.do, env)
+        {else_branch, else_branch_t} = compute_and_erase_types(if_ast.else, env)
+
+        unless Type.subtype_of?(Type.Boolean.new(), predicate_t) do
+          raise Deft.TypecheckingError, expected: Type.Boolean.new(), actual: predicate_t
+        end
+
+        type = Type.Union.new([do_branch_t, else_branch_t])
+
+        annotate({:if, if_ast.meta, [predicate, [do: do_branch, else: else_branch]]}, type)
+
+      %AST.Cond{} = cond_ast ->
+        {branches, branch_ts} =
+          Enum.map(cond_ast.branches, fn
+            %AST.CondBranch{} = branch ->
+              {predicate, predicate_t} = compute_and_erase_types(branch.predicate, env)
+              {body, body_t} = compute_and_erase_types(branch.body, env)
+
+              unless Type.subtype_of?(Type.Boolean.new(), predicate_t) do
+                raise Deft.TypecheckingError, expected: Type.Boolean.new(), actual: predicate_t
+              end
+
+              {{:->, branch.meta, [[predicate], body]}, body_t}
+          end)
+          |> Enum.unzip()
+
+        type = Type.Union.new(branch_ts)
+
+        annotate({:cond, cond_ast.meta, [[do: branches]]}, type)
+
+      %AST.Case{} = case_ast ->
+        {subject, subject_t} = compute_and_erase_types(case_ast.subject, env)
+
+        {branches, branches_t} =
+          Enum.map(case_ast.branches, fn
+            # TODO: Pattern matching. Most uses of case will fail.
+            %AST.CaseBranch{} = branch ->
+              pattern = erase_types(branch.pattern, env)
+
+              {body, body_t} =
+                compute_and_erase_type_in_context(
+                  branch.body,
+                  [{pattern, subject_t}],
+                  env
+                )
+
+              {{:->, branch.meta, [[pattern], body]}, body_t}
+          end)
+          |> Enum.unzip()
+
+        type = Type.Union.new(branches_t)
+
+        annotate({:case, case_ast.meta, [subject, [do: branches]]}, type)
+
+      %AST.Tuple{} = tuple ->
+        {elements, element_ts} = compute_and_erase_types(tuple.elements, env)
+
+        annotate({:{}, tuple.meta, elements}, Type.Tuple.new(element_ts))
+
+      %AST.Pair{} = pair ->
+        fst = local_expand(pair.fst, env)
+        snd = local_expand(pair.snd, env)
+
+        {fst, snd}
+
+      %AST.List{} = list ->
+        Enum.map(list.elements, &local_expand(&1, env))
+
+      %AST.LocalCall{} = local_call ->
+        if Enum.member?(@supported_guards, {local_call.name, length(local_call.args)}) do
+          {args, t} = Guards.handle_guard(local_call.name, local_call.args, env)
+
+          annotate({local_call.name, local_call.meta, args}, t)
+        else
+          # TODO: Maybe raise because of an unsupported function call?
+          {local_call.name, local_call.meta, local_call.args}
+        end
+
+      %AST.Local{} = local ->
+        {local.name, local.meta, local.context}
+
+      literal ->
+        if Macro.quoted_literal?(literal) do
+          literal
+        else
+          raise "Unexpected AST node: #{inspect(literal)}"
+        end
+    end
   end
 end

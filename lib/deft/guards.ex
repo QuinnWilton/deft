@@ -19,38 +19,39 @@ defmodule Deft.Guards do
     :is_list
   ]
 
-  def handle_guard(name, [a, b], env) when name in @comparisons do
-    a = erase_type(a, env)
-    b = erase_type(b, env)
+  def handle_guard(name, [fst, snd], env) when name in @comparisons do
+    fst = erase_types(fst, env)
+    snd = erase_types(snd, env)
 
-    {[a, b], Type.Boolean.new()}
+    {[fst, snd], Type.Boolean.new()}
   end
 
-  def handle_guard(name, [a], env) when name in @unary_math do
-    {a, a_t} = compute_and_erase_type(a, env)
+  def handle_guard(name, [term], env) when name in @unary_math do
+    {term, term_t} = compute_and_erase_types(term, env)
 
-    unless Type.subtype_of?(Type.Number.new(), a_t) do
-      raise Deft.TypecheckingError, expected: Type.Number.new(), actual: a_t
+    unless Type.subtype_of?(Type.Number.new(), term_t) do
+      raise Deft.TypecheckingError, expected: Type.Number.new(), actual: term_t
     end
 
-    {[a], a_t}
+    {[term], term_t}
   end
 
-  def handle_guard(name, [a, b], env) when name in @binary_math do
-    {a, a_t} = compute_and_erase_type(a, env)
-    {b, b_t} = compute_and_erase_type(b, env)
+  def handle_guard(name, [fst, snd], env) when name in @binary_math do
+    {fst, fst_t} = compute_and_erase_types(fst, env)
+    {snd, snd_t} = compute_and_erase_types(snd, env)
 
-    unless Type.subtype_of?(Type.Number.new(), a_t) do
-      raise Deft.TypecheckingError, expected: Type.Number.new(), actual: a_t
+    unless Type.subtype_of?(Type.Number.new(), fst_t) do
+      raise Deft.TypecheckingError, expected: Type.Number.new(), actual: fst_t
     end
 
-    unless Type.subtype_of?(Type.Number.new(), b_t) do
-      raise Deft.TypecheckingError, expected: Type.Number.new(), actual: b_t
+    unless Type.subtype_of?(Type.Number.new(), fst_t) do
+      raise Deft.TypecheckingError, expected: Type.Number.new(), actual: snd_t
     end
 
     # TODO: Reusable?
+    # TODO: needs to use subtyping
     type =
-      case {a_t, b_t} do
+      case {fst_t, snd_t} do
         {%Type.Number{}, _} ->
           Type.Number.new()
 
@@ -67,41 +68,41 @@ defmodule Deft.Guards do
           Type.Integer.new()
       end
 
-    {[a, b], type}
+    {[fst, snd], type}
   end
 
-  def handle_guard(name, [a, b], env) when name in @integer_division do
-    {a, a_t} = compute_and_erase_type(a, env)
-    {b, b_t} = compute_and_erase_type(b, env)
+  def handle_guard(name, [fst, snd], env) when name in @integer_division do
+    {fst, fst_t} = compute_and_erase_types(fst, env)
+    {snd, snd_t} = compute_and_erase_types(snd, env)
 
-    unless Type.subtype_of?(Type.Integer.new(), a_t) do
-      raise Deft.TypecheckingError, expected: Type.Integer.new(), actual: a_t
+    unless Type.subtype_of?(Type.Integer.new(), fst_t) do
+      raise Deft.TypecheckingError, expected: Type.Integer.new(), actual: fst_t
     end
 
-    unless Type.subtype_of?(Type.Integer.new(), b_t) do
-      raise Deft.TypecheckingError, expected: Type.Integer.new(), actual: b_t
+    unless Type.subtype_of?(Type.Integer.new(), snd_t) do
+      raise Deft.TypecheckingError, expected: Type.Integer.new(), actual: snd_t
     end
 
-    {[a, b], Type.Integer.new()}
+    {[fst, snd], Type.Integer.new()}
   end
 
-  def handle_guard(:/, [a, b], env) do
-    {a, a_t} = compute_and_erase_type(a, env)
-    {b, b_t} = compute_and_erase_type(b, env)
+  def handle_guard(:/, [fst, snd], env) do
+    {fst, fst_t} = compute_and_erase_types(fst, env)
+    {snd, snd_t} = compute_and_erase_types(snd, env)
 
-    unless Type.subtype_of?(Type.Number.new(), a_t) do
-      raise Deft.TypecheckingError, expected: Type.Number.new(), actual: a_t
+    unless Type.subtype_of?(Type.Number.new(), fst_t) do
+      raise Deft.TypecheckingError, expected: Type.Number.new(), actual: fst_t
     end
 
-    unless Type.subtype_of?(Type.Number.new(), b_t) do
-      raise Deft.TypecheckingError, expected: Type.Number.new(), actual: b_t
+    unless Type.subtype_of?(Type.Number.new(), snd_t) do
+      raise Deft.TypecheckingError, expected: Type.Number.new(), actual: snd_t
     end
 
-    {[a, b], Type.Float.new()}
+    {[fst, snd], Type.Float.new()}
   end
 
   def handle_guard(:tuple_size, [term], env) do
-    {term, term_t} = compute_and_erase_type(term, env)
+    {term, term_t} = compute_and_erase_types(term, env)
 
     unless is_struct(term_t, Type.Tuple) do
       # TODO This doesn't handle unions. I need a way of checking if a type
@@ -113,7 +114,7 @@ defmodule Deft.Guards do
   end
 
   def handle_guard(:length, [term], env) do
-    {term, term_t} = compute_and_erase_type(term, env)
+    {term, term_t} = compute_and_erase_types(term, env)
 
     unless Type.subtype_of?(Type.List.new(Type.Top.new()), term_t) do
       raise Deft.TypecheckingError, expected: Type.List.new(Type.Top.new()), actual: term_t
@@ -123,14 +124,14 @@ defmodule Deft.Guards do
   end
 
   def handle_guard(name, [term], env) when name in @type_guards do
-    term = erase_type(term, env)
+    term = erase_types(term, env)
 
     {[term], Type.Boolean.new()}
   end
 
   def handle_guard(:is_function, [fun, arity], env) do
-    fun = erase_type(fun, env)
-    {arity, arity_t} = compute_and_erase_type(arity, env)
+    fun = erase_types(fun, env)
+    {arity, arity_t} = compute_and_erase_types(arity, env)
 
     unless Type.subtype_of?(Type.Integer.new(), arity_t) do
       raise Deft.TypecheckingError, expected: Type.Integer.new(), actual: arity_t
@@ -140,7 +141,7 @@ defmodule Deft.Guards do
   end
 
   def handle_guard(:not, [term], env) do
-    {term, term_t} = compute_and_erase_type(term, env)
+    {term, term_t} = compute_and_erase_types(term, env)
 
     unless Type.subtype_of?(Type.Boolean.new(), term_t) do
       raise Deft.TypecheckingError, expected: Type.Integer.new(), actual: term_t
@@ -150,7 +151,7 @@ defmodule Deft.Guards do
   end
 
   def handle_guard(:hd, [term], env) do
-    {term, term_t} = compute_and_erase_type(term, env)
+    {term, term_t} = compute_and_erase_types(term, env)
 
     unless Type.subtype_of?(Type.List.new(Type.Top.new()), term_t) do
       raise Deft.TypecheckingError, expected: Type.List.new(Type.Top.new()), actual: term_t
@@ -160,7 +161,7 @@ defmodule Deft.Guards do
   end
 
   def handle_guard(:tl, [term], env) do
-    {term, term_t} = compute_and_erase_type(term, env)
+    {term, term_t} = compute_and_erase_types(term, env)
 
     unless Type.subtype_of?(Type.List.new(Type.Top.new()), term_t) do
       raise Deft.TypecheckingError, expected: Type.List.new(Type.Top.new()), actual: term_t
@@ -170,8 +171,8 @@ defmodule Deft.Guards do
   end
 
   def handle_guard(:elem, [tuple, index], env) do
-    {tuple, tuple_t} = compute_and_erase_type(tuple, env)
-    {index, index_t} = compute_and_erase_type(index, env)
+    {tuple, tuple_t} = compute_and_erase_types(tuple, env)
+    {index, index_t} = compute_and_erase_types(index, env)
 
     unless is_struct(tuple_t, Type.Tuple) do
       raise "Expected a tuple"
@@ -187,11 +188,5 @@ defmodule Deft.Guards do
       |> Type.Union.new()
 
     {[tuple, index], type}
-  end
-
-  def handle_guard(:-, [e], env) do
-    # HACK? Macro.expand_once(quote do -1 end) expands to 1, but
-    #       Macro.expand_once(quote do -1.0 end) does not
-    compute_and_erase_type(e, env)
   end
 end
