@@ -138,7 +138,7 @@ defmodule Deft.TypeChecking do
       Enum.map(ast, &compute_types(&1, env))
     else
       ast
-      |> local_expand(env)
+      |> type_check(env)
       |> type_of()
     end
   end
@@ -148,7 +148,7 @@ defmodule Deft.TypeChecking do
       Enum.map(ast, &erase_types(&1, env))
     else
       ast
-      |> local_expand(env)
+      |> type_check(env)
       |> delete_annotation()
     end
   end
@@ -160,7 +160,7 @@ defmodule Deft.TypeChecking do
         |> Enum.map(&compute_and_erase_types(&1, env))
         |> Enum.unzip()
       else
-        ast = local_expand(ast, env)
+        ast = type_check(ast, env)
         ast_erased = delete_annotation(ast)
 
         {ast_erased, type_of(ast)}
@@ -186,50 +186,50 @@ defmodule Deft.TypeChecking do
     compute_and_erase_types(ast, env)
   end
 
-  def local_expand(%AST.Annotation{} = ast, env) do
+  def type_check(%AST.Annotation{} = ast, env) do
     TypeChecking.Annotation.type_check(ast, env)
   end
 
-  def local_expand(%AST.Block{} = ast, env) do
+  def type_check(%AST.Block{} = ast, env) do
     TypeChecking.Block.type_check(ast, env)
   end
 
-  def local_expand(%AST.Fn{} = ast, env) do
+  def type_check(%AST.Fn{} = ast, env) do
     TypeChecking.Fn.type_check(ast, env)
   end
 
-  def local_expand(%AST.FnApplication{} = ast, env) do
+  def type_check(%AST.FnApplication{} = ast, env) do
     TypeChecking.FnApplication.type_check(ast, env)
   end
 
-  def local_expand(%AST.If{} = ast, env) do
+  def type_check(%AST.If{} = ast, env) do
     TypeChecking.If.type_check(ast, env)
   end
 
-  def local_expand(%AST.Cond{} = ast, env) do
+  def type_check(%AST.Cond{} = ast, env) do
     TypeChecking.Cond.type_check(ast, env)
   end
 
-  def local_expand(%AST.Case{} = ast, env) do
+  def type_check(%AST.Case{} = ast, env) do
     TypeChecking.Case.type_check(ast, env)
   end
 
-  def local_expand(%AST.Tuple{} = ast, env) do
+  def type_check(%AST.Tuple{} = ast, env) do
     TypeChecking.Tuple.type_check(ast, env)
   end
 
-  def local_expand(%AST.Pair{} = ast, env) do
-    fst = local_expand(ast.fst, env)
-    snd = local_expand(ast.snd, env)
+  def type_check(%AST.Pair{} = ast, env) do
+    fst = type_check(ast.fst, env)
+    snd = type_check(ast.snd, env)
 
     {fst, snd}
   end
 
-  def local_expand(%AST.List{} = ast, env) do
-    Enum.map(ast.elements, &local_expand(&1, env))
+  def type_check(%AST.List{} = ast, env) do
+    Enum.map(ast.elements, &type_check(&1, env))
   end
 
-  def local_expand(%AST.LocalCall{} = ast, env) do
+  def type_check(%AST.LocalCall{} = ast, env) do
     if Enum.member?(@supported_guards, {ast.name, length(ast.args)}) do
       {args, t} = TypeChecking.Guards.handle_guard(ast.name, ast.args, env)
 
@@ -240,11 +240,11 @@ defmodule Deft.TypeChecking do
     end
   end
 
-  def local_expand(%AST.Local{} = ast, _env) do
+  def type_check(%AST.Local{} = ast, _env) do
     {ast.name, ast.meta, ast.context}
   end
 
-  def local_expand(%AST.Literal{} = ast, _env) do
+  def type_check(%AST.Literal{} = ast, _env) do
     ast.value
   end
 end
