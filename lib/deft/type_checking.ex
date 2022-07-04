@@ -3,21 +3,6 @@ defmodule Deft.TypeChecking do
   alias Deft.Type
   alias Deft.TypeChecking
 
-  @type_modules [
-    Type.Atom,
-    Type.Boolean,
-    Type.Bottom,
-    Type.Float,
-    Type.Fn,
-    Type.Integer,
-    Type.List,
-    Type.Number,
-    Type.Number,
-    Type.Top,
-    Type.Tuple,
-    Type.Union
-  ]
-
   @supported_guards [
     !=: 2,
     !==: 2,
@@ -89,7 +74,7 @@ defmodule Deft.TypeChecking do
         raise Deft.MissingTypeError, expr: e
 
       {:ok, type} ->
-        unless type_well_formed?(type) do
+        unless Type.well_formed?(type) do
           raise Deft.MalformedTypedError, expr: type
         end
 
@@ -119,14 +104,6 @@ defmodule Deft.TypeChecking do
 
   def type_of(e) do
     raise Deft.MissingTypeError, expr: e
-  end
-
-  def type_well_formed?(t) when is_struct(t) do
-    t.__struct__ in @type_modules
-  end
-
-  def type_well_formed?(_) do
-    false
   end
 
   def types_of(es) do

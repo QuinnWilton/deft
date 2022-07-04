@@ -1,6 +1,21 @@
 defmodule Deft.Type do
   alias Deft.Type
 
+  @types [
+    Type.Atom,
+    Type.Boolean,
+    Type.Bottom,
+    Type.Float,
+    Type.Fn,
+    Type.Integer,
+    Type.List,
+    Type.Number,
+    Type.Number,
+    Type.Top,
+    Type.Tuple,
+    Type.Union
+  ]
+
   def atom() do
     Type.Atom.new()
   end
@@ -43,5 +58,13 @@ defmodule Deft.Type do
 
   def union(elements) do
     Type.Union.new(elements)
+  end
+
+  def well_formed?(type) when is_struct(type) do
+    type.__struct__ in @types
+  end
+
+  def well_formed?(_) do
+    false
   end
 end
