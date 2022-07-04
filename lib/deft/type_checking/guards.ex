@@ -20,6 +20,67 @@ defmodule Deft.TypeChecking.Guards do
     :is_list
   ]
 
+  @supported_guards [
+    !=: 2,
+    !==: 2,
+    *: 2,
+    +: 1,
+    +: 2,
+    -: 1,
+    -: 2,
+    /: 2,
+    <: 2,
+    <=: 2,
+    ==: 2,
+    ===: 2,
+    >: 2,
+    >=: 2,
+    abs: 1,
+    # binary_part: 3,
+    # bit_size: 1,
+    # byte_size: 1,
+    ceil: 1,
+    div: 2,
+    elem: 2,
+    floor: 1,
+    hd: 1,
+    is_atom: 1,
+    # is_binary: 1,
+    # is_bitstring: 1,
+    is_boolean: 1,
+    is_float: 1,
+    is_function: 1,
+    is_function: 2,
+    is_integer: 1,
+    is_list: 1,
+    # is_map: 1,
+    # is_map_key: 2,
+    is_number: 1,
+    # is_pid: 1,
+    # is_port: 1,
+    # is_reference: 1,
+    is_tuple: 1,
+    length: 1,
+    # map_size: 1,
+    # node: 0,
+    # node: 1,
+    not: 1,
+    rem: 2,
+    round: 1,
+    # self: 0,
+    tl: 1,
+    trunc: 1,
+    tuple_size: 1
+  ]
+
+  def supported_guards() do
+    @supported_guards
+  end
+
+  def supported?(name, arity) do
+    {name, arity} in supported_guards()
+  end
+
   def handle_guard(name, [fst, snd], env) when name in @comparisons do
     fst = erase_types(fst, env)
     snd = erase_types(snd, env)
