@@ -21,7 +21,7 @@ defmodule Deft.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:stream_data, "~> 0.5", only: :test}
+      {:stream_data, "~> 0.5"}
     ]
   end
 end

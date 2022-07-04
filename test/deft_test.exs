@@ -6,6 +6,7 @@ defmodule DeftTest do
 
   require Deft
 
+  alias Deft.Generators
   alias Deft.Subtyping
   alias Deft.Type
 
@@ -42,7 +43,7 @@ defmodule DeftTest do
   property "compile/1 succeeds when the AST is correctly typed" do
     check(
       all(
-        fn_type <- fn_type(),
+        fn_type <- Generators.Types.fn_type(),
         fn_code <- inhabitant_of(fn_type),
         args <- fixed_list(Enum.map(fn_type.inputs, &inhabitant_of/1))
       ) do
@@ -59,9 +60,9 @@ defmodule DeftTest do
   property "compile/1 fails when the AST is incorrectly typed" do
     check(
       all(
-        fn_type <- fn_type(),
+        fn_type <- Generators.Types.fn_type(),
         fn_code <- inhabitant_of(fn_type),
-        arg_types <- list_of(type(), length: length(fn_type.inputs)),
+        arg_types <- list_of(Generators.type(), length: length(fn_type.inputs)),
         args <- fixed_list(Enum.map(arg_types, &inhabitant_of/1))
       ) do
         arg_functions =
@@ -95,92 +96,11 @@ defmodule DeftTest do
 
   property "type/1 returns the type of an expression" do
     check all(
-            type <- type(),
+            type <- Generators.type(),
             ast <- inhabitant_of(type)
           ) do
       assert Subtyping.subtype_of?(type, get_type(ast))
     end
-  end
-
-  def type() do
-    one_of([
-      primitive_type(),
-      compound_type()
-    ])
-  end
-
-  def primitive_type() do
-    one_of([
-      atom_type(),
-      boolean_type(),
-      float_type(),
-      integer_type(),
-      number_type(),
-      top_type()
-    ])
-  end
-
-  def compound_type() do
-    one_of([
-      fn_type(),
-      tuple_type(),
-      union_type(),
-      list_type()
-    ])
-  end
-
-  def atom_type() do
-    constant(Type.atom())
-  end
-
-  def boolean_type() do
-    constant(Type.boolean())
-  end
-
-  def bottom_type() do
-    constant(Type.bottom())
-  end
-
-  def float_type() do
-    constant(Type.float())
-  end
-
-  def fn_type() do
-    bind(list_of(primitive_type(), max_length: 8), fn inputs ->
-      map(primitive_type(), fn output ->
-        Type.fun(inputs, output)
-      end)
-    end)
-  end
-
-  def tuple_type() do
-    bind(list_of(primitive_type(), max_length: 8), fn elements ->
-      constant(Type.tuple(elements))
-    end)
-  end
-
-  def union_type() do
-    bind(list_of(primitive_type(), min_length: 1, max_length: 8), fn elements ->
-      constant(Type.union(elements))
-    end)
-  end
-
-  def list_type() do
-    bind(primitive_type(), fn type ->
-      constant(Type.list(type))
-    end)
-  end
-
-  def integer_type() do
-    constant(Type.integer())
-  end
-
-  def number_type() do
-    constant(Type.number())
-  end
-
-  def top_type() do
-    constant(Type.top())
   end
 
   def inhabitant_of(type) do
