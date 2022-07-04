@@ -3,6 +3,7 @@ defmodule Deft.Generators.Code do
 
   alias Deft.AST
   alias Deft.Generators
+  alias Deft.Subtyping
   alias Deft.Type
 
   def code() do
@@ -90,10 +91,14 @@ defmodule Deft.Generators.Code do
   end
 
   def fn_node(child_data \\ literal_node()) do
-    map({child_data, list_of(annotation_node())}, fn {{body, body_type}, arg_children} ->
+    bind(list_of(annotation_node()), fn arg_children ->
       {args, arg_types} = Enum.unzip(arg_children)
 
-      {AST.Fn.new(body, args), Type.fun(arg_types, body_type)}
+      map(child_data, fn term ->
+        {body, body_type} = consume_exprs([term | arg_children])
+
+        {AST.Fn.new(body, args), Type.fun(arg_types, body_type)}
+      end)
     end)
   end
 
@@ -247,5 +252,140 @@ defmodule Deft.Generators.Code do
       integer(),
       float()
     ])
+  end
+
+  def consume_exprs(exprs) do
+    # TODO: Slow.
+    exprs = Enum.shuffle(exprs)
+
+    if length(exprs) > 2 do
+      {[fst, snd], exprs} = Enum.split(exprs, 2)
+      expr = choose_fn(fst, snd)
+
+      consume_exprs([expr | exprs])
+    else
+      term = Enum.random(exprs)
+
+      choose_fn(term)
+    end
+  end
+
+  def choose_fn({term, %Type.Boolean{}}) do
+    node = AST.LocalCall.new(:not, [term])
+    type = Type.boolean()
+
+    {node, type}
+  end
+
+  def choose_fn({term, %Type.Tuple{}}) do
+    node = AST.LocalCall.new(:tuple_size, [term])
+    type = Type.integer()
+
+    {node, type}
+  end
+
+  def choose_fn({term, %Type.List{}}) do
+    name =
+      Enum.random([
+        :length,
+        :hd,
+        :tl
+      ])
+
+    node = AST.LocalCall.new(name, [term])
+    type = Type.integer()
+
+    {node, type}
+  end
+
+  def choose_fn({term, type}) do
+    if Enum.random([true, false]) do
+      name =
+        Enum.random([
+          :is_atom,
+          :is_boolean,
+          :is_float,
+          :is_function,
+          :is_integer,
+          :is_number,
+          :is_tuple,
+          :is_list
+        ])
+
+      node = AST.LocalCall.new(name, [term])
+      type = Type.boolean()
+
+      {node, type}
+    else
+      node =
+        AST.FnApplication.new(
+          AST.Fn.new(
+            AST.Local.new(:x, Elixir),
+            [
+              AST.Annotation.new(
+                AST.Local.new(:x, Elixir),
+                type
+              )
+            ]
+          ),
+          [term]
+        )
+
+      {node, type}
+    end
+  end
+
+  def choose_fn({fst, %Type.Tuple{} = tuple}, {snd, %Type.Integer{}}) do
+    node = AST.LocalCall.new(:elem, [fst, snd])
+    type = Type.union(Type.Tuple.elements(tuple))
+
+    {node, type}
+  end
+
+  def choose_fn({fst, fst_type}, {snd, snd_type}) do
+    cond do
+      Subtyping.subtype_of?(Type.number(), fst_type) and
+          Subtyping.subtype_of?(Type.number(), snd_type) ->
+        name =
+          Enum.random([
+            :*,
+            :+,
+            :-
+          ])
+
+        node = AST.LocalCall.new(name, [fst, snd])
+
+        type =
+          cond do
+            Subtyping.subtype_of?(fst_type, snd_type) ->
+              fst_type
+
+            Subtyping.subtype_of?(snd_type, fst_type) ->
+              snd_type
+
+            true ->
+              Type.number()
+          end
+
+        {node, type}
+
+      true ->
+        name =
+          Enum.random([
+            :!=,
+            :!==,
+            :<,
+            :<=,
+            :==,
+            :===,
+            :>,
+            :>=
+          ])
+
+        node = AST.LocalCall.new(name, [fst, snd])
+        type = Type.boolean()
+
+        {node, type}
+    end
   end
 end

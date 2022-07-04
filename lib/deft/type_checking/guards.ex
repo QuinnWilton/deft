@@ -111,23 +111,16 @@ defmodule Deft.TypeChecking.Guards do
     end
 
     # TODO: Reusable?
-    # TODO: needs to use subtyping
     type =
-      case {fst_t, snd_t} do
-        {%Type.Number{}, _} ->
+      cond do
+        Subtyping.subtype_of?(fst_t, snd_t) ->
+          fst_t
+
+        Subtyping.subtype_of?(snd_t, fst_t) ->
+          snd_t
+
+        true ->
           Type.number()
-
-        {_, %Type.Number{}} ->
-          Type.number()
-
-        {%Type.Float{}, _} ->
-          Type.float()
-
-        {_, %Type.Float{}} ->
-          Type.float()
-
-        {%Type.Integer{}, %Type.Integer{}} ->
-          Type.integer()
       end
 
     {[fst, snd], type}
@@ -178,7 +171,7 @@ defmodule Deft.TypeChecking.Guards do
   def handle_guard(:length, [term], env) do
     {term, term_t} = compute_and_erase_types(term, env)
 
-    unless Subtyping.subtype_of?(Type.list(Type.top()), term_t) do
+    unless is_struct(term_t, Type.List) do
       raise Deft.TypecheckingError, expected: Type.list(Type.top()), actual: term_t
     end
 
@@ -215,7 +208,7 @@ defmodule Deft.TypeChecking.Guards do
   def handle_guard(:hd, [term], env) do
     {term, term_t} = compute_and_erase_types(term, env)
 
-    unless Subtyping.subtype_of?(Type.list(Type.top()), term_t) do
+    unless is_struct(term_t, Type.List) do
       raise Deft.TypecheckingError, expected: Type.list(Type.top()), actual: term_t
     end
 
@@ -225,7 +218,7 @@ defmodule Deft.TypeChecking.Guards do
   def handle_guard(:tl, [term], env) do
     {term, term_t} = compute_and_erase_types(term, env)
 
-    unless Subtyping.subtype_of?(Type.list(Type.top()), term_t) do
+    unless is_struct(term_t, Type.List) do
       raise Deft.TypecheckingError, expected: Type.list(Type.top()), actual: term_t
     end
 
