@@ -1,8 +1,8 @@
 defmodule Deft.TypeChecking do
   alias Deft.AST
-  alias Deft.Guards
   alias Deft.Subtyping
   alias Deft.Type
+  alias Deft.TypeChecking.Guards
 
   @type_modules [
     Type.Atom,

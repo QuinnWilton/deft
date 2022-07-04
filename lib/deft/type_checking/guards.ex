@@ -1,4 +1,4 @@
-defmodule Deft.Guards do
+defmodule Deft.TypeChecking.Guards do
   import Deft.TypeChecking
 
   alias Deft.Subtyping
