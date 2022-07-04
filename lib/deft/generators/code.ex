@@ -39,8 +39,7 @@ defmodule Deft.Generators.Code do
   end
 
   def annotation_node() do
-    # TODO: Handle compound types
-    map({local_node(), Generators.primitive_type()}, fn {name, type} ->
+    map({local_node(), Generators.Types.compound_type()}, fn {name, type} ->
       {AST.Annotation.new(name, type), type}
     end)
   end
@@ -80,7 +79,7 @@ defmodule Deft.Generators.Code do
   def fn_application_node(child_data \\ literal_node()) do
     bind(fn_node(child_data), fn {fn_node, fn_type} ->
       # TODO: Generate non-literal arguments
-      arg_nodes = Enum.map(fn_type.inputs, &literal_node/1)
+      arg_nodes = Enum.map(fn_type.inputs, &argument_node/1)
 
       map(fixed_list(arg_nodes), fn children ->
         {args, _} = Enum.unzip(children)
@@ -126,6 +125,61 @@ defmodule Deft.Generators.Code do
       type = Type.list(Type.union(element_types))
 
       {AST.List.new(elements), type}
+    end)
+  end
+
+  def argument_node(%Type.Union{} = type) do
+    type
+    |> Type.Union.types()
+    |> Enum.random()
+    |> argument_node()
+  end
+
+  def argument_node(type)
+      when is_struct(type, Type.Atom)
+      when is_struct(type, Type.Boolean)
+      when is_struct(type, Type.Float)
+      when is_struct(type, Type.Integer)
+      when is_struct(type, Type.Number) do
+    literal_node(type)
+  end
+
+  def argument_node(%Type.Fn{} = type) do
+    bind(list_of(local_node(), length: length(type.inputs)), fn arg_names ->
+      args =
+        Enum.zip(arg_names, type.inputs)
+        |> Enum.map(&AST.Annotation.new(elem(&1, 0), elem(&1, 1)))
+
+      map(literal_node(type.output), fn {body, _} ->
+        {AST.Fn.new(body, args), type}
+      end)
+    end)
+  end
+
+  def argument_node(%Type.List{} = type) do
+    type
+    |> Type.List.contents()
+    |> argument_node()
+    |> list_of()
+    |> nonempty()
+    |> map(fn children ->
+      {elements, _} = Enum.unzip(children)
+      node = AST.List.new(elements)
+
+      {node, type}
+    end)
+  end
+
+  def argument_node(%Type.Tuple{} = type) do
+    type
+    |> Type.Tuple.elements()
+    |> Enum.map(&argument_node/1)
+    |> fixed_list()
+    |> map(fn children ->
+      {elements, _} = Enum.unzip(children)
+      node = AST.Tuple.new(elements)
+
+      {node, type}
     end)
   end
 
@@ -284,7 +338,7 @@ defmodule Deft.Generators.Code do
     {node, type}
   end
 
-  def choose_fn({term, %Type.List{}}) do
+  def choose_fn({term, %Type.List{} = list_type}) do
     name =
       Enum.random([
         :length,
@@ -293,7 +347,18 @@ defmodule Deft.Generators.Code do
       ])
 
     node = AST.LocalCall.new(name, [term])
-    type = Type.integer()
+
+    type =
+      case name do
+        :length ->
+          Type.integer()
+
+        :hd ->
+          Type.List.contents(list_type)
+
+        :tl ->
+          list_type
+      end
 
     {node, type}
   end

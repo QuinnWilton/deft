@@ -175,7 +175,7 @@ defmodule Deft.TypeChecking.Guards do
       raise Deft.TypecheckingError, expected: Type.list(Type.top()), actual: term_t
     end
 
-    {[term], term_t}
+    {[term], Type.integer()}
   end
 
   def handle_guard(name, [term], env) when name in @type_guards do

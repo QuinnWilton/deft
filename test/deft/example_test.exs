@@ -53,7 +53,7 @@ defmodule Deft.ExampleTest do
                    ])
                  ]),
                  Type.union([
-                   Type.atom()
+                   Type.Atom.new()
                  ])
                ])
              ])
