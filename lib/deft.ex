@@ -1,6 +1,6 @@
 defmodule Deft do
   alias Deft.AST
-  alias Deft.Type
+  alias Deft.Annotations
 
   defmacro compile(do: block) do
     block = rewrite(block)
@@ -125,9 +125,9 @@ defmodule Deft do
     literal
   end
 
-  def rewrite_fn_arg({:"::", meta, [name, type]}) do
+  def rewrite_fn_arg({:"::", meta, [name, annotation]}) do
     # TODO: handle literals in function heads
-    type = parse_type(type)
+    type = Annotations.parse(annotation)
     name = rewrite(name)
 
     AST.Annotation.new(name, type, meta)
@@ -135,58 +135,5 @@ defmodule Deft do
 
   def rewrite_pattern({name, meta, context}) when is_atom(context) do
     AST.Local.new(name, context, meta)
-  end
-
-  def parse_type(t) do
-    case t do
-      {:boolean, _, _} ->
-        Type.boolean()
-
-      {:atom, _, _} ->
-        Type.atom()
-
-      {:float, _, _} ->
-        Type.float()
-
-      {:integer, _, _} ->
-        Type.integer()
-
-      {:number, _, _} ->
-        Type.number()
-
-      {:top, _, _} ->
-        Type.top()
-
-      {:bottom, _, _} ->
-        Type.bottom()
-
-      {elem0, elem1} ->
-        elem0 = parse_type(elem0)
-        elem1 = parse_type(elem1)
-
-        Type.tuple([elem0, elem1])
-
-      {:{}, _, elements} ->
-        elements = Enum.map(elements, &parse_type/1)
-
-        Type.tuple(elements)
-
-      {:|, _, [t1, t2]} ->
-        t1 = parse_type(t1)
-        t2 = parse_type(t2)
-
-        [t1]
-        |> Type.Union.new()
-        |> Type.Union.put_type(t2)
-
-      [{:->, _, [inputs, output]}] ->
-        inputs = Enum.map(inputs, &parse_type/1)
-        output = parse_type(output)
-
-        Type.fun(inputs, output)
-
-      [type] ->
-        Type.list(parse_type(type))
-    end
   end
 end
