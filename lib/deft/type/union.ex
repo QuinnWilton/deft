@@ -1,5 +1,5 @@
 defmodule Deft.Type.Union do
-  alias Deft.Type
+  alias Deft.Subtyping
 
   @enforce_keys [:types]
   defstruct @enforce_keys
@@ -33,11 +33,11 @@ defmodule Deft.Type.Union do
 
     new_types =
       Enum.reduce(candidate_types, union.types, fn new_type, acc ->
-        if Enum.any?(acc, &Type.subtype_of?(&1, new_type)) do
+        if Enum.any?(acc, &Subtyping.subtype_of?(&1, new_type)) do
           acc
         else
           acc
-          |> Enum.reject(&Type.subtype_of?(new_type, &1))
+          |> Enum.reject(&Subtyping.subtype_of?(new_type, &1))
           |> MapSet.new()
           |> MapSet.put(new_type)
         end

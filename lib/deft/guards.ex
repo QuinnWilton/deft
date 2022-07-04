@@ -1,6 +1,7 @@
 defmodule Deft.Guards do
   import Deft.Helpers
 
+  alias Deft.Subtyping
   alias Deft.Type
 
   @comparisons [:!=, :!==, :<, :<=, :==, :===, :>, :>=]
@@ -29,7 +30,7 @@ defmodule Deft.Guards do
   def handle_guard(name, [term], env) when name in @unary_math do
     {term, term_t} = compute_and_erase_types(term, env)
 
-    unless Type.subtype_of?(Type.number(), term_t) do
+    unless Subtyping.subtype_of?(Type.number(), term_t) do
       raise Deft.TypecheckingError, expected: Type.number(), actual: term_t
     end
 
@@ -40,11 +41,11 @@ defmodule Deft.Guards do
     {fst, fst_t} = compute_and_erase_types(fst, env)
     {snd, snd_t} = compute_and_erase_types(snd, env)
 
-    unless Type.subtype_of?(Type.number(), fst_t) do
+    unless Subtyping.subtype_of?(Type.number(), fst_t) do
       raise Deft.TypecheckingError, expected: Type.number(), actual: fst_t
     end
 
-    unless Type.subtype_of?(Type.number(), fst_t) do
+    unless Subtyping.subtype_of?(Type.number(), fst_t) do
       raise Deft.TypecheckingError, expected: Type.number(), actual: snd_t
     end
 
@@ -75,11 +76,11 @@ defmodule Deft.Guards do
     {fst, fst_t} = compute_and_erase_types(fst, env)
     {snd, snd_t} = compute_and_erase_types(snd, env)
 
-    unless Type.subtype_of?(Type.integer(), fst_t) do
+    unless Subtyping.subtype_of?(Type.integer(), fst_t) do
       raise Deft.TypecheckingError, expected: Type.integer(), actual: fst_t
     end
 
-    unless Type.subtype_of?(Type.integer(), snd_t) do
+    unless Subtyping.subtype_of?(Type.integer(), snd_t) do
       raise Deft.TypecheckingError, expected: Type.integer(), actual: snd_t
     end
 
@@ -90,11 +91,11 @@ defmodule Deft.Guards do
     {fst, fst_t} = compute_and_erase_types(fst, env)
     {snd, snd_t} = compute_and_erase_types(snd, env)
 
-    unless Type.subtype_of?(Type.number(), fst_t) do
+    unless Subtyping.subtype_of?(Type.number(), fst_t) do
       raise Deft.TypecheckingError, expected: Type.number(), actual: fst_t
     end
 
-    unless Type.subtype_of?(Type.number(), snd_t) do
+    unless Subtyping.subtype_of?(Type.number(), snd_t) do
       raise Deft.TypecheckingError, expected: Type.number(), actual: snd_t
     end
 
@@ -116,7 +117,7 @@ defmodule Deft.Guards do
   def handle_guard(:length, [term], env) do
     {term, term_t} = compute_and_erase_types(term, env)
 
-    unless Type.subtype_of?(Type.list(Type.top()), term_t) do
+    unless Subtyping.subtype_of?(Type.list(Type.top()), term_t) do
       raise Deft.TypecheckingError, expected: Type.list(Type.top()), actual: term_t
     end
 
@@ -133,7 +134,7 @@ defmodule Deft.Guards do
     fun = erase_types(fun, env)
     {arity, arity_t} = compute_and_erase_types(arity, env)
 
-    unless Type.subtype_of?(Type.integer(), arity_t) do
+    unless Subtyping.subtype_of?(Type.integer(), arity_t) do
       raise Deft.TypecheckingError, expected: Type.integer(), actual: arity_t
     end
 
@@ -143,7 +144,7 @@ defmodule Deft.Guards do
   def handle_guard(:not, [term], env) do
     {term, term_t} = compute_and_erase_types(term, env)
 
-    unless Type.subtype_of?(Type.boolean(), term_t) do
+    unless Subtyping.subtype_of?(Type.boolean(), term_t) do
       raise Deft.TypecheckingError, expected: Type.integer(), actual: term_t
     end
 
@@ -153,7 +154,7 @@ defmodule Deft.Guards do
   def handle_guard(:hd, [term], env) do
     {term, term_t} = compute_and_erase_types(term, env)
 
-    unless Type.subtype_of?(Type.list(Type.top()), term_t) do
+    unless Subtyping.subtype_of?(Type.list(Type.top()), term_t) do
       raise Deft.TypecheckingError, expected: Type.list(Type.top()), actual: term_t
     end
 
@@ -163,7 +164,7 @@ defmodule Deft.Guards do
   def handle_guard(:tl, [term], env) do
     {term, term_t} = compute_and_erase_types(term, env)
 
-    unless Type.subtype_of?(Type.list(Type.top()), term_t) do
+    unless Subtyping.subtype_of?(Type.list(Type.top()), term_t) do
       raise Deft.TypecheckingError, expected: Type.list(Type.top()), actual: term_t
     end
 
@@ -178,7 +179,7 @@ defmodule Deft.Guards do
       raise "Expected a tuple"
     end
 
-    unless Type.subtype_of?(Type.integer(), index_t) do
+    unless Subtyping.subtype_of?(Type.integer(), index_t) do
       raise Deft.TypecheckingError, expected: Type.integer(), actual: index_t
     end
 

@@ -1,6 +1,7 @@
 defmodule Deft.Helpers do
   alias Deft.AST
   alias Deft.Guards
+  alias Deft.Subtyping
   alias Deft.Type
 
   @type_modules [
@@ -233,7 +234,8 @@ defmodule Deft.Helpers do
         {fun, fun_t} = compute_and_erase_types(fn_application.fun, env)
         {args, args_t} = compute_and_erase_types(fn_application.args, env)
 
-        unless length(fun_t.inputs) == length(args_t) and Type.subtypes_of?(fun_t.inputs, args_t) do
+        unless length(fun_t.inputs) == length(args_t) and
+                 Subtyping.subtypes_of?(fun_t.inputs, args_t) do
           raise Deft.TypecheckingError, expected: fun_t.inputs, actual: args_t
         end
 
@@ -247,7 +249,7 @@ defmodule Deft.Helpers do
         {do_branch, do_branch_t} = compute_and_erase_types(if_ast.do, env)
         {else_branch, else_branch_t} = compute_and_erase_types(if_ast.else, env)
 
-        unless Type.subtype_of?(Type.boolean(), predicate_t) do
+        unless Subtyping.subtype_of?(Type.boolean(), predicate_t) do
           raise Deft.TypecheckingError, expected: Type.boolean(), actual: predicate_t
         end
 
@@ -262,7 +264,7 @@ defmodule Deft.Helpers do
               {predicate, predicate_t} = compute_and_erase_types(branch.predicate, env)
               {body, body_t} = compute_and_erase_types(branch.body, env)
 
-              unless Type.subtype_of?(Type.boolean(), predicate_t) do
+              unless Subtyping.subtype_of?(Type.boolean(), predicate_t) do
                 raise Deft.TypecheckingError, expected: Type.boolean(), actual: predicate_t
               end
 

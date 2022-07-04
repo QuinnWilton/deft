@@ -6,6 +6,7 @@ defmodule DeftTest do
 
   require Deft
 
+  alias Deft.Subtyping
   alias Deft.Type
 
   def compile(ast) do
@@ -80,7 +81,7 @@ defmodule DeftTest do
 
         subtypes? =
           Enum.all?(Enum.zip(fn_type.inputs, arg_types), fn {fn_type, arg_type} ->
-            Deft.Type.subtype_of?(fn_type, arg_type)
+            Subtyping.subtype_of?(fn_type, arg_type)
           end)
 
         unless subtypes? do
@@ -97,7 +98,7 @@ defmodule DeftTest do
             type <- type(),
             ast <- inhabitant_of(type)
           ) do
-      assert Type.subtype_of?(type, get_type(ast))
+      assert Subtyping.subtype_of?(type, get_type(ast))
     end
   end
 
