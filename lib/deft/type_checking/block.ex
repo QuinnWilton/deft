@@ -1,5 +1,5 @@
 defmodule Deft.TypeChecking.Block do
-  import Deft.TypeChecking
+  import Deft.Helpers
 
   alias Deft.AST
 

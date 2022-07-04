@@ -1,5 +1,5 @@
 defmodule Deft.TypeChecking.Case do
-  import Deft.TypeChecking
+  import Deft.Helpers
 
   alias Deft.AST
   alias Deft.Type

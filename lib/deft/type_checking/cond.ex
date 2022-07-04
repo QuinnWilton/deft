@@ -1,5 +1,5 @@
 defmodule Deft.TypeChecking.Cond do
-  import Deft.TypeChecking
+  import Deft.Helpers
 
   alias Deft.AST
   alias Deft.Subtyping
