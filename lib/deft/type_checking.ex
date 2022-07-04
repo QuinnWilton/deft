@@ -1,8 +1,7 @@
 defmodule Deft.TypeChecking do
   alias Deft.AST
-  alias Deft.Subtyping
   alias Deft.Type
-  alias Deft.TypeChecking.Guards
+  alias Deft.TypeChecking
 
   @type_modules [
     Type.Atom,
@@ -187,148 +186,65 @@ defmodule Deft.TypeChecking do
     compute_and_erase_types(ast, env)
   end
 
-  def local_expand(ast, env) do
-    case ast do
-      %AST.Annotation{} = annotation ->
-        local = erase_types(annotation.name, env)
+  def local_expand(%AST.Annotation{} = ast, env) do
+    TypeChecking.Annotation.type_check(ast, env)
+  end
 
-        annotate(local, annotation.type)
+  def local_expand(%AST.Block{} = ast, env) do
+    TypeChecking.Block.type_check(ast, env)
+  end
 
-      %AST.Block{} = block ->
-        {exprs, _ctx, type} =
-          Enum.reduce(block.exprs, {[], [], nil}, fn
-            # TODO: Only simple assignment so far, no pattern matching
-            %AST.Match{} = match, {exprs, ctx, _} ->
-              pattern = erase_types(match.pattern, env)
+  def local_expand(%AST.Fn{} = ast, env) do
+    TypeChecking.Fn.type_check(ast, env)
+  end
 
-              {value, value_t} =
-                compute_and_erase_type_in_context(
-                  match.value,
-                  ctx,
-                  env
-                )
+  def local_expand(%AST.FnApplication{} = ast, env) do
+    TypeChecking.FnApplication.type_check(ast, env)
+  end
 
-              expr = {:=, match.meta, [pattern, value]}
+  def local_expand(%AST.If{} = ast, env) do
+    TypeChecking.If.type_check(ast, env)
+  end
 
-              {exprs ++ [expr], ctx ++ [{pattern, value_t}], value_t}
+  def local_expand(%AST.Cond{} = ast, env) do
+    TypeChecking.Cond.type_check(ast, env)
+  end
 
-            expr, {exprs, ctx, _} ->
-              {expr, expr_t} = compute_and_erase_type_in_context(expr, ctx, env)
+  def local_expand(%AST.Case{} = ast, env) do
+    TypeChecking.Case.type_check(ast, env)
+  end
 
-              {exprs ++ [expr], ctx, expr_t}
-          end)
+  def local_expand(%AST.Tuple{} = ast, env) do
+    TypeChecking.Tuple.type_check(ast, env)
+  end
 
-        annotate({:__block__, block.meta, exprs}, type)
+  def local_expand(%AST.Pair{} = ast, env) do
+    fst = local_expand(ast.fst, env)
+    snd = local_expand(ast.snd, env)
 
-      %AST.Fn{} = fun ->
-        {args, input_types} = compute_and_erase_types(fun.args, env)
+    {fst, snd}
+  end
 
-        {body, output_type} =
-          compute_and_erase_type_in_context(fun.body, Enum.zip(args, input_types), env)
+  def local_expand(%AST.List{} = ast, env) do
+    Enum.map(ast.elements, &local_expand(&1, env))
+  end
 
-        type = Type.fun(input_types, output_type)
+  def local_expand(%AST.LocalCall{} = ast, env) do
+    if Enum.member?(@supported_guards, {ast.name, length(ast.args)}) do
+      {args, t} = TypeChecking.Guards.handle_guard(ast.name, ast.args, env)
 
-        annotate({:fn, fun.fn_meta, [{:->, fun.arrow_meta, [args, body]}]}, type)
-
-      %AST.FnApplication{} = fn_application ->
-        {fun, fun_t} = compute_and_erase_types(fn_application.fun, env)
-        {args, args_t} = compute_and_erase_types(fn_application.args, env)
-
-        unless length(fun_t.inputs) == length(args_t) and
-                 Subtyping.subtypes_of?(fun_t.inputs, args_t) do
-          raise Deft.TypecheckingError, expected: fun_t.inputs, actual: args_t
-        end
-
-        annotate(
-          {{:., fn_application.fun_meta, [fun]}, fn_application.args_meta, args},
-          fun_t.output
-        )
-
-      %AST.If{} = if_ast ->
-        {predicate, predicate_t} = compute_and_erase_types(if_ast.predicate, env)
-        {do_branch, do_branch_t} = compute_and_erase_types(if_ast.do, env)
-        {else_branch, else_branch_t} = compute_and_erase_types(if_ast.else, env)
-
-        unless Subtyping.subtype_of?(Type.boolean(), predicate_t) do
-          raise Deft.TypecheckingError, expected: Type.boolean(), actual: predicate_t
-        end
-
-        type = Type.Union.new([do_branch_t, else_branch_t])
-
-        annotate({:if, if_ast.meta, [predicate, [do: do_branch, else: else_branch]]}, type)
-
-      %AST.Cond{} = cond_ast ->
-        {branches, branch_ts} =
-          Enum.map(cond_ast.branches, fn
-            %AST.CondBranch{} = branch ->
-              {predicate, predicate_t} = compute_and_erase_types(branch.predicate, env)
-              {body, body_t} = compute_and_erase_types(branch.body, env)
-
-              unless Subtyping.subtype_of?(Type.boolean(), predicate_t) do
-                raise Deft.TypecheckingError, expected: Type.boolean(), actual: predicate_t
-              end
-
-              {{:->, branch.meta, [[predicate], body]}, body_t}
-          end)
-          |> Enum.unzip()
-
-        type = Type.Union.new(branch_ts)
-
-        annotate({:cond, cond_ast.meta, [[do: branches]]}, type)
-
-      %AST.Case{} = case_ast ->
-        {subject, subject_t} = compute_and_erase_types(case_ast.subject, env)
-
-        {branches, branches_t} =
-          Enum.map(case_ast.branches, fn
-            # TODO: Pattern matching. Most uses of case will fail.
-            %AST.CaseBranch{} = branch ->
-              pattern = erase_types(branch.pattern, env)
-
-              {body, body_t} =
-                compute_and_erase_type_in_context(
-                  branch.body,
-                  [{pattern, subject_t}],
-                  env
-                )
-
-              {{:->, branch.meta, [[pattern], body]}, body_t}
-          end)
-          |> Enum.unzip()
-
-        type = Type.Union.new(branches_t)
-
-        annotate({:case, case_ast.meta, [subject, [do: branches]]}, type)
-
-      %AST.Tuple{} = tuple ->
-        {elements, element_ts} = compute_and_erase_types(tuple.elements, env)
-
-        annotate({:{}, tuple.meta, elements}, Type.tuple(element_ts))
-
-      %AST.Pair{} = pair ->
-        fst = local_expand(pair.fst, env)
-        snd = local_expand(pair.snd, env)
-
-        {fst, snd}
-
-      %AST.List{} = list ->
-        Enum.map(list.elements, &local_expand(&1, env))
-
-      %AST.LocalCall{} = local_call ->
-        if Enum.member?(@supported_guards, {local_call.name, length(local_call.args)}) do
-          {args, t} = Guards.handle_guard(local_call.name, local_call.args, env)
-
-          annotate({local_call.name, local_call.meta, args}, t)
-        else
-          # TODO: Maybe raise because of an unsupported function call?
-          {local_call.name, local_call.meta, local_call.args}
-        end
-
-      %AST.Local{} = local ->
-        {local.name, local.meta, local.context}
-
-      %AST.Literal{} = literal ->
-        literal.value
+      annotate({ast.name, ast.meta, args}, t)
+    else
+      # TODO: Maybe raise because of an unsupported function call?
+      {ast.name, ast.meta, ast.args}
     end
+  end
+
+  def local_expand(%AST.Local{} = ast, _env) do
+    {ast.name, ast.meta, ast.context}
+  end
+
+  def local_expand(%AST.Literal{} = ast, _env) do
+    ast.value
   end
 end
