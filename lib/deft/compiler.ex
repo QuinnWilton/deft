@@ -97,8 +97,13 @@ defmodule Deft.Compiler do
     AST.Local.new(name, context, meta)
   end
 
-  def compile(literal) do
-    literal
+  def compile(literal)
+      when is_atom(literal)
+      when is_boolean(literal)
+      when is_float(literal)
+      when is_integer(literal)
+      when is_number(literal) do
+    AST.Literal.new(literal)
   end
 
   def compile_fn_arg({:"::", meta, [name, annotation]}) do

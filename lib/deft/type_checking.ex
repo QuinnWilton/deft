@@ -327,12 +327,8 @@ defmodule Deft.TypeChecking do
       %AST.Local{} = local ->
         {local.name, local.meta, local.context}
 
-      literal ->
-        if Macro.quoted_literal?(literal) do
-          literal
-        else
-          raise "Unexpected AST node: #{inspect(literal)}"
-        end
+      %AST.Literal{} = literal ->
+        literal.value
     end
   end
 end
