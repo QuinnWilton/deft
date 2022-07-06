@@ -57,13 +57,13 @@ defmodule Deft.Type do
   end
 
   def union(elements) do
-    elements = MapSet.new(elements)
+    union = Type.Union.new(elements)
 
     # A union of one type is just that type
-    if Enum.count(elements) == 1 do
-      Enum.at(elements, 0)
+    if Type.Union.size(union) == 1 do
+      Enum.at(Type.Union.types(union), 0)
     else
-      Type.Union.new(elements)
+      union
     end
   end
 
