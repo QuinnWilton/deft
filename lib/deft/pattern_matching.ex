@@ -43,13 +43,21 @@ defmodule Deft.PatternMatching do
         [{local, value_t}]
       end
 
-    {local, _, inner_bindings} =
+    {local, local_t, inner_bindings} =
       compute_and_erase_types(
         local,
         env
       )
 
-    {local, value_t, inner_bindings ++ local_bindings}
+    # TODO: This seems a bit hacky
+    type =
+      if is_nil(local_t) do
+        value_t
+      else
+        local_t
+      end
+
+    {local, type, inner_bindings ++ local_bindings}
   end
 
   defp do_handle_pattern(%AST.Pin{} = pin, value_t, env) do
@@ -63,29 +71,29 @@ defmodule Deft.PatternMatching do
     {{:^, pin.meta, [expr]}, expr_t, bindings}
   end
 
-  defp do_handle_pattern(%AST.Match{} = match, rhs_t, env) do
-    {value, lhs_t, value_bindings} =
+  defp do_handle_pattern(%AST.Match{} = match, type, env) do
+    {value, value_t, value_bindings} =
       do_handle_pattern(
         match.value,
-        rhs_t,
+        type,
         env
       )
 
-    unless Subtyping.subtype_of?(rhs_t, lhs_t) do
-      raise Deft.UnreachableBranchError, expected: rhs_t, actual: lhs_t
+    unless Subtyping.subtype_of?(type, value_t) do
+      raise Deft.UnreachableBranchError, expected: type, actual: value_t
     end
 
-    {pattern, _, pattern_bindings} =
+    {pattern, pattern_t, pattern_bindings} =
       do_handle_pattern(
         match.pattern,
-        lhs_t,
+        value_t,
         env
       )
 
     match = {:=, match.meta, [pattern, value]}
     bindings = value_bindings ++ pattern_bindings
 
-    {match, lhs_t, bindings}
+    {match, pattern_t, bindings}
   end
 
   defp do_handle_pattern(%AST.Tuple{} = tuple, value_t, env) do
