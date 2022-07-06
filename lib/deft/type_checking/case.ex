@@ -2,18 +2,17 @@ defmodule Deft.TypeChecking.Case do
   import Deft.Helpers
 
   alias Deft.AST
+  alias Deft.PatternMatching
   alias Deft.Type
-  alias Deft.TypeChecking
 
   def type_check(%AST.Case{} = case_ast, env) do
     {subject, subject_t, bindings} = compute_and_erase_types(case_ast.subject, env)
 
     {branches, branches_t} =
       Enum.map(case_ast.branches, fn
-        # TODO: Pattern matching. Most uses of case will fail.
         %AST.CaseBranch{} = branch ->
           {pattern, _, pattern_bindings} =
-            TypeChecking.Match.handle_pattern(branch.pattern, subject_t, env)
+            PatternMatching.handle_pattern(branch.pattern, subject_t, env)
 
           {body, body_t, _} =
             compute_and_erase_type_in_context(
