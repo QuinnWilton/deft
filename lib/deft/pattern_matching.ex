@@ -97,7 +97,10 @@ defmodule Deft.PatternMatching do
   end
 
   defp do_handle_pattern(%AST.Tuple{} = tuple, value_t, env) do
-    # TODO: handle case where value_t isn't a tuple, but pattern is
+    unless Subtyping.subtype_of?(value_t, Type.tuple()) do
+      raise Deft.UnreachableBranchError, expected: value_t, actual: Type.tuple()
+    end
+
     elements = tuple.elements
     element_types = Type.FixedTuple.elements(value_t)
 
@@ -112,10 +115,6 @@ defmodule Deft.PatternMatching do
     tuple = {:{}, tuple.meta, elements}
     tuple_t = Type.fixed_tuple(types)
 
-    unless Subtyping.subtype_of?(value_t, tuple_t) do
-      raise Deft.UnreachableBranchError, expected: value_t, actual: tuple_t
-    end
-
     {tuple, tuple_t, inner_bindings}
   end
 
@@ -124,8 +123,10 @@ defmodule Deft.PatternMatching do
   end
 
   defp do_handle_pattern(%AST.List{} = list, value_t, env) do
-    # TODO: handle case where value_t isn't a list, but pattern is
-    #
+    unless Subtyping.subtype_of?(value_t, Type.list()) do
+      raise Deft.UnreachableBranchError, expected: value_t, actual: Type.list()
+    end
+
     # TODO: should each element in the pattern take on the type
     # at that position?
     contents_t = Type.FixedList.contents(value_t)
