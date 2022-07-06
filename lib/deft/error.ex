@@ -59,8 +59,22 @@ defmodule Deft.UnsupportedLocalCall do
           name: atom(),
           arity: arity()
         }
+
   @impl true
   def message(exception) do
     "Call to unsupported local function: #{exception.name}/#{exception.arity}"
+  end
+end
+
+defmodule Deft.InexhaustivePatterns do
+  defexception [:missing]
+
+  @type t() :: %__MODULE__{
+          missing: term()
+        }
+
+  @impl true
+  def message(exception) do
+    "Inexhaustive patterns: missing branch for #{inspect(exception.missing)}"
   end
 end

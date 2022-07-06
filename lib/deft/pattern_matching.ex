@@ -97,12 +97,28 @@ defmodule Deft.PatternMatching do
   end
 
   defp do_handle_pattern(%AST.Tuple{} = tuple, value_t, env) do
-    unless Subtyping.subtype_of?(value_t, Type.tuple()) do
+    # HACK: Add helpers for "peeling" off layers of a union
+    value_tuple_ts =
+      Type.union(Enum.filter(Type.Union.types(value_t), &Subtyping.subtype_of?(Type.tuple(), &1)))
+
+    if is_struct(value_tuple_ts, Type.Union) and Type.Union.size(value_tuple_ts) == 0 do
       raise Deft.UnreachableBranchError, expected: value_t, actual: Type.tuple()
     end
 
     elements = tuple.elements
-    element_types = Type.FixedTuple.elements(value_t)
+
+    # HACK
+    element_types =
+      case value_tuple_ts do
+        %Type.Union{} ->
+          value_tuple_ts
+          |> Type.Union.types()
+          |> Enum.zip()
+          |> Enum.map(&Type.union/1)
+
+        %Type.FixedTuple{} ->
+          Type.FixedTuple.elements(value_tuple_ts)
+      end
 
     {elements, types, inner_bindings} =
       Enum.zip(elements, element_types)
@@ -123,7 +139,7 @@ defmodule Deft.PatternMatching do
   end
 
   defp do_handle_pattern(%AST.List{} = list, value_t, env) do
-    unless Subtyping.subtype_of?(value_t, Type.list()) do
+    unless Subtyping.subtype_of?(Type.list(), value_t) do
       raise Deft.UnreachableBranchError, expected: value_t, actual: Type.list()
     end
 
