@@ -51,3 +51,16 @@ defmodule Deft.UnreachableBranchError do
     "Branch unreachable: value has type #{inspect(exception.expected)}, but pattern has type #{inspect(exception.actual)}"
   end
 end
+
+defmodule Deft.UnsupportedLocalCall do
+  defexception [:name, :arity]
+
+  @type t() :: %__MODULE__{
+          name: atom(),
+          arity: arity()
+        }
+  @impl true
+  def message(exception) do
+    "Call to unsupported local function: #{exception.name}/#{exception.arity}"
+  end
+end

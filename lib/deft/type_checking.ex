@@ -59,8 +59,7 @@ defmodule Deft.TypeChecking do
       |> annotate_type(t)
       |> annotate_bindings(bindings)
     else
-      # TODO: Maybe raise because of an unsupported function call?
-      {ast.name, ast.meta, ast.args}
+      raise Deft.UnsupportedLocalCall, name: ast.name, arity: length(ast.args)
     end
   end
 
