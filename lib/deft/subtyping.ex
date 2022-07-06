@@ -13,6 +13,10 @@ defmodule Deft.Subtyping do
     true
   end
 
+  def subtype_of?(_, %Type.Bottom{}) do
+    true
+  end
+
   def subtype_of?(%Type.Number{}, t)
       when is_struct(t, Type.Number)
       when is_struct(t, Type.Integer)
