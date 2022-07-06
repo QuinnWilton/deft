@@ -43,7 +43,7 @@ defmodule Deft.Helpers do
     fst = type_of(fst)
     snd = type_of(snd)
 
-    Type.tuple([fst, snd])
+    Type.fixed_tuple([fst, snd])
   end
 
   # is_boolean/1 must be checked before is_atom/1

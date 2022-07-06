@@ -167,10 +167,8 @@ defmodule Deft.TypeChecking.Guards do
   def handle_guard(:tuple_size, [term], env) do
     {term, term_t, bindings} = compute_and_erase_types(term, env)
 
-    unless is_struct(term_t, Type.Tuple) do
-      # TODO This doesn't handle unions. I need a way of checking if a type
-      # subtypes any tuple
-      raise Deft.TypecheckingError, expected: Type.tuple([Type.top()]), actual: term_t
+    unless Subtyping.subtype_of?(Type.tuple(), term_t) do
+      raise Deft.TypecheckingError, expected: Type.tuple(), actual: term_t
     end
 
     {[term], Type.integer(), bindings}
@@ -237,8 +235,8 @@ defmodule Deft.TypeChecking.Guards do
     {tuple, tuple_t, tuple_bindings} = compute_and_erase_types(tuple, env)
     {index, index_t, index_bindings} = compute_and_erase_types(index, env)
 
-    unless is_struct(tuple_t, Type.Tuple) do
-      raise "Expected a tuple, got #{inspect(tuple_t)}"
+    unless Subtyping.subtype_of?(Type.tuple(), tuple_t) do
+      raise Deft.TypecheckingError, expected: Type.tuple(), actual: tuple_t
     end
 
     unless Subtyping.subtype_of?(Type.integer(), index_t) do
@@ -247,7 +245,7 @@ defmodule Deft.TypeChecking.Guards do
 
     type =
       tuple_t
-      |> Type.Tuple.unique_types()
+      |> Type.FixedTuple.unique_types()
       |> Type.union()
 
     bindings = tuple_bindings ++ index_bindings

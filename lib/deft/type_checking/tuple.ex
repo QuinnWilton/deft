@@ -8,7 +8,7 @@ defmodule Deft.TypeChecking.Tuple do
     {elements, element_ts, bindings} = compute_and_erase_types(tuple.elements, env)
 
     {:{}, tuple.meta, elements}
-    |> annotate_type(Type.tuple(element_ts))
+    |> annotate_type(Type.fixed_tuple(element_ts))
     |> annotate_bindings(bindings)
   end
 end

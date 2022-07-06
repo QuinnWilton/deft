@@ -170,9 +170,9 @@ defmodule Deft.Generators.Code do
     end)
   end
 
-  def argument_node(%Type.Tuple{} = type) do
+  def argument_node(%Type.FixedTuple{} = type) do
     type
-    |> Type.Tuple.elements()
+    |> Type.FixedTuple.elements()
     |> Enum.map(&argument_node/1)
     |> fixed_list()
     |> map(fn children ->
@@ -285,7 +285,7 @@ defmodule Deft.Generators.Code do
 
   def pair_node(child_data \\ literal_node()) do
     map({child_data, child_data}, fn {{fst, fst_type}, {snd, snd_type}} ->
-      {AST.Pair.new(fst, snd), Type.tuple([fst_type, snd_type])}
+      {AST.Pair.new(fst, snd), Type.fixed_tuple([fst_type, snd_type])}
     end)
   end
 
@@ -293,7 +293,7 @@ defmodule Deft.Generators.Code do
     map(list_of(child_data), fn children ->
       {elements, element_types} = Enum.unzip(children)
 
-      {AST.Tuple.new(elements), Type.tuple(element_types)}
+      {AST.Tuple.new(elements), Type.fixed_tuple(element_types)}
     end)
   end
 
@@ -331,7 +331,7 @@ defmodule Deft.Generators.Code do
     {node, type}
   end
 
-  def choose_fn({term, %Type.Tuple{}}) do
+  def choose_fn({term, %Type.FixedTuple{}}) do
     node = AST.LocalCall.new(:tuple_size, [term])
     type = Type.integer()
 
@@ -400,9 +400,9 @@ defmodule Deft.Generators.Code do
     end
   end
 
-  def choose_fn({fst, %Type.Tuple{} = tuple}, {snd, %Type.Integer{}}) do
+  def choose_fn({fst, %Type.FixedTuple{} = tuple}, {snd, %Type.Integer{}}) do
     node = AST.LocalCall.new(:elem, [fst, snd])
-    type = Type.union(Type.Tuple.elements(tuple))
+    type = Type.union(Type.FixedTuple.elements(tuple))
 
     {node, type}
   end

@@ -33,13 +33,13 @@ defmodule Deft.Annotations do
     elem0 = parse(elem0)
     elem1 = parse(elem1)
 
-    Type.tuple([elem0, elem1])
+    Type.fixed_tuple([elem0, elem1])
   end
 
   def parse({:{}, _, elements}) do
     elements = Enum.map(elements, &parse/1)
 
-    Type.tuple(elements)
+    Type.fixed_tuple(elements)
   end
 
   def parse({:|, _, [t1, t2]}) do

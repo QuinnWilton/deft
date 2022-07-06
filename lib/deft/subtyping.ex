@@ -17,6 +17,10 @@ defmodule Deft.Subtyping do
     true
   end
 
+  def subtype_of?(%Type.Tuple{}, %Type.FixedTuple{}) do
+    true
+  end
+
   def subtype_of?(%Type.Number{}, t)
       when is_struct(t, Type.Number)
       when is_struct(t, Type.Integer)
@@ -46,7 +50,7 @@ defmodule Deft.Subtyping do
     subtype_of?(Type.List.contents(t1), Type.List.contents(t2))
   end
 
-  def subtype_of?(%Type.Tuple{} = t1, %Type.Tuple{} = t2) do
+  def subtype_of?(%Type.FixedTuple{} = t1, %Type.FixedTuple{} = t2) do
     elements = Enum.zip(t1.elements, t2.elements)
 
     length(t1.elements) == length(t2.elements) and

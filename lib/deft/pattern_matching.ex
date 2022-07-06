@@ -99,7 +99,7 @@ defmodule Deft.PatternMatching do
   defp do_handle_pattern(%AST.Tuple{} = tuple, value_t, env) do
     # TODO: handle case where value_t isn't a tuple, but pattern is
     elements = tuple.elements
-    element_types = Type.Tuple.elements(value_t)
+    element_types = Type.FixedTuple.elements(value_t)
 
     {elements, types, inner_bindings} =
       Enum.zip(elements, element_types)
@@ -110,7 +110,7 @@ defmodule Deft.PatternMatching do
       end)
 
     tuple = {:{}, tuple.meta, elements}
-    tuple_t = Type.tuple(types)
+    tuple_t = Type.fixed_tuple(types)
 
     unless Subtyping.subtype_of?(value_t, tuple_t) do
       raise Deft.UnreachableBranchError, expected: value_t, actual: tuple_t

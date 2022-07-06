@@ -24,7 +24,7 @@ defmodule Deft.Generators.Types do
   def compound_type() do
     one_of([
       fn_type(),
-      tuple_type(),
+      fixed_tuple_type(),
       union_type(),
       list_type()
     ])
@@ -54,9 +54,9 @@ defmodule Deft.Generators.Types do
     end)
   end
 
-  def tuple_type() do
+  def fixed_tuple_type() do
     bind(list_of(primitive_type(), max_length: 8), fn elements ->
-      constant(Type.tuple(elements))
+      constant(Type.fixed_tuple(elements))
     end)
   end
 

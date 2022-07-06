@@ -13,6 +13,7 @@ defmodule Deft.Type do
     Type.Number,
     Type.Top,
     Type.Tuple,
+    Type.FixedTuple,
     Type.Union,
     Type.Intersection
   ]
@@ -53,8 +54,12 @@ defmodule Deft.Type do
     Type.Top.new()
   end
 
-  def tuple(elements) do
-    Type.Tuple.new(elements)
+  def tuple() do
+    Type.Tuple.new()
+  end
+
+  def fixed_tuple(elements) do
+    Type.FixedTuple.new(elements)
   end
 
   def union(elements) do

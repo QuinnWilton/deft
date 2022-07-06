@@ -50,8 +50,8 @@ defmodule Deft.ExampleTest do
 
     assert type ==
              Type.list(
-               Type.tuple([
-                 Type.tuple([
+               Type.fixed_tuple([
+                 Type.fixed_tuple([
                    Type.atom(),
                    Type.atom(),
                    Type.integer()
@@ -86,7 +86,7 @@ defmodule Deft.ExampleTest do
     assert result == {0, 1, 3, 4}
 
     assert type ==
-             Type.tuple([
+             Type.fixed_tuple([
                Type.integer(),
                Type.integer(),
                Type.integer(),
