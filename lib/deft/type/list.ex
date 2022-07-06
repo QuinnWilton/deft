@@ -1,26 +1,16 @@
 defmodule Deft.Type.List do
-  @enforce_keys [:contents]
+  @enforce_keys []
   defstruct @enforce_keys
 
-  def new(contents) do
-    %__MODULE__{
-      contents: contents
-    }
-  end
-
-  def contents(%__MODULE__{} = list) do
-    list.contents
+  def new() do
+    %__MODULE__{}
   end
 
   defimpl Inspect do
     import Inspect.Algebra
 
-    def inspect(t, opts) do
-      concat([
-        string("["),
-        Inspect.inspect(t.contents, opts),
-        string("]")
-      ])
+    def inspect(_t, _opts) do
+      string("list")
     end
   end
 end

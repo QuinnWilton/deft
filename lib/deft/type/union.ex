@@ -3,6 +3,15 @@ defmodule Deft.Type.Union do
   defstruct @enforce_keys
 
   def new(types) do
+    types =
+      Enum.flat_map(types, fn
+        %__MODULE__{} = union ->
+          types(union)
+
+        type ->
+          [type]
+      end)
+
     %__MODULE__{
       types: MapSet.new(types)
     }

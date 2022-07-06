@@ -122,7 +122,7 @@ defmodule Deft.Generators.Code do
   def list_node(child_data \\ literal_node()) do
     map(list_of(child_data), fn children ->
       {elements, element_types} = Enum.unzip(children)
-      type = Type.list(Type.union(element_types))
+      type = Type.fixed_list(Type.union(element_types))
 
       {AST.List.new(elements), type}
     end)
@@ -156,9 +156,9 @@ defmodule Deft.Generators.Code do
     end)
   end
 
-  def argument_node(%Type.List{} = type) do
+  def argument_node(%Type.FixedList{} = type) do
     type
-    |> Type.List.contents()
+    |> Type.FixedList.contents()
     |> argument_node()
     |> list_of()
     |> nonempty()
@@ -338,7 +338,7 @@ defmodule Deft.Generators.Code do
     {node, type}
   end
 
-  def choose_fn({term, %Type.List{} = list_type}) do
+  def choose_fn({term, %Type.FixedList{} = list_type}) do
     name =
       Enum.random([
         :length,
@@ -354,7 +354,7 @@ defmodule Deft.Generators.Code do
           Type.integer()
 
         :hd ->
-          Type.List.contents(list_type)
+          Type.FixedList.contents(list_type)
 
         :tl ->
           list_type

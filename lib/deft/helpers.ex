@@ -56,7 +56,7 @@ defmodule Deft.Helpers do
   def type_of(e) when is_list(e) do
     e_ts = types_of(e)
 
-    Type.list(Type.union(e_ts))
+    Type.fixed_list(Type.union(e_ts))
   end
 
   def type_of(e) do

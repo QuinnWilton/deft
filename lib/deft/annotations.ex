@@ -57,6 +57,6 @@ defmodule Deft.Annotations do
   end
 
   def parse([type]) do
-    Type.list(parse(type))
+    Type.fixed_list(parse(type))
   end
 end

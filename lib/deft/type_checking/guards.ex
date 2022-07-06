@@ -177,8 +177,8 @@ defmodule Deft.TypeChecking.Guards do
   def handle_guard(:length, [term], env) do
     {term, term_t, bindings} = compute_and_erase_types(term, env)
 
-    unless is_struct(term_t, Type.List) do
-      raise Deft.TypecheckingError, expected: Type.list(Type.top()), actual: term_t
+    unless Subtyping.subtype_of?(Type.list(), term_t) do
+      raise Deft.TypecheckingError, expected: Type.list(), actual: term_t
     end
 
     {[term], Type.integer(), bindings}
@@ -214,18 +214,18 @@ defmodule Deft.TypeChecking.Guards do
   def handle_guard(:hd, [term], env) do
     {term, term_t, bindings} = compute_and_erase_types(term, env)
 
-    unless is_struct(term_t, Type.List) do
-      raise Deft.TypecheckingError, expected: Type.list(Type.top()), actual: term_t
+    unless Subtyping.subtype_of?(Type.list(), term_t) do
+      raise Deft.TypecheckingError, expected: Type.list(), actual: term_t
     end
 
-    {[term], Type.List.contents(term_t), bindings}
+    {[term], Type.FixedList.contents(term_t), bindings}
   end
 
   def handle_guard(:tl, [term], env) do
     {term, term_t, bindings} = compute_and_erase_types(term, env)
 
-    unless is_struct(term_t, Type.List) do
-      raise Deft.TypecheckingError, expected: Type.list(Type.top()), actual: term_t
+    unless Subtyping.subtype_of?(Type.list(), term_t) do
+      raise Deft.TypecheckingError, expected: Type.list(), actual: term_t
     end
 
     {[term], term_t, bindings}

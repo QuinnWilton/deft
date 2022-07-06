@@ -49,7 +49,7 @@ defmodule Deft.ExampleTest do
            ]
 
     assert type ==
-             Type.list(
+             Type.fixed_list(
                Type.fixed_tuple([
                  Type.fixed_tuple([
                    Type.atom(),

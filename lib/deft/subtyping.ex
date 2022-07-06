@@ -21,6 +21,10 @@ defmodule Deft.Subtyping do
     true
   end
 
+  def subtype_of?(%Type.List{}, %Type.FixedList{}) do
+    true
+  end
+
   def subtype_of?(%Type.Number{}, t)
       when is_struct(t, Type.Number)
       when is_struct(t, Type.Integer)
@@ -46,8 +50,8 @@ defmodule Deft.Subtyping do
     inputs_subtype? and output_subtype?
   end
 
-  def subtype_of?(%Type.List{} = t1, %Type.List{} = t2) do
-    subtype_of?(Type.List.contents(t1), Type.List.contents(t2))
+  def subtype_of?(%Type.FixedList{} = t1, %Type.FixedList{} = t2) do
+    subtype_of?(Type.FixedList.contents(t1), Type.FixedList.contents(t2))
   end
 
   def subtype_of?(%Type.FixedTuple{} = t1, %Type.FixedTuple{} = t2) do

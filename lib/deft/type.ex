@@ -9,6 +9,7 @@ defmodule Deft.Type do
     Type.Fn,
     Type.Integer,
     Type.List,
+    Type.FixedList,
     Type.Number,
     Type.Number,
     Type.Top,
@@ -42,8 +43,12 @@ defmodule Deft.Type do
     Type.Integer.new()
   end
 
-  def list(contents) do
-    Type.List.new(contents)
+  def list() do
+    Type.List.new()
+  end
+
+  def fixed_list(contents) do
+    Type.FixedList.new(contents)
   end
 
   def number() do

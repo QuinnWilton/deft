@@ -128,7 +128,7 @@ defmodule Deft.PatternMatching do
     #
     # TODO: should each element in the pattern take on the type
     # at that position?
-    contents_t = Type.List.contents(value_t)
+    contents_t = Type.FixedList.contents(value_t)
 
     {elements, element_types, inner_bindings} =
       Enum.reduce(list.elements, {[], [], []}, fn
@@ -147,13 +147,13 @@ defmodule Deft.PatternMatching do
           }
       end)
 
-    elements_t = Type.list(Type.union(element_types))
+    elements_t = Type.fixed_list(Type.union(element_types))
 
     {elements, elements_t, inner_bindings}
   end
 
   defp do_handle_pattern(%AST.Cons{} = cons, value_t, env) do
-    list_t = Type.list(value_t)
+    list_t = Type.fixed_list(value_t)
 
     {head, _, head_bindings} = do_handle_pattern(cons.head, value_t, env)
     {rest, _, rest_bindings} = do_handle_pattern(cons.rest, list_t, env)

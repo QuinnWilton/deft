@@ -26,7 +26,7 @@ defmodule Deft.Generators.Types do
       fn_type(),
       fixed_tuple_type(),
       union_type(),
-      list_type()
+      fixed_list_type()
     ])
   end
 
@@ -66,9 +66,9 @@ defmodule Deft.Generators.Types do
     end)
   end
 
-  def list_type() do
+  def fixed_list_type() do
     bind(primitive_type(), fn type ->
-      constant(Type.list(type))
+      constant(Type.fixed_list(type))
     end)
   end
 
