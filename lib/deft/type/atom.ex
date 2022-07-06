@@ -1,5 +1,4 @@
 defmodule Deft.Type.Atom do
-  alias Deft.Type
   @enforce_keys []
   defstruct @enforce_keys
 

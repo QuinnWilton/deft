@@ -1,6 +1,4 @@
 defmodule Deft.Type.Integer do
-  alias Deft.Type
-
   @enforce_keys []
   defstruct @enforce_keys
 

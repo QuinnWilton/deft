@@ -3,8 +3,6 @@ defmodule Deft.TypeChecking.Match do
 
   alias Deft.AST
   alias Deft.PatternMatching
-  alias Deft.Subtyping
-  alias Deft.Type
 
   def type_check(%AST.Match{} = match, env) do
     {value, value_t, value_bindings} =
