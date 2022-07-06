@@ -36,7 +36,12 @@ defmodule Deft.PatternMatching do
   end
 
   defp do_handle_pattern(%AST.Local{} = local, value_t, env) do
-    local_bindings = [{local, value_t}]
+    local_bindings =
+      if local.name == :_ do
+        []
+      else
+        [{local, value_t}]
+      end
 
     {local, local_t, inner_bindings} =
       compute_and_erase_type_in_context(
@@ -130,12 +135,13 @@ defmodule Deft.PatternMatching do
   end
 
   defp do_handle_pattern(%AST.Cons{} = cons, value_t, env) do
-    {head, head_t, head_bindings} = do_handle_pattern(cons.head, value_t, env)
-    {rest, rest_t, rest_bindings} = do_handle_pattern(cons.rest, Type.list(value_t), env)
+    list_t = Type.list(value_t)
+
+    {head, _, head_bindings} = do_handle_pattern(cons.head, value_t, env)
+    {rest, _, rest_bindings} = do_handle_pattern(cons.rest, list_t, env)
 
     cons = {:|, cons.meta, [head, rest]}
-    cons_t = Type.list(Type.union([head_t, rest_t]))
 
-    {cons, cons_t, head_bindings ++ rest_bindings}
+    {cons, value_t, head_bindings ++ rest_bindings}
   end
 end

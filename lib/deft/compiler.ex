@@ -107,12 +107,11 @@ defmodule Deft.Compiler do
     AST.Literal.new(literal)
   end
 
-  def compile_fn_arg({:"::", meta, [name, annotation]}) do
-    # TODO: handle literals in function heads
+  def compile_fn_arg({:"::", meta, [pattern, annotation]}) do
+    pattern = compile_pattern(pattern)
     type = Annotations.parse(annotation)
-    name = compile(name)
 
-    AST.Annotation.new(name, type, meta)
+    AST.Annotation.new(pattern, type, meta)
   end
 
   def compile_pattern(literal)

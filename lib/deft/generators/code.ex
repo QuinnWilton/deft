@@ -39,8 +39,8 @@ defmodule Deft.Generators.Code do
   end
 
   def annotation_node() do
-    map({local_node(), Generators.Types.compound_type()}, fn {name, type} ->
-      {AST.Annotation.new(name, type), type}
+    map({local_node(), Generators.Types.compound_type()}, fn {pattern, type} ->
+      {AST.Annotation.new(pattern, type), type}
     end)
   end
 

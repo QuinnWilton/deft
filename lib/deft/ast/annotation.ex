@@ -1,10 +1,10 @@
 defmodule Deft.AST.Annotation do
-  @enforce_keys [:name, :type, :meta]
+  @enforce_keys [:pattern, :type, :meta]
   defstruct @enforce_keys
 
-  def new(name, type, meta \\ []) do
+  def new(pattern, type, meta \\ []) do
     %__MODULE__{
-      name: name,
+      pattern: pattern,
       type: type,
       meta: meta
     }

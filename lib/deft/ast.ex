@@ -2,8 +2,8 @@ defmodule Deft.AST do
   alias Deft.AST
 
   def postwalk(%AST.Annotation{} = ast, f) do
-    name = postwalk(ast.name, f)
-    ast = %{ast | name: name}
+    pattern = postwalk(ast.pattern, f)
+    ast = %{ast | pattern: pattern}
 
     f.(ast)
   end
