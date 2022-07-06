@@ -6,11 +6,19 @@ defmodule Deft.PatternMatching do
   alias Deft.Type
 
   def handle_pattern(pattern, value_t, env) do
-    do_handle_pattern(
-      pattern,
-      value_t,
-      env
-    )
+    {pattern, pattern_t, bindings} =
+      do_handle_pattern(
+        pattern,
+        value_t,
+        env
+      )
+
+    bindings =
+      bindings
+      |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
+      |> Enum.map(fn {local, types} -> {local, Type.intersection(types)} end)
+
+    {pattern, pattern_t, bindings}
   end
 
   defp do_handle_pattern(%AST.Literal{} = literal, value_t, env) do
@@ -28,8 +36,6 @@ defmodule Deft.PatternMatching do
   end
 
   defp do_handle_pattern(%AST.Local{} = local, value_t, env) do
-    # TODO: Handle conflicting rebinds:
-    # {x, x} = {1, 2}
     local_bindings = [{local, value_t}]
 
     {local, local_t, inner_bindings} =

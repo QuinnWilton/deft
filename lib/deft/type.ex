@@ -13,7 +13,8 @@ defmodule Deft.Type do
     Type.Number,
     Type.Top,
     Type.Tuple,
-    Type.Union
+    Type.Union,
+    Type.Intersection
   ]
 
   def atom() do
@@ -64,6 +65,17 @@ defmodule Deft.Type do
       Enum.at(Type.Union.types(union), 0)
     else
       union
+    end
+  end
+
+  def intersection(elements) do
+    intersection = Type.Intersection.new(elements)
+
+    # An intersection of one type is just that type
+    if Type.Intersection.size(intersection) == 1 do
+      Enum.at(Type.Intersection.types(intersection), 0)
+    else
+      intersection
     end
   end
 
