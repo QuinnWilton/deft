@@ -30,7 +30,7 @@ defmodule Deft.TypeChecking.If do
       raise Deft.TypecheckingError, expected: Type.boolean(), actual: predicate_t
     end
 
-    type = Type.Union.new([do_branch_t, else_branch_t])
+    type = Type.union([do_branch_t, else_branch_t])
 
     {:if, if_ast.meta, [predicate, [do: do_branch, else: else_branch]]}
     |> annotate_type(type)

@@ -46,9 +46,7 @@ defmodule Deft.Annotations do
     t1 = parse(t1)
     t2 = parse(t2)
 
-    [t1]
-    |> Type.Union.new()
-    |> Type.Union.put_type(t2)
+    Type.union([t1, t2])
   end
 
   def parse([{:->, _, [inputs, output]}]) do

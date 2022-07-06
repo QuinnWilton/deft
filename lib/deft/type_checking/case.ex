@@ -25,7 +25,7 @@ defmodule Deft.TypeChecking.Case do
       end)
       |> Enum.unzip()
 
-    type = Type.Union.new(branches_t)
+    type = Type.union(branches_t)
 
     {:case, case_ast.meta, [subject, [do: branches]]}
     |> annotate_type(type)

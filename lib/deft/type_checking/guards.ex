@@ -248,7 +248,7 @@ defmodule Deft.TypeChecking.Guards do
     type =
       tuple_t
       |> Type.Tuple.unique_types()
-      |> Type.Union.new()
+      |> Type.union()
 
     bindings = tuple_bindings ++ index_bindings
 

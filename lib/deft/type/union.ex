@@ -20,7 +20,11 @@ defmodule Deft.Type.Union do
     MapSet.to_list(union.types)
   end
 
-  def put_type(%__MODULE__{} = union, type) do
+  defp put_type(%__MODULE__{} = union, %__MODULE__{} = type) do
+    Enum.reduce(types(type), union, &put_type(&2, &1))
+  end
+
+  defp put_type(%__MODULE__{} = union, type) do
     # TODO: Very inefficient
     candidate_types =
       case type do

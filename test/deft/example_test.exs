@@ -50,19 +50,13 @@ defmodule Deft.ExampleTest do
 
     assert type ==
              Type.list(
-               Type.union([
+               Type.tuple([
                  Type.tuple([
-                   Type.union([
-                     Type.tuple([
-                       Type.atom(),
-                       Type.atom(),
-                       Type.integer()
-                     ])
-                   ]),
-                   Type.union([
-                     Type.Atom.new()
-                   ])
-                 ])
+                   Type.atom(),
+                   Type.atom(),
+                   Type.integer()
+                 ]),
+                 Type.Atom.new()
                ])
              )
   end
@@ -93,10 +87,10 @@ defmodule Deft.ExampleTest do
 
     assert type ==
              Type.tuple([
-               Type.union([Type.integer()]),
-               Type.union([Type.integer()]),
-               Type.union([Type.integer()]),
-               Type.union([Type.integer()])
+               Type.integer(),
+               Type.integer(),
+               Type.integer(),
+               Type.integer()
              ])
   end
 end
