@@ -112,7 +112,6 @@ defmodule Deft.Helpers do
   end
 
   def compute_and_erase_type_in_context(ast, context, env) do
-    # TODO: Handle pin operator
     ast =
       Enum.reduce(context, ast, fn
         {%AST.Local{name: name, context: context}, t}, acc ->

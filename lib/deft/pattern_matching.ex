@@ -43,14 +43,24 @@ defmodule Deft.PatternMatching do
         [{local, value_t}]
       end
 
-    {local, local_t, inner_bindings} =
-      compute_and_erase_type_in_context(
+    {local, _, inner_bindings} =
+      compute_and_erase_types(
         local,
-        local_bindings,
         env
       )
 
-    {local, local_t, inner_bindings ++ local_bindings}
+    {local, value_t, inner_bindings ++ local_bindings}
+  end
+
+  defp do_handle_pattern(%AST.Pin{} = pin, value_t, env) do
+    {expr, expr_t, bindings} = handle_pattern(pin.expr, value_t, env)
+
+    # Is this correct? Should the local be an intersection of expr_t and value_t?
+    unless Subtyping.subtype_of?(value_t, expr_t) do
+      raise Deft.TypecheckingError, expected: value_t, actual: expr_t
+    end
+
+    {{:^, pin.meta, [expr]}, expr_t, bindings}
   end
 
   defp do_handle_pattern(%AST.Match{} = match, rhs_t, env) do

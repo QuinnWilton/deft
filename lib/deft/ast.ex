@@ -8,6 +8,13 @@ defmodule Deft.AST do
     f.(ast)
   end
 
+  def postwalk(%AST.Pin{} = ast, f) do
+    expr = postwalk(ast.expr, f)
+    ast = %{ast | expr: expr}
+
+    f.(ast)
+  end
+
   def postwalk(%AST.Block{} = ast, f) do
     exprs = postwalk(ast.exprs, f)
     ast = %{ast | exprs: exprs}

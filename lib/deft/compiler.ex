@@ -123,6 +123,12 @@ defmodule Deft.Compiler do
     AST.Literal.new(literal)
   end
 
+  def compile_pattern({:^, meta, [expr]}) do
+    expr = compile_pattern(expr)
+
+    AST.Pin.new(expr, meta)
+  end
+
   def compile_pattern({:|, meta, [head, rest]}) do
     head = compile_pattern(head)
     rest = compile_pattern(rest)
