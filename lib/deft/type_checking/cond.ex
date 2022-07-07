@@ -20,7 +20,7 @@ defmodule Deft.TypeChecking.Cond do
       end)
       |> Enum.unzip()
 
-    type = Type.union(branch_ts)
+    type = Enum.reduce(branch_ts, &Type.union/2)
 
     {:cond, cond_ast.meta, [[do: branches]]}
     |> annotate_type(type)

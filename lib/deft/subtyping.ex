@@ -64,15 +64,11 @@ defmodule Deft.Subtyping do
   end
 
   def subtype_of?(t1, %Type.Union{} = t2) do
-    t2
-    |> Type.Union.types()
-    |> Enum.all?(&subtype_of?(t1, &1))
+    subtype_of?(t1, t2.fst) and subtype_of?(t1, t2.snd)
   end
 
   def subtype_of?(%Type.Union{} = t1, t2) do
-    t1
-    |> Type.Union.types()
-    |> Enum.any?(&subtype_of?(&1, t2))
+    subtype_of?(t1.fst, t2) or subtype_of?(t1.snd, t2)
   end
 
   def subtype_of?(t1, %Type.Intersection{} = t2) do

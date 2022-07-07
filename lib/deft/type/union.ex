@@ -1,42 +1,23 @@
 defmodule Deft.Type.Union do
-  @enforce_keys [:types]
+  @enforce_keys [:fst, :snd]
   defstruct @enforce_keys
 
-  def new(types) do
-    types =
-      Enum.flat_map(types, fn
-        %__MODULE__{} = union ->
-          types(union)
-
-        type ->
-          [type]
-      end)
-
+  def new(fst, snd) do
     %__MODULE__{
-      types: MapSet.new(types)
+      fst: fst,
+      snd: snd
     }
-  end
-
-  def size(%__MODULE__{} = union) do
-    MapSet.size(union.types)
-  end
-
-  def types(%__MODULE__{} = union) do
-    MapSet.to_list(union.types)
   end
 
   defimpl Inspect do
     import Inspect.Algebra
 
     def inspect(t, opts) do
-      container_doc(
-        "",
-        @for.types(t),
-        "",
-        opts,
-        fn i, _opts -> Inspect.inspect(i, opts) end,
-        separator: " |"
-      )
+      concat([
+        Inspect.inspect(t.fst, opts),
+        " | ",
+        Inspect.inspect(t.snd, opts)
+      ])
     end
   end
 end

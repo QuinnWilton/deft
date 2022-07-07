@@ -246,7 +246,7 @@ defmodule Deft.TypeChecking.Guards do
     type =
       tuple_t
       |> Type.FixedTuple.unique_types()
-      |> Type.union()
+      |> Enum.reduce(Type.bottom(), &Type.union/2)
 
     bindings = tuple_bindings ++ index_bindings
 

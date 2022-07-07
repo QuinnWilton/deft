@@ -67,8 +67,7 @@ defmodule Deft.Generators.Code do
             [AST.CaseBranch.new(local, local)]
 
         branch_types = branch_types ++ [subject_type]
-
-        type = Type.union(branch_types)
+        type = Enum.reduce(branch_types, &Type.union/2)
 
         {AST.Case.new(subject, branches), type}
       end)
@@ -84,7 +83,7 @@ defmodule Deft.Generators.Code do
   def cond_node(child_data \\ literal_node()) do
     map(nonempty(list_of(cond_branch_node(child_data))), fn children ->
       {branches, branch_types} = Enum.unzip(children)
-      type = Type.union(branch_types)
+      type = Enum.reduce(branch_types, &Type.union/2)
 
       {AST.Cond.new(branches), type}
     end)
@@ -124,10 +123,10 @@ defmodule Deft.Generators.Code do
         {else_branch, else_type}
       } ->
         type =
-          Type.union([
+          Type.union(
             do_type,
             else_type
-          ])
+          )
 
         {AST.If.new(predicate, do_branch, else_branch), type}
     end)
@@ -136,15 +135,18 @@ defmodule Deft.Generators.Code do
   def list_node(child_data \\ literal_node()) do
     map(list_of(child_data), fn children ->
       {elements, element_types} = Enum.unzip(children)
-      type = Type.fixed_list(Type.union(element_types))
+
+      type =
+        element_types
+        |> Enum.reduce(Type.bottom(), &Type.union/2)
+        |> Type.fixed_list()
 
       {AST.List.new(elements), type}
     end)
   end
 
   def argument_node(%Type.Union{} = type) do
-    type
-    |> Type.Union.types()
+    [type.fst, type.snd]
     |> Enum.random()
     |> argument_node()
   end
@@ -418,7 +420,11 @@ defmodule Deft.Generators.Code do
 
   def choose_fn({fst, %Type.FixedTuple{} = tuple}, {snd, %Type.Integer{}}) do
     node = AST.LocalCall.new(:elem, [fst, snd])
-    type = Type.union(Type.FixedTuple.elements(tuple))
+
+    type =
+      tuple
+      |> Type.FixedTuple.elements()
+      |> Enum.reduce(Type.bottom(), &Type.union/2)
 
     {node, type}
   end

@@ -1,22 +1,22 @@
 defmodule Deft.Type do
+  alias Deft.Subtyping
   alias Deft.Type
 
   @types [
     Type.Atom,
     Type.Boolean,
     Type.Bottom,
+    Type.FixedList,
+    Type.FixedTuple,
     Type.Float,
     Type.Fn,
     Type.Integer,
+    Type.Intersection,
     Type.List,
-    Type.FixedList,
-    Type.Number,
     Type.Number,
     Type.Top,
     Type.Tuple,
-    Type.FixedTuple,
-    Type.Union,
-    Type.Intersection
+    Type.Union
   ]
 
   def atom() do
@@ -67,14 +67,19 @@ defmodule Deft.Type do
     Type.FixedTuple.new(elements)
   end
 
-  def union(elements) do
-    union = Type.Union.new(elements)
+  def union(fst, snd) do
+    cond do
+      fst == snd ->
+        fst
 
-    # A union of one type is just that type
-    if Type.Union.size(union) == 1 do
-      Enum.at(Type.Union.types(union), 0)
-    else
-      union
+      Subtyping.subtype_of?(fst, snd) ->
+        fst
+
+      Subtyping.subtype_of?(snd, fst) ->
+        snd
+
+      true ->
+        Type.Union.new(fst, snd)
     end
   end
 

@@ -3,6 +3,13 @@ defmodule Deft.Helpers do
   alias Deft.Type
   alias Deft.TypeChecking
 
+  defguard is_literal_type(term)
+           when is_struct(term, Type.Atom) or
+                  is_struct(term, Type.Boolean) or
+                  is_struct(term, Type.Float) or
+                  is_struct(term, Type.Integer) or
+                  is_struct(term, Type.Number)
+
   def annotate_type(e, t) when is_list(e) do
     Keyword.put(e, :__deft_type__, t)
   end
@@ -54,9 +61,10 @@ defmodule Deft.Helpers do
   def type_of(e) when is_number(e), do: Type.number()
 
   def type_of(e) when is_list(e) do
-    e_ts = types_of(e)
-
-    Type.fixed_list(Type.union(e_ts))
+    e
+    |> types_of()
+    |> Enum.reduce(Type.bottom(), &Type.union/2)
+    |> Type.fixed_list()
   end
 
   def type_of(e) do

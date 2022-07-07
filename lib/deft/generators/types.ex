@@ -62,7 +62,9 @@ defmodule Deft.Generators.Types do
 
   def union_type() do
     bind(list_of(primitive_type(), min_length: 1, max_length: 8), fn elements ->
-      constant(Type.union(elements))
+      elements
+      |> Enum.reduce(Type.bottom(), &Type.union/2)
+      |> constant()
     end)
   end
 
