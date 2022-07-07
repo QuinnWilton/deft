@@ -32,7 +32,7 @@ defmodule Deft.TypeChecking.Case do
     if is_struct(subject_t, Type.Union) do
       missing =
         Enum.find(Type.Union.types(subject_t), fn t ->
-          not Enum.any?(patterns_t, &Subtyping.subtype_of?(t, &1))
+          not Enum.any?(patterns_t, &Subtyping.subtype_of?(&1, t))
         end)
 
       if missing do
