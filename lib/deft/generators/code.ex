@@ -54,6 +54,20 @@ defmodule Deft.Generators.Code do
     bind(child_data, fn {subject, subject_type} ->
       map(nonempty(list_of(case_branch_node(subject_type, child_data))), fn children ->
         {branches, branch_types} = Enum.unzip(children)
+
+        # HACK: Catch-all branch to beat exhaustiveness checking.
+        # I should be using the type of the subject to generate
+        # branches from elimination rules though.
+        {name, meta, context} = Macro.unique_var(:x, __MODULE__)
+
+        local = AST.Local.new(name, context, meta)
+
+        branches =
+          branches ++
+            [AST.CaseBranch.new(local, local)]
+
+        branch_types = branch_types ++ [subject_type]
+
         type = Type.union(branch_types)
 
         {AST.Case.new(subject, branches), type}
