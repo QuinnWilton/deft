@@ -114,12 +114,17 @@ defmodule Deft.Helpers do
   def compute_and_erase_type_in_context(ast, context, env) do
     ast =
       Enum.reduce(context, ast, fn
-        {%AST.Local{name: name, context: context}, t}, acc ->
+        {%AST.Local{name: name, context: context} = x, t}, acc ->
           AST.postwalk(acc, fn
             %AST.Local{name: ^name, context: ^context} = local ->
-              meta = annotate_type(local.meta, t)
+              # HACK: Encapsulate this in Local
+              if Keyword.get(local.meta, :counter) == Keyword.get(x.meta, :counter) do
+                meta = annotate_type(local.meta, t)
 
-              %{local | meta: meta}
+                %{local | meta: meta}
+              else
+                local
+              end
 
             acc ->
               acc

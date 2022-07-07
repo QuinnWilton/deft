@@ -382,13 +382,15 @@ defmodule Deft.Generators.Code do
 
       {node, type}
     else
+      {name, meta, context} = Macro.unique_var(:x, __MODULE__)
+
       node =
         AST.FnApplication.new(
           AST.Fn.new(
-            AST.Local.new(:x, Elixir),
+            AST.Local.new(name, context, meta),
             [
               AST.Annotation.new(
-                AST.Local.new(:x, Elixir),
+                AST.Local.new(name, context, meta),
                 type
               )
             ]
