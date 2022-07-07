@@ -99,7 +99,18 @@ defmodule Deft.PatternMatching do
   defp do_handle_pattern(%AST.Tuple{} = tuple, value_t, env) do
     # HACK: Add helpers for "peeling" off layers of a union
     value_tuple_ts =
-      Type.union(Enum.filter(Type.Union.types(value_t), &Subtyping.subtype_of?(Type.tuple(), &1)))
+      case value_t do
+        %Type.FixedTuple{} ->
+          value_t
+
+        %Type.Union{} ->
+          Type.union(
+            Enum.filter(Type.Union.types(value_t), &Subtyping.subtype_of?(Type.tuple(), &1))
+          )
+
+        _ ->
+          Type.union([])
+      end
 
     if is_struct(value_tuple_ts, Type.Union) and Type.Union.size(value_tuple_ts) == 0 do
       raise Deft.UnreachableBranchError, expected: value_t, actual: Type.tuple()
@@ -139,21 +150,43 @@ defmodule Deft.PatternMatching do
   end
 
   defp do_handle_pattern(%AST.List{} = list, value_t, env) do
-    unless Subtyping.subtype_of?(Type.list(), value_t) do
+    # HACK: Add helpers for "peeling" off layers of a union
+    value_list_ts =
+      case value_t do
+        %Type.FixedList{} ->
+          value_t
+
+        %Type.Union{} ->
+          Type.union(
+            Enum.filter(Type.Union.types(value_t), &Subtyping.subtype_of?(Type.list(), &1))
+          )
+
+        _ ->
+          Type.union([])
+      end
+
+    if is_struct(value_list_ts, Type.Union) and Type.Union.size(value_list_ts) == 0 do
       raise Deft.UnreachableBranchError, expected: value_t, actual: Type.list()
     end
 
+    type =
+      if is_struct(value_list_ts, Type.Union) do
+        Type.Union.types(value_list_ts)
+        |> Enum.map(&Type.FixedList.contents/1)
+        |> Type.union()
+      else
+        Type.FixedList.contents(value_list_ts)
+      end
+
     # TODO: should each element in the pattern take on the type
     # at that position?
-    contents_t = Type.FixedList.contents(value_t)
-
     {elements, element_types, inner_bindings} =
       Enum.reduce(list.elements, {[], [], []}, fn
         element, {elements, element_types, inner_bindings} ->
           {element, element_t, element_bindings} =
             do_handle_pattern(
               element,
-              contents_t,
+              type,
               env
             )
 
