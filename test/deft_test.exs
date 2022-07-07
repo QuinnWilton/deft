@@ -7,15 +7,9 @@ defmodule DeftTest do
   alias Deft.Type
 
   property "computes the type for an expression" do
-    check all({expr, expected} <- Generators.Code.expression()) do
+    check all({expr, expected} <- Generators.Code.expression(), max_shrinking_steps: 0) do
       assert actual = Deft.Helpers.compute_types(expr, __ENV__)
       assert Type.well_formed?(actual)
-
-      pretty =
-        expr
-        |> Deft.Helpers.erase_types(__ENV__)
-        |> Macro.to_string()
-
       # HACK: It isn't enough to check subtyping.
       # Consider this case:
       #
@@ -36,22 +30,8 @@ defmodule DeftTest do
         for type <- Type.Union.types(expected) do
           actual_types = Type.Union.types(actual)
 
-          unless Enum.any?(actual_types, &Subtyping.subtype_of?(type, &1)) do
-            IO.inspect(expected, structs: false, label: :expected)
-            IO.inspect(actual, structs: false, label: :actual)
-            IO.inspect(expr, label: :expr)
-            IO.puts(pretty)
-          end
-
           assert Enum.any?(actual_types, &Subtyping.subtype_of?(type, &1))
         end
-      end
-
-      unless Subtyping.subtype_of?(expected, actual) do
-        IO.inspect(expected, structs: false, label: :expected)
-        IO.inspect(actual, structs: false, label: :actual)
-        IO.inspect(expr, label: :expr)
-        IO.puts(pretty)
       end
 
       assert Subtyping.subtype_of?(expected, actual)
