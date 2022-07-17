@@ -5,25 +5,28 @@ defmodule Deft.TypeChecking.If do
   alias Deft.Subtyping
   alias Deft.Type
 
-  def type_check(%AST.If{} = if_ast, env) do
+  def type_check(%AST.If{} = if_ast, env, opts) do
     {predicate, predicate_t, bindings} =
       compute_and_erase_types(
         if_ast.predicate,
-        env
+        env,
+        opts
       )
 
     {do_branch, do_branch_t, _} =
       compute_and_erase_type_in_context(
         if_ast.do,
         bindings,
-        env
+        env,
+        opts
       )
 
     {else_branch, else_branch_t, _} =
       compute_and_erase_type_in_context(
         if_ast.else,
         bindings,
-        env
+        env,
+        opts
       )
 
     unless Subtyping.subtype_of?(Type.boolean(), predicate_t) do

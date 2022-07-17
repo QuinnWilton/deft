@@ -6,20 +6,21 @@ defmodule Deft.TypeChecking.Case do
   alias Deft.Subtyping
   alias Deft.Type
 
-  def type_check(%AST.Case{} = case_ast, env) do
-    {subject, subject_type, bindings} = compute_and_erase_types(case_ast.subject, env)
+  def type_check(%AST.Case{} = case_ast, env, opts) do
+    {subject, subject_type, bindings} = compute_and_erase_types(case_ast.subject, env, opts)
 
     {branches, types} =
       Enum.map(case_ast.branches, fn
         %AST.CaseBranch{} = branch ->
           {pattern, pattern_t, pattern_bindings} =
-            PatternMatching.handle_pattern(branch.pattern, subject_type, env)
+            PatternMatching.handle_pattern(branch.pattern, subject_type, env, opts)
 
           {body, body_t, _} =
             compute_and_erase_type_in_context(
               branch.body,
               bindings ++ pattern_bindings,
-              env
+              env,
+              opts
             )
 
           {{:->, branch.meta, [[pattern], body]}, {pattern_t, body_t}}

@@ -75,33 +75,40 @@ defmodule Deft.Helpers do
     Enum.map(es, &type_of/1)
   end
 
-  def compute_types(ast, env) do
+  def compute_types(ast, env, opts) do
     if is_list(ast) do
-      Enum.map(ast, &compute_types(&1, env))
+      Enum.map(ast, &compute_types(&1, env, opts))
     else
-      ast
-      |> TypeChecking.type_check(env)
-      |> type_of()
+      type =
+        ast
+        |> TypeChecking.type_check(env, opts)
+        |> type_of()
+
+      if callback = opts[:on_compute] do
+        callback.(ast, type)
+      end
+
+      type
     end
   end
 
-  def erase_types(ast, env) do
+  def erase_types(ast, env, opts) do
     if is_list(ast) do
-      Enum.map(ast, &erase_types(&1, env))
+      Enum.map(ast, &erase_types(&1, env, opts))
     else
       ast
-      |> TypeChecking.type_check(env)
+      |> TypeChecking.type_check(env, opts)
       |> delete_annotations()
     end
   end
 
-  def compute_and_erase_types(ast, env) do
+  def compute_and_erase_types(ast, env, opts) do
     {ast, t, bindings} =
       if is_list(ast) do
         # TODO: Messy
         {nodes_types, bindings} =
           ast
-          |> Enum.map(&compute_and_erase_types(&1, env))
+          |> Enum.map(&compute_and_erase_types(&1, env, opts))
           |> Enum.map(fn {ast, type, bindings} -> {{ast, type}, bindings} end)
           |> Enum.unzip()
 
@@ -110,16 +117,21 @@ defmodule Deft.Helpers do
 
         {nodes, types, bindings}
       else
-        ast = TypeChecking.type_check(ast, env)
+        ast = TypeChecking.type_check(ast, env, opts)
         ast_erased = delete_annotations(ast)
+        type = type_of(ast)
 
-        {ast_erased, type_of(ast), bindings_for(ast)}
+        if callback = opts[:on_compute] do
+          callback.(ast, type)
+        end
+
+        {ast_erased, type, bindings_for(ast)}
       end
 
     {ast, t, bindings}
   end
 
-  def compute_and_erase_type_in_context(ast, context, env) do
+  def compute_and_erase_type_in_context(ast, context, env, opts) do
     ast =
       Enum.reduce(context, ast, fn
         {%AST.Local{name: name, context: context} = x, t}, acc ->
@@ -139,6 +151,6 @@ defmodule Deft.Helpers do
           end)
       end)
 
-    compute_and_erase_types(ast, env)
+    compute_and_erase_types(ast, env, opts)
   end
 end

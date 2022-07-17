@@ -7,7 +7,8 @@ defmodule Deft do
     {block, type, _bindings} =
       Deft.Helpers.compute_and_erase_types(
         block,
-        __CALLER__
+        __CALLER__,
+        []
       )
 
     {block, Macro.escape(type)}
@@ -19,7 +20,8 @@ defmodule Deft do
     {_block, type, bindings} =
       Deft.Helpers.compute_and_erase_types(
         block,
-        __CALLER__
+        __CALLER__,
+        []
       )
 
     Macro.escape({type, bindings})

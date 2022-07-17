@@ -4,56 +4,56 @@ defmodule Deft.TypeChecking do
   alias Deft.AST
   alias Deft.TypeChecking
 
-  def type_check(%AST.Annotation{} = ast, env) do
-    TypeChecking.Annotation.type_check(ast, env)
+  def type_check(%AST.Annotation{} = ast, env, opts) do
+    TypeChecking.Annotation.type_check(ast, env, opts)
   end
 
-  def type_check(%AST.Block{} = ast, env) do
-    TypeChecking.Block.type_check(ast, env)
+  def type_check(%AST.Block{} = ast, env, opts) do
+    TypeChecking.Block.type_check(ast, env, opts)
   end
 
-  def type_check(%AST.Match{} = ast, env) do
-    TypeChecking.Match.type_check(ast, env)
+  def type_check(%AST.Match{} = ast, env, opts) do
+    TypeChecking.Match.type_check(ast, env, opts)
   end
 
-  def type_check(%AST.Fn{} = ast, env) do
-    TypeChecking.Fn.type_check(ast, env)
+  def type_check(%AST.Fn{} = ast, env, opts) do
+    TypeChecking.Fn.type_check(ast, env, opts)
   end
 
-  def type_check(%AST.FnApplication{} = ast, env) do
-    TypeChecking.FnApplication.type_check(ast, env)
+  def type_check(%AST.FnApplication{} = ast, env, opts) do
+    TypeChecking.FnApplication.type_check(ast, env, opts)
   end
 
-  def type_check(%AST.If{} = ast, env) do
-    TypeChecking.If.type_check(ast, env)
+  def type_check(%AST.If{} = ast, env, opts) do
+    TypeChecking.If.type_check(ast, env, opts)
   end
 
-  def type_check(%AST.Cond{} = ast, env) do
-    TypeChecking.Cond.type_check(ast, env)
+  def type_check(%AST.Cond{} = ast, env, opts) do
+    TypeChecking.Cond.type_check(ast, env, opts)
   end
 
-  def type_check(%AST.Case{} = ast, env) do
-    TypeChecking.Case.type_check(ast, env)
+  def type_check(%AST.Case{} = ast, env, opts) do
+    TypeChecking.Case.type_check(ast, env, opts)
   end
 
-  def type_check(%AST.Tuple{} = ast, env) do
-    TypeChecking.Tuple.type_check(ast, env)
+  def type_check(%AST.Tuple{} = ast, env, opts) do
+    TypeChecking.Tuple.type_check(ast, env, opts)
   end
 
-  def type_check(%AST.Pair{} = ast, env) do
-    fst = type_check(ast.fst, env)
-    snd = type_check(ast.snd, env)
+  def type_check(%AST.Pair{} = ast, env, opts) do
+    fst = type_check(ast.fst, env, opts)
+    snd = type_check(ast.snd, env, opts)
 
     {fst, snd}
   end
 
-  def type_check(%AST.List{} = ast, env) do
-    Enum.map(ast.elements, &type_check(&1, env))
+  def type_check(%AST.List{} = ast, env, opts) do
+    Enum.map(ast.elements, &type_check(&1, env, opts))
   end
 
-  def type_check(%AST.LocalCall{} = ast, env) do
+  def type_check(%AST.LocalCall{} = ast, env, opts) do
     if TypeChecking.Guards.supported?(ast.name, length(ast.args)) do
-      {args, t, bindings} = TypeChecking.Guards.handle_guard(ast.name, ast.args, env)
+      {args, t, bindings} = TypeChecking.Guards.handle_guard(ast.name, ast.args, env, opts)
 
       {ast.name, ast.meta, args}
       |> annotate_type(t)
@@ -63,11 +63,11 @@ defmodule Deft.TypeChecking do
     end
   end
 
-  def type_check(%AST.Local{} = ast, _env) do
+  def type_check(%AST.Local{} = ast, _env, _opts) do
     {ast.name, ast.meta, ast.context}
   end
 
-  def type_check(%AST.Literal{} = ast, _env) do
+  def type_check(%AST.Literal{} = ast, _env, _opts) do
     ast.value
   end
 end

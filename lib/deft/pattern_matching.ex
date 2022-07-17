@@ -5,8 +5,8 @@ defmodule Deft.PatternMatching do
   alias Deft.Subtyping
   alias Deft.Type
 
-  def handle_pattern(pattern, type, env) do
-    case do_handle_pattern(pattern, type, env) do
+  def handle_pattern(pattern, type, env, opts) do
+    case do_handle_pattern(pattern, type, env, opts) do
       {:ok, result} ->
         result
 
@@ -15,9 +15,9 @@ defmodule Deft.PatternMatching do
     end
   end
 
-  defp do_handle_pattern(pattern, %Type.Union{} = type, env) do
-    fst = do_handle_pattern(pattern, type.fst, env)
-    snd = do_handle_pattern(pattern, type.snd, env)
+  defp do_handle_pattern(pattern, %Type.Union{} = type, env, opts) do
+    fst = do_handle_pattern(pattern, type.fst, env, opts)
+    snd = do_handle_pattern(pattern, type.snd, env, opts)
 
     case {fst, snd} do
       {{:error, fst_type}, {:error, snd_type}} ->
@@ -44,16 +44,17 @@ defmodule Deft.PatternMatching do
     end
   end
 
-  defp do_handle_pattern(%AST.Pair{} = pair, type, env) do
-    do_handle_pattern(AST.Tuple.new([pair.fst, pair.snd]), type, env)
+  defp do_handle_pattern(%AST.Pair{} = pair, type, env, opts) do
+    do_handle_pattern(AST.Tuple.new([pair.fst, pair.snd]), type, env, opts)
   end
 
-  defp do_handle_pattern(%AST.Literal{} = literal, type, env)
+  defp do_handle_pattern(%AST.Literal{} = literal, type, env, opts)
        when is_literal_type(type) do
     {pattern, pattern_type, pattern_bindings} =
       compute_and_erase_types(
         literal,
-        env
+        env,
+        opts
       )
 
     if Subtyping.subtype_of?(type, pattern_type) do
@@ -63,7 +64,7 @@ defmodule Deft.PatternMatching do
     end
   end
 
-  defp do_handle_pattern(%AST.Local{} = local, type, env) do
+  defp do_handle_pattern(%AST.Local{} = local, type, env, opts) do
     local_bindings =
       if local.name == :_ do
         []
@@ -74,7 +75,8 @@ defmodule Deft.PatternMatching do
     {pattern, pattern_type, pattern_bindings} =
       compute_and_erase_types(
         local,
-        env
+        env,
+        opts
       )
 
     # TODO: This seems a bit hacky
@@ -88,8 +90,8 @@ defmodule Deft.PatternMatching do
     {:ok, {pattern, pattern_type, pattern_bindings ++ local_bindings}}
   end
 
-  defp do_handle_pattern(%AST.Pin{} = pin, type, env) do
-    case do_handle_pattern(pin.expr, type, env) do
+  defp do_handle_pattern(%AST.Pin{} = pin, type, env, opts) do
+    case do_handle_pattern(pin.expr, type, env, opts) do
       {:error, pattern_type} ->
         {:error, pattern_type}
 
@@ -103,8 +105,8 @@ defmodule Deft.PatternMatching do
     end
   end
 
-  defp do_handle_pattern(%AST.Match{} = match, type, env) do
-    case do_handle_pattern(match.value, type, env) do
+  defp do_handle_pattern(%AST.Match{} = match, type, env, opts) do
+    case do_handle_pattern(match.value, type, env, opts) do
       {:error, pattern_type} ->
         {:error, pattern_type}
 
@@ -114,7 +116,8 @@ defmodule Deft.PatternMatching do
             do_handle_pattern(
               match.pattern,
               type,
-              env
+              env,
+              opts
             )
 
           pattern = {:=, match.meta, [pattern, value]}
@@ -127,11 +130,12 @@ defmodule Deft.PatternMatching do
     end
   end
 
-  defp do_handle_pattern(%AST.Tuple{} = tuple, %Type.FixedTuple{} = type, env) do
+  defp do_handle_pattern(%AST.Tuple{} = tuple, %Type.FixedTuple{} = type, env, opts) do
     {elements, types, inner_bindings} =
       Enum.zip(tuple.elements, Type.FixedTuple.elements(type))
       |> Enum.reduce({[], [], []}, fn {element, type}, {elements, types, inner_bindings} ->
-        {:ok, {element, element_type, element_bindings}} = do_handle_pattern(element, type, env)
+        {:ok, {element, element_type, element_bindings}} =
+          do_handle_pattern(element, type, env, opts)
 
         {elements ++ [element], types ++ [element_type], inner_bindings ++ element_bindings}
       end)
@@ -147,7 +151,7 @@ defmodule Deft.PatternMatching do
     {:ok, {tuple, tuple_t, bindings}}
   end
 
-  defp do_handle_pattern(%AST.List{} = list, %Type.FixedList{} = type, env) do
+  defp do_handle_pattern(%AST.List{} = list, %Type.FixedList{} = type, env, opts) do
     # TODO: should each element in the pattern take on the type
     # at that position?
     {elements, element_types, inner_bindings} =
@@ -157,7 +161,8 @@ defmodule Deft.PatternMatching do
             do_handle_pattern(
               element,
               Type.FixedList.contents(type),
-              env
+              env,
+              opts
             )
 
           {
@@ -175,9 +180,11 @@ defmodule Deft.PatternMatching do
     {:ok, {elements, elements_t, inner_bindings}}
   end
 
-  defp do_handle_pattern(%AST.Cons{} = cons, type, env) do
-    {:ok, {head, _, head_bindings}} = do_handle_pattern(cons.head, type, env)
-    {:ok, {rest, _, rest_bindings}} = do_handle_pattern(cons.rest, Type.fixed_list(type), env)
+  defp do_handle_pattern(%AST.Cons{} = cons, type, env, opts) do
+    {:ok, {head, _, head_bindings}} = do_handle_pattern(cons.head, type, env, opts)
+
+    {:ok, {rest, _, rest_bindings}} =
+      do_handle_pattern(cons.rest, Type.fixed_list(type), env, opts)
 
     cons = {:|, cons.meta, [head, rest]}
 

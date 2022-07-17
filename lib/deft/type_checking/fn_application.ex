@@ -4,9 +4,9 @@ defmodule Deft.TypeChecking.FnApplication do
   alias Deft.AST
   alias Deft.Subtyping
 
-  def type_check(%AST.FnApplication{} = fn_application, env) do
-    {fun, fun_t, _} = compute_and_erase_types(fn_application.fun, env)
-    {args, args_t, bindings} = compute_and_erase_types(fn_application.args, env)
+  def type_check(%AST.FnApplication{} = fn_application, env, opts) do
+    {fun, fun_t, _} = compute_and_erase_types(fn_application.fun, env, opts)
+    {args, args_t, bindings} = compute_and_erase_types(fn_application.args, env, opts)
 
     unless length(fun_t.inputs) == length(args_t) and
              Subtyping.subtypes_of?(fun_t.inputs, args_t) do
