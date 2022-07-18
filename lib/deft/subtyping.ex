@@ -79,6 +79,11 @@ defmodule Deft.Subtyping do
     subtype_of?(t2, t1.fst) and subtype_of?(t2, t1.snd)
   end
 
+  def subtype_of?(%Type.ADT{} = adt, %Type.Variant{} = variant) do
+    adt.name == variant.adt_name and
+      variant in adt.variants
+  end
+
   def subtype_of?(_, _) do
     false
   end

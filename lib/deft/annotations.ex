@@ -59,4 +59,8 @@ defmodule Deft.Annotations do
   def parse([type]) do
     Type.fixed_list(parse(type))
   end
+
+  def parse({name, _, ctx}) when is_atom(name) and is_atom(ctx) do
+    Type.alias(name, ctx)
+  end
 end

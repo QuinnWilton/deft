@@ -8,6 +8,13 @@ defmodule Deft.Compiler do
     AST.Block.new(exprs, meta)
   end
 
+  def compile({:defdata, def_meta, [{:"::", variants_meta, [{name, name_meta, ctx}, variants]}]}) do
+    name = AST.Local.new(name, ctx, name_meta)
+    variants = compile_adt_variants(variants, name)
+
+    AST.DefData.new(name, variants, def_meta, variants_meta)
+  end
+
   def compile({:fn, fn_meta, [{:->, arrow_meta, [args, body]}]}) do
     args = Enum.map(args, &compile_fn_arg/1)
     body = compile(body)
@@ -157,6 +164,14 @@ defmodule Deft.Compiler do
     AST.Local.new(name, context, meta)
   end
 
+  def compile_pattern({name, meta, args}) when is_list(args) do
+    # TODO: Risky to allow LocalCall nodes in patterns, even though
+    #       they should get rewritten in the case of type constructors.
+    args = Enum.map(args, &compile_pattern/1)
+
+    AST.LocalCall.new(name, args, meta)
+  end
+
   def compile_pattern(elements) when is_list(elements) do
     elements = Enum.map(elements, &compile_pattern/1)
 
@@ -168,5 +183,25 @@ defmodule Deft.Compiler do
     snd = compile_pattern(snd)
 
     AST.Pair.new(fst, snd)
+  end
+
+  def compile_adt_variant({name, meta, columns}, adt_name) do
+    columns = Enum.map(columns, &Annotations.parse/1)
+
+    AST.Variant.new(name, adt_name, columns, meta)
+  end
+
+  def compile_adt_variants({:|, _, [first, rest]}, adt_name) do
+    first = compile_adt_variant(first, adt_name)
+    rest = compile_adt_variants(rest, adt_name)
+
+    [first | rest]
+  end
+
+  def compile_adt_variants({name, meta, columns}, adt_name) do
+    columns = Enum.map(columns, &Annotations.parse/1)
+    variant = AST.Variant.new(name, adt_name, columns, meta)
+
+    [variant]
   end
 end

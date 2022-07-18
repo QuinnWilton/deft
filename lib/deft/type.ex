@@ -19,6 +19,10 @@ defmodule Deft.Type do
     Type.Union
   ]
 
+  def alias(name, context) do
+    Type.Alias.new(name, context)
+  end
+
   def atom() do
     Type.Atom.new()
   end
@@ -65,6 +69,14 @@ defmodule Deft.Type do
 
   def fixed_tuple(elements) do
     Type.FixedTuple.new(elements)
+  end
+
+  def adt(name, variants) do
+    Type.ADT.new(name, variants)
+  end
+
+  def variant(name, adt_name, columns) do
+    Type.Variant.new(name, adt_name, columns)
   end
 
   def union(fst, snd) do

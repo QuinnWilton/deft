@@ -194,4 +194,41 @@ defmodule Deft.PatternMatching do
 
     {:ok, {cons, type, head_bindings ++ rest_bindings}}
   end
+
+  defp do_handle_pattern(%AST.TypeConstructorCall{} = constructor, %Type.ADT{}, env, opts) do
+    variant = constructor.variant
+
+    {columns, types, inner_bindings} =
+      Enum.zip(constructor.args, variant.columns)
+      |> Enum.reduce({[], [], []}, fn
+        {column, column_type}, {columns, types, inner_bindings} ->
+          {:ok, {column, column_type, column_bindings}} =
+            do_handle_pattern(column, column_type, env, opts)
+
+          {columns ++ [column], types ++ [column_type], inner_bindings ++ column_bindings}
+      end)
+
+    if length(types) == length(variant.columns) and
+         Subtyping.subtypes_of?(variant.columns, types) do
+      columns =
+        Enum.reduce(columns, [constructor.name], fn
+          arg, acc ->
+            acc ++ [arg]
+        end)
+
+      data = {:{}, constructor.meta, columns}
+      data_t = variant
+
+      bindings =
+        inner_bindings
+        |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
+        |> Enum.map(fn {local, types} ->
+          type = Enum.reduce(types, Type.bottom(), &Type.intersection/2)
+
+          {local, type}
+        end)
+
+      {:ok, {data, data_t, bindings}}
+    end
+  end
 end

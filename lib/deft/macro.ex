@@ -1,5 +1,6 @@
 defmodule Deft.Macro do
   alias Deft.AST
+  alias Deft.Type
 
   def to_string(node) do
     raw_ast = AST.to_raw_ast(node)
@@ -9,7 +10,8 @@ defmodule Deft.Macro do
 
   def postwalk(%AST.Annotation{} = node, f) do
     pattern = postwalk(node.pattern, f)
-    node = %{node | pattern: pattern}
+    type = postwalk(node.type, f)
+    node = %{node | pattern: pattern, type: type}
 
     f.(node)
   end
@@ -126,6 +128,82 @@ defmodule Deft.Macro do
 
   def postwalk(%AST.Tuple{} = node, f) do
     elements = postwalk(node.elements, f)
+    node = %{node | elements: elements}
+
+    f.(node)
+  end
+
+  def postwalk(%AST.DefData{} = node, f) do
+    name = postwalk(node.name, f)
+    variants = postwalk(node.variants, f)
+    node = %{node | name: name, variants: variants}
+
+    f.(node)
+  end
+
+  def postwalk(%AST.TypeConstructorCall{} = node, f) do
+    name = postwalk(node.name, f)
+    args = postwalk(node.args, f)
+    node = %{node | name: name, args: args}
+
+    f.(node)
+  end
+
+  def postwalk(%AST.Variant{} = node, f) do
+    name = postwalk(node.name, f)
+    columns = postwalk(node.columns, f)
+    node = %{node | name: name, columns: columns}
+
+    f.(node)
+  end
+
+  def postwalk(%Type.ADT{} = node, f) do
+    variants = f.(node.variants)
+    node = %{node | variants: variants}
+
+    f.(node)
+  end
+
+  def postwalk(%Type.Alias{} = node, f) do
+    name = f.(node.name)
+    node = %{node | name: name}
+
+    f.(node)
+  end
+
+  def postwalk(%Type.Fn{} = node, f) do
+    inputs = Enum.map(node.inputs, &postwalk(&1, f))
+    output = f.(node.output)
+    node = %{node | inputs: inputs, output: output}
+
+    f.(node)
+  end
+
+  def postwalk(%Type.Union{} = node, f) do
+    fst = f.(node.fst)
+    snd = f.(node.snd)
+    node = %{node | fst: fst, snd: snd}
+
+    f.(node)
+  end
+
+  def postwalk(%Type.Intersection{} = node, f) do
+    fst = f.(node.fst)
+    snd = f.(node.snd)
+    node = %{node | fst: fst, snd: snd}
+
+    f.(node)
+  end
+
+  def postwalk(%Type.FixedList{} = node, f) do
+    contents = f.(node.contents)
+    node = %{node | contents: contents}
+
+    f.(node)
+  end
+
+  def postwalk(%Type.FixedTuple{} = node, f) do
+    elements = f.(node.elements)
     node = %{node | elements: elements}
 
     f.(node)

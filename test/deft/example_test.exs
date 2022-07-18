@@ -3,6 +3,7 @@ defmodule Deft.ExampleTest do
 
   require Deft
 
+  alias Deft.AST
   alias Deft.Type
 
   test "medium example" do
@@ -91,6 +92,81 @@ defmodule Deft.ExampleTest do
                Type.integer(),
                Type.integer(),
                Type.integer()
+             ])
+  end
+
+  test "ADTs" do
+    {result, type} =
+      Deft.compile do
+        defdata(
+          shape ::
+            circle(float)
+            | rectangle(float, float)
+        )
+
+        defdata(scene :: scene([shape]))
+
+        classify = fn x :: shape ->
+          case x do
+            circle(_) ->
+              :circle
+
+            rectangle(width, width) ->
+              :square
+
+            rectangle(_, _) ->
+              :rectangle
+          end
+        end
+
+        c = circle(5.0)
+        r = rectangle(2.0, 3.0)
+        s = rectangle(6.0, 6.0)
+
+        classify.(c)
+        classify.(r)
+        classify.(s)
+
+        scene([c, r, s])
+      end
+
+    assert result ==
+             {
+               :scene,
+               [
+                 {:circle, 5.0},
+                 {:rectangle, 2.0, 3.0},
+                 {:rectangle, 6.0, 6.0}
+               ]
+             }
+
+    assert type ==
+             Type.adt(%AST.Local{context: nil, meta: [line: 107], name: :scene}, [
+               Type.variant(
+                 :scene,
+                 %AST.Local{context: nil, meta: [line: 107], name: :scene},
+                 [
+                   Type.fixed_list(
+                     Type.adt(%AST.Local{context: nil, meta: [line: 102], name: :shape}, [
+                       Type.variant(
+                         :circle,
+                         %AST.Local{context: nil, meta: [line: 102], name: :shape},
+                         [
+                           Type.float()
+                         ]
+                       ),
+                       Type.variant(
+                         :rectangle,
+                         %AST.Local{context: nil, meta: [line: 102], name: :shape},
+                         [
+                           Type.float(),
+                           Type.float()
+                         ]
+                       )
+                     ])
+                   )
+                 ]
+               )
              ])
   end
 end

@@ -43,6 +43,18 @@ defmodule Deft.TypeChecking.Case do
     exhaustive_check!(subject_type.snd, pattern_types)
   end
 
+  def exhaustive_check!(%Type.ADT{} = subject_type, pattern_types) do
+    for variant <- subject_type.variants do
+      unless(
+        Enum.any?(pattern_types, fn pattern ->
+          Subtyping.subtype_of?(pattern, variant)
+        end)
+      ) do
+        raise Deft.InexhaustivePatterns, missing: variant
+      end
+    end
+  end
+
   def exhaustive_check!(subject_type, pattern_types) do
     unless Enum.any?(pattern_types, &Subtyping.subtype_of?(&1, subject_type)) do
       raise Deft.InexhaustivePatterns, missing: subject_type

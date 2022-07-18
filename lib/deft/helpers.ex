@@ -131,25 +131,46 @@ defmodule Deft.Helpers do
     {ast, t, bindings}
   end
 
-  def compute_and_erase_type_in_context(ast, context, env, opts) do
-    ast =
-      Enum.reduce(context, ast, fn
-        {%AST.Local{name: name, context: context} = x, t}, acc ->
-          Deft.Macro.postwalk(acc, fn
-            %AST.Local{name: ^name, context: ^context} = local ->
-              # HACK: Encapsulate this in Local
-              if Keyword.get(local.meta, :counter) == Keyword.get(x.meta, :counter) do
-                meta = annotate_type(local.meta, t)
+  def inject_bindings(ast, bindings, _env, _opts) do
+    Enum.reduce(bindings, ast, fn
+      {:adt, %AST.Local{name: name, context: context}, %Type.ADT{} = type}, acc ->
+        Deft.Macro.postwalk(acc, fn
+          %Type.Alias{name: ^name, context: ^context} ->
+            type
 
-                %{local | meta: meta}
-              else
-                local
-              end
+          acc ->
+            acc
+        end)
 
-            acc ->
-              acc
-          end)
-      end)
+      {:adt_variant, name, %Type.ADT{} = type, %Type.Variant{} = variant}, acc ->
+        Deft.Macro.postwalk(acc, fn
+          %AST.LocalCall{name: ^name, args: args, meta: meta} ->
+            AST.TypeConstructorCall.new(name, args, type, variant, meta)
+
+          acc ->
+            acc
+        end)
+
+      {%AST.Local{name: name, context: context} = x, t}, acc ->
+        Deft.Macro.postwalk(acc, fn
+          %AST.Local{name: ^name, context: ^context} = local ->
+            # HACK: Encapsulate this in Local
+            if Keyword.get(local.meta, :counter) == Keyword.get(x.meta, :counter) do
+              meta = annotate_type(local.meta, t)
+
+              %{local | meta: meta}
+            else
+              local
+            end
+
+          acc ->
+            acc
+        end)
+    end)
+  end
+
+  def compute_and_erase_type_in_context(ast, bindings, env, opts) do
+    ast = inject_bindings(ast, bindings, env, opts)
 
     compute_and_erase_types(ast, env, opts)
   end

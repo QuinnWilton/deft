@@ -3,6 +3,7 @@ defmodule Deft.TypeChecking do
 
   alias Deft.AST
   alias Deft.TypeChecking
+  alias Deft.Subtyping
 
   def type_check(%AST.Annotation{} = ast, env, opts) do
     TypeChecking.Annotation.type_check(ast, env, opts)
@@ -61,6 +62,24 @@ defmodule Deft.TypeChecking do
     else
       raise Deft.UnsupportedLocalCall, name: ast.name, arity: length(ast.args)
     end
+  end
+
+  def type_check(%AST.TypeConstructorCall{} = ast, env, opts) do
+    {args, arg_types, _bindings} = compute_and_erase_types(ast.args, env, opts)
+
+    unless length(ast.variant.columns) == length(arg_types) and
+             Subtyping.subtypes_of?(ast.variant.columns, arg_types) do
+      raise Deft.TypecheckingError, expected: ast.variant.columns, actual: arg_types
+    end
+
+    columns =
+      Enum.reduce(args, [ast.name], fn
+        arg, acc ->
+          acc ++ [arg]
+      end)
+
+    {:{}, ast.meta, columns}
+    |> annotate_type(ast.type)
   end
 
   def type_check(%AST.Local{} = ast, _env, _opts) do
