@@ -72,15 +72,11 @@ defmodule Deft.Subtyping do
   end
 
   def subtype_of?(t1, %Type.Intersection{} = t2) do
-    t2
-    |> Type.Intersection.types()
-    |> Enum.any?(&subtype_of?(t1, &1))
+    subtype_of?(t1, t2.fst) or subtype_of?(t1, t2.snd)
   end
 
   def subtype_of?(%Type.Intersection{} = t1, t2) do
-    t1
-    |> Type.Intersection.types()
-    |> Enum.all?(&subtype_of?(t2, &1))
+    subtype_of?(t2, t1.fst) and subtype_of?(t2, t1.snd)
   end
 
   def subtype_of?(_, _) do

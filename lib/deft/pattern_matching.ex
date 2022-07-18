@@ -146,7 +146,11 @@ defmodule Deft.PatternMatching do
     bindings =
       inner_bindings
       |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
-      |> Enum.map(fn {local, types} -> {local, Type.intersection(types)} end)
+      |> Enum.map(fn {local, types} ->
+        type = Enum.reduce(types, Type.bottom(), &Type.intersection/2)
+
+        {local, type}
+      end)
 
     {:ok, {tuple, tuple_t, bindings}}
   end

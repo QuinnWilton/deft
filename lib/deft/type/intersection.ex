@@ -1,28 +1,22 @@
 defmodule Deft.Type.Intersection do
   alias Deft.AST
 
-  @enforce_keys [:types]
+  @enforce_keys [:fst, :snd]
   defstruct @enforce_keys
 
-  def new(types) do
+  def new(fst, snd) do
     %__MODULE__{
-      types: MapSet.new(types)
+      fst: fst,
+      snd: snd
     }
-  end
-
-  def size(%__MODULE__{} = intersection) do
-    MapSet.size(intersection.types)
-  end
-
-  def types(%__MODULE__{} = intersection) do
-    MapSet.to_list(intersection.types)
   end
 
   defimpl AST do
     def to_raw_ast(type) do
-      types = Enum.map(type.types, &@protocol.to_raw_ast/1)
+      fst = @protocol.to_raw_ast(type.fst)
+      snd = @protocol.to_raw_ast(type.snd)
 
-      {:&, [], types}
+      {:&, [], [fst, snd]}
     end
   end
 
@@ -30,14 +24,11 @@ defmodule Deft.Type.Intersection do
     import Inspect.Algebra
 
     def inspect(t, opts) do
-      container_doc(
-        "",
-        @for.types(t),
-        "",
-        opts,
-        fn i, _opts -> Inspect.inspect(i, opts) end,
-        separator: " &"
-      )
+      concat([
+        Inspect.inspect(t.fst, opts),
+        " & ",
+        Inspect.inspect(t.snd, opts)
+      ])
     end
   end
 end

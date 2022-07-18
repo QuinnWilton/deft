@@ -83,14 +83,19 @@ defmodule Deft.Type do
     end
   end
 
-  def intersection(elements) do
-    intersection = Type.Intersection.new(elements)
+  def intersection(fst, snd) do
+    cond do
+      fst == snd ->
+        fst
 
-    # An intersection of one type is just that type
-    if Type.Intersection.size(intersection) == 1 do
-      Enum.at(Type.Intersection.types(intersection), 0)
-    else
-      intersection
+      Subtyping.subtype_of?(fst, snd) ->
+        fst
+
+      Subtyping.subtype_of?(snd, fst) ->
+        snd
+
+      true ->
+        Type.Intersection.new(fst, snd)
     end
   end
 
