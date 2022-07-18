@@ -1,4 +1,6 @@
 defmodule Deft.AST.Match do
+  alias Deft.AST
+
   @enforce_keys [:pattern, :value, :meta]
   defstruct @enforce_keys
 
@@ -8,5 +10,14 @@ defmodule Deft.AST.Match do
       value: value,
       meta: meta
     }
+  end
+
+  defimpl AST do
+    def to_raw_ast(node) do
+      pattern = @protocol.to_raw_ast(node.pattern)
+      value = @protocol.to_raw_ast(node.value)
+
+      {:=, node.meta, [pattern, value]}
+    end
   end
 end

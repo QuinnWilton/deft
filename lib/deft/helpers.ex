@@ -135,7 +135,7 @@ defmodule Deft.Helpers do
     ast =
       Enum.reduce(context, ast, fn
         {%AST.Local{name: name, context: context} = x, t}, acc ->
-          AST.postwalk(acc, fn
+          Deft.Macro.postwalk(acc, fn
             %AST.Local{name: ^name, context: ^context} = local ->
               # HACK: Encapsulate this in Local
               if Keyword.get(local.meta, :counter) == Keyword.get(x.meta, :counter) do

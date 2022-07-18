@@ -1,4 +1,6 @@
 defmodule Deft.Type.FixedList do
+  alias Deft.AST
+
   @enforce_keys [:contents]
   defstruct @enforce_keys
 
@@ -10,6 +12,14 @@ defmodule Deft.Type.FixedList do
 
   def contents(%__MODULE__{} = list) do
     list.contents
+  end
+
+  defimpl AST do
+    def to_raw_ast(type) do
+      contents = Enum.map(type.contents, &@protocol.to_raw_ast/1)
+
+      [contents]
+    end
   end
 
   defimpl Inspect do

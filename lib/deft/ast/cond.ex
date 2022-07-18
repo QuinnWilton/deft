@@ -1,4 +1,6 @@
 defmodule Deft.AST.Cond do
+  alias Deft.AST
+
   @enforce_keys [:branches, :meta]
   defstruct @enforce_keys
 
@@ -7,5 +9,13 @@ defmodule Deft.AST.Cond do
       branches: branches,
       meta: meta
     }
+  end
+
+  defimpl AST do
+    def to_raw_ast(node) do
+      branches = Enum.map(node.branches, &@protocol.to_raw_ast/1)
+
+      {:cond, node.meta, [[do: branches]]}
+    end
   end
 end

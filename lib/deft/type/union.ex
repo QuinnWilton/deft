@@ -1,4 +1,6 @@
 defmodule Deft.Type.Union do
+  alias Deft.AST
+
   @enforce_keys [:fst, :snd]
   defstruct @enforce_keys
 
@@ -7,6 +9,15 @@ defmodule Deft.Type.Union do
       fst: fst,
       snd: snd
     }
+  end
+
+  defimpl AST do
+    def to_raw_ast(type) do
+      fst = @protocol.to_raw_ast(type.fst)
+      snd = @protocol.to_raw_ast(type.snd)
+
+      {:|, [], [fst, snd]}
+    end
   end
 
   defimpl Inspect do

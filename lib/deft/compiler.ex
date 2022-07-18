@@ -24,7 +24,11 @@ defmodule Deft.Compiler do
 
   def compile({:if, meta, [predicate, branches]}) do
     predicate = compile(predicate)
-    branches = Keyword.map(branches, &compile(elem(&1, 1)))
+
+    branches =
+      Keyword.new(branches, fn {key, node} ->
+        {key, compile(node)}
+      end)
 
     AST.If.new(
       predicate,

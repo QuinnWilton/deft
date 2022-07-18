@@ -1,4 +1,6 @@
 defmodule Deft.AST.Local do
+  alias Deft.AST
+
   @enforce_keys [:name, :context, :meta]
   defstruct @enforce_keys
 
@@ -8,5 +10,11 @@ defmodule Deft.AST.Local do
       context: context,
       meta: meta
     }
+  end
+
+  defimpl AST do
+    def to_raw_ast(node) do
+      {node.name, node.meta, node.context}
+    end
   end
 end

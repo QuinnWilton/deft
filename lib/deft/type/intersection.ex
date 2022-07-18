@@ -1,4 +1,6 @@
 defmodule Deft.Type.Intersection do
+  alias Deft.AST
+
   @enforce_keys [:types]
   defstruct @enforce_keys
 
@@ -14,6 +16,14 @@ defmodule Deft.Type.Intersection do
 
   def types(%__MODULE__{} = intersection) do
     MapSet.to_list(intersection.types)
+  end
+
+  defimpl AST do
+    def to_raw_ast(type) do
+      types = Enum.map(type.types, &@protocol.to_raw_ast/1)
+
+      {:&, [], types}
+    end
   end
 
   defimpl Inspect do

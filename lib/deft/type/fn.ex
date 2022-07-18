@@ -1,4 +1,6 @@
 defmodule Deft.Type.Fn do
+  alias Deft.AST
+
   @enforce_keys [:inputs, :output]
   defstruct @enforce_keys
 
@@ -7,6 +9,15 @@ defmodule Deft.Type.Fn do
       inputs: inputs,
       output: output
     }
+  end
+
+  defimpl AST do
+    def to_raw_ast(type) do
+      inputs = Enum.map(type.inputs, &@protocol.to_raw_ast/1)
+      output = @protocol.to_raw_ast(type.output)
+
+      [{:->, [], [inputs, output]}]
+    end
   end
 
   defimpl Inspect do

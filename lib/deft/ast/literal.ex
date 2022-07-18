@@ -1,4 +1,6 @@
 defmodule Deft.AST.Literal do
+  alias Deft.AST
+
   @enforce_keys [:value, :meta]
   defstruct @enforce_keys
 
@@ -7,5 +9,11 @@ defmodule Deft.AST.Literal do
       value: value,
       meta: meta
     }
+  end
+
+  defimpl AST do
+    def to_raw_ast(node) do
+      node.value
+    end
   end
 end
