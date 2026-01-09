@@ -3,12 +3,12 @@ defmodule Deft.RuleTest do
 
   alias Deft.AST
   alias Deft.Context
-  alias Deft.Rule.Registry
+  alias Deft.Rules.Registry
   alias Deft.Type
 
   # A simple test rule for testing
   defmodule TestLiteralRule do
-    @behaviour Deft.Rule
+    @behaviour Deft.Rules
 
     @impl true
     def name, do: :test_literal
@@ -36,7 +36,7 @@ defmodule Deft.RuleTest do
   end
 
   defmodule TestLocalRule do
-    @behaviour Deft.Rule
+    @behaviour Deft.Rules
 
     @impl true
     def name, do: :test_local
@@ -110,7 +110,7 @@ defmodule Deft.RuleTest do
     test "returns first matching rule" do
       # Both rules could match, but first wins
       defmodule CatchAllRule do
-        @behaviour Deft.Rule
+        @behaviour Deft.Rules
 
         def name, do: :catch_all
         def judgment, do: :synth

@@ -1,4 +1,4 @@
-defmodule Deft.Rule.DSLTest do
+defmodule Deft.RulesDSLTest do
   use ExUnit.Case
 
   alias Deft.Context
@@ -7,7 +7,7 @@ defmodule Deft.Rule.DSLTest do
   describe "defrule macro" do
     test "defines a rule with the correct name" do
       defmodule TestNameRule do
-        use Deft.Rule.DSL
+        use Deft.Rules.DSL
 
         defrule(:test_name,
           match: %{test: _},
@@ -20,7 +20,7 @@ defmodule Deft.Rule.DSLTest do
 
     test "defines a rule with the correct judgment" do
       defmodule TestJudgmentRule do
-        use Deft.Rule.DSL
+        use Deft.Rules.DSL
 
         defrule(:synth_rule,
           match: %{synth: _},
@@ -41,7 +41,7 @@ defmodule Deft.Rule.DSLTest do
 
     test "matches? returns true for matching patterns" do
       defmodule TestMatchRule do
-        use Deft.Rule.DSL
+        use Deft.Rules.DSL
 
         defrule(:match_test,
           match: %{value: 42},
@@ -56,7 +56,7 @@ defmodule Deft.Rule.DSLTest do
 
     test "apply returns successful result" do
       defmodule TestApplyRule do
-        use Deft.Rule.DSL
+        use Deft.Rules.DSL
 
         defrule(:apply_test,
           match: %{value: value},
@@ -76,7 +76,7 @@ defmodule Deft.Rule.DSLTest do
 
     test "rules/0 returns all defined rules" do
       defmodule TestRulesCollection do
-        use Deft.Rule.DSL
+        use Deft.Rules.DSL
 
         defrule(:first_rule,
           match: %{first: _},
@@ -98,7 +98,7 @@ defmodule Deft.Rule.DSLTest do
 
   describe "DSL helpers" do
     test "type_of_literal returns correct types" do
-      import Deft.Rule.DSL.Helpers
+      import Deft.Rules.DSL.Helpers
 
       assert %Type.Boolean{} = type_of_literal(true)
       assert %Type.Boolean{} = type_of_literal(false)
@@ -108,7 +108,7 @@ defmodule Deft.Rule.DSLTest do
     end
 
     test "union_types combines types correctly" do
-      import Deft.Rule.DSL.Helpers
+      import Deft.Rules.DSL.Helpers
 
       assert %Type.Bottom{} = union_types([])
       assert %Type.Integer{} = union_types([Type.integer()])
@@ -116,7 +116,7 @@ defmodule Deft.Rule.DSLTest do
     end
 
     test "bind creates binding tuple" do
-      import Deft.Rule.DSL.Helpers
+      import Deft.Rules.DSL.Helpers
 
       var = :x
       type = Type.integer()
@@ -128,7 +128,7 @@ defmodule Deft.Rule.DSLTest do
   describe "feature flags in rules" do
     test "rule with required features fails if feature not enabled" do
       defmodule TestFeatureRule do
-        use Deft.Rule.DSL
+        use Deft.Rules.DSL
 
         defrule(:needs_feature,
           match: %{featured: _},
@@ -145,7 +145,7 @@ defmodule Deft.Rule.DSLTest do
 
     test "rule with required features succeeds if feature enabled" do
       defmodule TestFeatureEnabledRule do
-        use Deft.Rule.DSL
+        use Deft.Rules.DSL
 
         defrule(:needs_feature,
           match: %{featured: _},

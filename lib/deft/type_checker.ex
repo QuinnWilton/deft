@@ -13,12 +13,12 @@ defmodule Deft.TypeChecker do
   ## Extensibility
 
   Custom rules can be added by creating modules that implement the
-  `Deft.Rule` behaviour and registering them with the registry.
+  `Deft.Rules` behaviour and registering them with the registry.
   """
 
   alias Deft.Context
   alias Deft.Helpers
-  alias Deft.Rule.Registry
+  alias Deft.Rules.Registry
   alias Deft.Rules
 
   # Default rule set
@@ -41,7 +41,7 @@ defmodule Deft.TypeChecker do
   Returns `{:ok, erased_ast, type, bindings, context}` on success,
   or `{:error, reason}` on failure.
   """
-  @spec check(term(), Context.t()) :: Deft.Rule.result()
+  @spec check(term(), Context.t()) :: Deft.Rules.result()
   def check(ast, %Context{} = ctx) do
     check(ast, ctx, default_registry())
   end
@@ -49,7 +49,7 @@ defmodule Deft.TypeChecker do
   @doc """
   Type checks an AST node using a custom rule registry.
   """
-  @spec check(term(), Context.t(), Registry.t()) :: Deft.Rule.result()
+  @spec check(term(), Context.t(), Registry.t()) :: Deft.Rules.result()
   def check(ast, %Context{} = ctx, %Registry{} = registry) do
     result = Registry.apply_rule(registry, ast, nil, ctx)
 
@@ -69,7 +69,7 @@ defmodule Deft.TypeChecker do
 
   This is the "checking" direction of bidirectional type checking.
   """
-  @spec check_against(term(), Deft.Type.t(), Context.t()) :: Deft.Rule.result()
+  @spec check_against(term(), Deft.Type.t(), Context.t()) :: Deft.Rules.result()
   def check_against(ast, expected_type, %Context{} = ctx) do
     check_against(ast, expected_type, ctx, default_registry())
   end
@@ -77,7 +77,7 @@ defmodule Deft.TypeChecker do
   @doc """
   Type checks against an expected type using a custom registry.
   """
-  @spec check_against(term(), Deft.Type.t(), Context.t(), Registry.t()) :: Deft.Rule.result()
+  @spec check_against(term(), Deft.Type.t(), Context.t(), Registry.t()) :: Deft.Rules.result()
   def check_against(ast, expected_type, %Context{} = ctx, %Registry{} = registry) do
     case Registry.find_rule(registry, ast) do
       {:ok, rule} ->
@@ -123,7 +123,7 @@ defmodule Deft.TypeChecker do
   This is useful when checking expressions in a scope where
   variables have already been bound (e.g., function bodies).
   """
-  @spec check_in_context(term(), [Context.binding()], Context.t()) :: Deft.Rule.result()
+  @spec check_in_context(term(), [Context.binding()], Context.t()) :: Deft.Rules.result()
   def check_in_context(ast, bindings, %Context{} = ctx) do
     # First inject bindings into the AST
     ast = Helpers.inject_bindings(ast, bindings)

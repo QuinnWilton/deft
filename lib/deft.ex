@@ -32,7 +32,7 @@ defmodule Deft do
   ## Architecture
 
   Deft uses a rule-based extensible type system via `Deft.TypeChecker` and
-  `Deft.Rule`. Custom typing rules can be added by implementing the `Deft.Rule`
+  `Deft.Rules`. Custom typing rules can be added by implementing the `Deft.Rules`
   behaviour and registering them with the rule registry.
   """
 

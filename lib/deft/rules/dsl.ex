@@ -1,4 +1,4 @@
-defmodule Deft.Rule.DSL do
+defmodule Deft.Rules.DSL do
   @moduledoc """
   Declarative DSL for defining typing rules in the style of Turnstile.
 
@@ -8,7 +8,7 @@ defmodule Deft.Rule.DSL do
   ## Usage
 
       defmodule MyRules do
-        use Deft.Rule.DSL
+        use Deft.Rules.DSL
 
         defrule :literal,
           match: %AST.Literal{value: value},
@@ -62,11 +62,11 @@ defmodule Deft.Rule.DSL do
   """
   defmacro __using__(_opts) do
     quote do
-      import Deft.Rule.DSL, only: [defrule: 2, defrule: 3]
+      import Deft.Rules.DSL, only: [defrule: 2, defrule: 3]
       import Deft.Rules, only: [ok: 4, error: 1]
       Module.register_attribute(__MODULE__, :deft_rules, accumulate: true)
 
-      @before_compile Deft.Rule.DSL
+      @before_compile Deft.Rules.DSL
     end
   end
 
@@ -138,7 +138,7 @@ defmodule Deft.Rule.DSL do
       @__rule_module_name__ Module.concat(__MODULE__, unquote(rule_module_suffix))
 
       defmodule @__rule_module_name__ do
-        @behaviour Deft.Rule
+        @behaviour Deft.Rules
 
         alias Deft.Context
         alias Deft.Subtyping
@@ -166,7 +166,7 @@ defmodule Deft.Rule.DSL do
           # Check required features
           if features_enabled?(var!(ctx), @required_features) do
             # Make DSL helpers available
-            import Deft.Rule.DSL.Helpers
+            import Deft.Rules.DSL.Helpers
 
             unquote(body)
           else
@@ -187,7 +187,7 @@ defmodule Deft.Rule.DSL do
   end
 end
 
-defmodule Deft.Rule.DSL.Helpers do
+defmodule Deft.Rules.DSL.Helpers do
   @moduledoc """
   Helper functions available within defrule blocks.
 

@@ -7,7 +7,7 @@ defmodule Deft.Rules.Builtins do
   - Type constructor calls (ADT constructors)
   """
 
-  use Deft.Rule.DSL
+  use Deft.Rules.DSL
 
   alias Deft.AST
   alias Deft.Guards

@@ -1,9 +1,9 @@
 defmodule Deft.Rules do
   @moduledoc """
-  Index module for all typing rules.
+  Typing rules for the Deft type system.
 
-  This module aggregates all rule modules and provides convenient
-  access to the complete rule set.
+  This module defines the behaviour for typing rules and provides
+  the registry for rule composition and lookup.
 
   ## Rule Modules
 
@@ -11,16 +11,81 @@ defmodule Deft.Rules do
   - `Deft.Rules.Functions` - Anonymous functions and application
   - `Deft.Rules.ControlFlow` - If, cond, case, match expressions
   - `Deft.Rules.Builtins` - Guards and type constructors
+
+  ## Implementing a Rule
+
+  Rules are defined using the `Deft.Rules.DSL`:
+
+      defmodule MyRules do
+        use Deft.Rules.DSL
+
+        defrule :my_rule,
+          match: %MyAST{},
+          judgment: :synth,
+          do: (
+            # rule implementation
+            emit(erased, type)
+          )
+      end
+
+  ## Rule Results
+
+  Rules return a tuple:
+  - `{:ok, erased_ast, type, bindings, updated_ctx}` on success
+  - `{:error, error}` on type error
   """
 
   alias Deft.Context
-  alias Deft.Rule
-  alias Deft.Rule.Registry
+
+  # Type definitions for rules
+  @type judgment :: :synth | :check | :both
+  @type binding :: {term(), Deft.Type.t()}
+  @type success ::
+          {:ok, erased_ast :: term(), type :: Deft.Type.t(), bindings :: [binding()], Context.t()}
+  @type error :: {:error, term()}
+  @type result :: success() | error()
+
+  # Behaviour callbacks
+  @doc """
+  Returns the name of this rule for debugging/logging.
+  """
+  @callback name() :: atom()
+
+  @doc """
+  Returns the judgment mode: :synth, :check, or :both.
+  """
+  @callback judgment() :: judgment()
+
+  @doc """
+  Returns true if this rule can handle the given AST node.
+  """
+  @callback matches?(ast :: term()) :: boolean()
+
+  @doc """
+  Applies the typing rule to the AST node.
+
+  For synthesis rules, `expected_type` will be nil.
+  For checking rules, `expected_type` will be the type to check against.
+  """
+  @callback apply(ast :: term(), expected_type :: Deft.Type.t() | nil, ctx :: Context.t()) ::
+              result()
+
+  @doc """
+  Optional callback for rules that need special handling during pattern matching.
+  """
+  @callback match_pattern(pattern :: term(), against_type :: Deft.Type.t(), ctx :: Context.t()) ::
+              {:ok, erased :: term(), pattern_type :: Deft.Type.t(), bindings :: [binding()],
+               Context.t()}
+              | {:error, term()}
+              | :not_a_pattern
+  @optional_callbacks match_pattern: 3
+
+  # Helper functions
 
   @doc """
   Helper to create a successful rule result.
   """
-  @spec ok(term(), Deft.Type.t(), [Rule.binding()], Context.t()) :: Rule.success()
+  @spec ok(term(), Deft.Type.t(), [binding()], Context.t()) :: success()
   def ok(erased_ast, type, bindings, ctx) do
     {:ok, erased_ast, type, bindings, ctx}
   end
@@ -28,7 +93,7 @@ defmodule Deft.Rules do
   @doc """
   Helper to create an error result.
   """
-  @spec error(term()) :: Rule.error()
+  @spec error(term()) :: error()
   def error(reason) do
     {:error, reason}
   end
@@ -65,8 +130,79 @@ defmodule Deft.Rules do
   @doc """
   Returns a rule registry containing all rules.
   """
-  @spec registry() :: Registry.t()
+  @spec registry() :: Deft.Rules.Registry.t()
   def registry do
-    Registry.new(all_rules())
+    Deft.Rules.Registry.new(all_rules())
+  end
+end
+
+defmodule Deft.Rules.Registry do
+  @moduledoc """
+  Registry for typing rules.
+
+  Rules are stored in order and the first matching rule is applied.
+  This allows for rule composition and overriding.
+  """
+
+  alias Deft.Context
+
+  defstruct rules: []
+
+  @type t :: %__MODULE__{rules: [module()]}
+
+  @doc """
+  Creates a new empty registry.
+  """
+  @spec new() :: t()
+  def new, do: %__MODULE__{}
+
+  @doc """
+  Creates a registry with the given rules.
+  """
+  @spec new([module()]) :: t()
+  def new(rules) when is_list(rules) do
+    %__MODULE__{rules: rules}
+  end
+
+  @doc """
+  Adds a rule to the registry.
+  """
+  @spec add(t(), module()) :: t()
+  def add(%__MODULE__{rules: rules} = registry, rule) do
+    %{registry | rules: rules ++ [rule]}
+  end
+
+  @doc """
+  Prepends a rule to the registry (higher priority).
+  """
+  @spec prepend(t(), module()) :: t()
+  def prepend(%__MODULE__{rules: rules} = registry, rule) do
+    %{registry | rules: [rule | rules]}
+  end
+
+  @doc """
+  Finds the first rule that matches the given AST node.
+  """
+  @spec find_rule(t(), term()) :: {:ok, module()} | :error
+  def find_rule(%__MODULE__{rules: rules}, ast) do
+    case Enum.find(rules, fn rule -> rule.matches?(ast) end) do
+      nil -> :error
+      rule -> {:ok, rule}
+    end
+  end
+
+  @doc """
+  Applies the first matching rule to the AST node.
+  """
+  @spec apply_rule(t(), term(), Deft.Type.t() | nil, Context.t()) ::
+          Deft.Rules.result() | {:error, :no_matching_rule}
+  def apply_rule(%__MODULE__{} = registry, ast, expected_type, ctx) do
+    case find_rule(registry, ast) do
+      {:ok, rule} ->
+        rule.apply(ast, expected_type, ctx)
+
+      :error ->
+        {:error, {:no_matching_rule, ast}}
+    end
   end
 end

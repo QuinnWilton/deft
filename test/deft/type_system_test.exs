@@ -2,7 +2,7 @@ defmodule Deft.TypeSystemTest do
   use ExUnit.Case
 
   alias Deft.Context
-  alias Deft.Rule.Registry
+  alias Deft.Rules.Registry
   alias Deft.Type
 
   describe "use Deft.TypeSystem" do

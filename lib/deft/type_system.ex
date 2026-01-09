@@ -107,9 +107,9 @@ defmodule Deft.TypeSystem do
       @doc """
       Returns a rule registry containing all rules.
       """
-      @spec registry() :: Deft.Rule.Registry.t()
+      @spec registry() :: Deft.Rules.Registry.t()
       def registry do
-        Deft.Rule.Registry.new(all_rules())
+        Deft.Rules.Registry.new(all_rules())
       end
 
       @doc """
@@ -123,7 +123,7 @@ defmodule Deft.TypeSystem do
       @doc """
       Type checks an AST using this type system.
       """
-      @spec check(term(), Macro.Env.t()) :: Deft.Rule.result()
+      @spec check(term(), Macro.Env.t()) :: Deft.Rules.result()
       def check(ast, env) do
         ctx = context(env)
         Deft.TypeChecker.check(ast, ctx, registry())

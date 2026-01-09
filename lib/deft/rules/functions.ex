@@ -7,7 +7,7 @@ defmodule Deft.Rules.Functions do
   - Function application (f.(args))
   """
 
-  use Deft.Rule.DSL
+  use Deft.Rules.DSL
 
   alias Deft.AST
   alias Deft.Subtyping

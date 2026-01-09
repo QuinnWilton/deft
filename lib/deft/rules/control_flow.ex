@@ -9,7 +9,7 @@ defmodule Deft.Rules.ControlFlow do
   - Match (assignment) expressions
   """
 
-  use Deft.Rule.DSL
+  use Deft.Rules.DSL
 
   alias Deft.AST
   alias Deft.PatternMatching

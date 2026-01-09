@@ -25,7 +25,7 @@ defmodule Deft.RulesTest do
 
     test "registry returns a valid registry" do
       registry = Rules.registry()
-      assert %Deft.Rule.Registry{} = registry
+      assert %Deft.Rules.Registry{} = registry
     end
   end
 

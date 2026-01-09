@@ -11,7 +11,7 @@ defmodule Deft.Rules.Core do
   - Pairs
   """
 
-  use Deft.Rule.DSL
+  use Deft.Rules.DSL
 
   alias Deft.AST
   alias Deft.Helpers
