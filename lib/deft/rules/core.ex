@@ -1,4 +1,4 @@
-defmodule Deft.Rules.Declarative.Core do
+defmodule Deft.Rules.Core do
   @moduledoc """
   Core typing rules implemented using the declarative DSL.
 
@@ -86,7 +86,7 @@ defmodule Deft.Rules.Declarative.Core do
         %AST.Block{exprs: exprs, meta: meta} = ast
 
         {erased_exprs, final_type, new_ctx} =
-          Deft.Rules.Declarative.Core.check_block_exprs(exprs, ctx)
+          Deft.Rules.Core.check_block_exprs(exprs, ctx)
 
         erased = {:__block__, meta, erased_exprs}
         emit_with_ctx(erased, final_type, [], new_ctx)

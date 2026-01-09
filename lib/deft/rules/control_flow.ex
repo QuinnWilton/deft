@@ -1,4 +1,4 @@
-defmodule Deft.Rules.Declarative.ControlFlow do
+defmodule Deft.Rules.ControlFlow do
   @moduledoc """
   Control flow typing rules implemented using the declarative DSL.
 
@@ -111,7 +111,7 @@ defmodule Deft.Rules.Declarative.ControlFlow do
 
         # Check exhaustiveness if feature is enabled
         if feature_enabled?(ctx, :exhaustiveness_checking) do
-          Deft.Rules.Declarative.ControlFlow.exhaustive_check!(subject_type, pattern_types)
+          Deft.Rules.ControlFlow.exhaustive_check!(subject_type, pattern_types)
         end
 
         type = union_types(branch_types)

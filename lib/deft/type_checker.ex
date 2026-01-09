@@ -19,13 +19,13 @@ defmodule Deft.TypeChecker do
   alias Deft.Context
   alias Deft.Helpers
   alias Deft.Rule.Registry
-  alias Deft.Rules.Declarative
+  alias Deft.Rules
 
   # Default rule set
-  @default_rules Declarative.Core.rules() ++
-                   Declarative.Functions.rules() ++
-                   Declarative.ControlFlow.rules() ++
-                   Declarative.Builtins.rules()
+  @default_rules Rules.Core.rules() ++
+                   Rules.Functions.rules() ++
+                   Rules.ControlFlow.rules() ++
+                   Rules.Builtins.rules()
 
   @doc """
   Returns the default rule registry.

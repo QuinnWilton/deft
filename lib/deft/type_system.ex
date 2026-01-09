@@ -12,12 +12,12 @@ defmodule Deft.TypeSystem do
         use Deft.TypeSystem
 
         # Include base rule sets
-        include Deft.Rules.Declarative.Core
-        include Deft.Rules.Declarative.Functions
-        include Deft.Rules.Declarative.ControlFlow
+        include Deft.Rules.Core
+        include Deft.Rules.Functions
+        include Deft.Rules.ControlFlow
 
         # Include builtin guards
-        include Deft.Rules.Declarative.Builtins
+        include Deft.Rules.Builtins
 
         # Enable specific features
         features [:exhaustiveness_checking, :strict_subtyping]
@@ -47,7 +47,7 @@ defmodule Deft.TypeSystem do
   priority:
 
       include_first MyApp.CustomRules       # Applied before other rules
-      include Deft.Rules.Declarative.Core   # Applied after CustomRules
+      include Deft.Rules.Core   # Applied after CustomRules
   """
 
   @doc """
@@ -156,7 +156,7 @@ defmodule Deft.TypeSystem do
   ## Example
 
       include_first MyApp.CustomRules       # These take priority
-      include Deft.Rules.Declarative.Core   # Fallback rules
+      include Deft.Rules.Core   # Fallback rules
   """
   defmacro include_first(rule_module) do
     quote do
@@ -188,10 +188,10 @@ defmodule Deft.TypeSystem.Default do
 
   use Deft.TypeSystem
 
-  include(Deft.Rules.Declarative.Core)
-  include(Deft.Rules.Declarative.Functions)
-  include(Deft.Rules.Declarative.ControlFlow)
-  include(Deft.Rules.Declarative.Builtins)
+  include(Deft.Rules.Core)
+  include(Deft.Rules.Functions)
+  include(Deft.Rules.ControlFlow)
+  include(Deft.Rules.Builtins)
 
   features([:exhaustiveness_checking])
 end

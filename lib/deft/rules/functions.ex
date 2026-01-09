@@ -1,4 +1,4 @@
-defmodule Deft.Rules.Declarative.Functions do
+defmodule Deft.Rules.Functions do
   @moduledoc """
   Function typing rules implemented using the declarative DSL.
 

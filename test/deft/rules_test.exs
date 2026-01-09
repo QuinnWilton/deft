@@ -1,42 +1,42 @@
-defmodule Deft.Rules.DeclarativeTest do
+defmodule Deft.RulesTest do
   use ExUnit.Case
 
   alias Deft.AST
   alias Deft.Context
-  alias Deft.Rules.Declarative
+  alias Deft.Rules
   alias Deft.Type
 
-  describe "declarative rules registry" do
+  describe "rules registry" do
     test "includes all rule modules" do
-      modules = Declarative.rule_modules()
+      modules = Rules.rule_modules()
 
-      assert Declarative.Core in modules
-      assert Declarative.Functions in modules
-      assert Declarative.ControlFlow in modules
-      assert Declarative.Builtins in modules
+      assert Rules.Core in modules
+      assert Rules.Functions in modules
+      assert Rules.ControlFlow in modules
+      assert Rules.Builtins in modules
     end
 
     test "all_rules returns rules from all modules" do
-      rules = Declarative.all_rules()
+      rules = Rules.all_rules()
 
       assert is_list(rules)
       assert length(rules) > 0
     end
 
     test "registry returns a valid registry" do
-      registry = Declarative.registry()
+      registry = Rules.registry()
       assert %Deft.Rule.Registry{} = registry
     end
   end
 
-  describe "Core declarative rules" do
+  describe "Core rules" do
     setup do
       %{ctx: Context.new(__ENV__)}
     end
 
     test "literal rule synthesizes integer type", %{ctx: ctx} do
       ast = %AST.Literal{value: 42, meta: []}
-      rule = Declarative.Core.Rule_literal
+      rule = Rules.Core.Rule_literal
 
       {:ok, erased, type, bindings, _ctx} = rule.apply(ast, nil, ctx)
 
@@ -47,7 +47,7 @@ defmodule Deft.Rules.DeclarativeTest do
 
     test "literal rule synthesizes boolean type", %{ctx: ctx} do
       ast = %AST.Literal{value: true, meta: []}
-      rule = Declarative.Core.Rule_literal
+      rule = Rules.Core.Rule_literal
 
       {:ok, erased, type, _bindings, _ctx} = rule.apply(ast, nil, ctx)
 
@@ -57,7 +57,7 @@ defmodule Deft.Rules.DeclarativeTest do
 
     test "literal rule synthesizes float type", %{ctx: ctx} do
       ast = %AST.Literal{value: 3.14, meta: []}
-      rule = Declarative.Core.Rule_literal
+      rule = Rules.Core.Rule_literal
 
       {:ok, erased, type, _bindings, _ctx} = rule.apply(ast, nil, ctx)
 
@@ -67,7 +67,7 @@ defmodule Deft.Rules.DeclarativeTest do
 
     test "literal rule synthesizes atom type", %{ctx: ctx} do
       ast = %AST.Literal{value: :hello, meta: []}
-      rule = Declarative.Core.Rule_literal
+      rule = Rules.Core.Rule_literal
 
       {:ok, erased, type, _bindings, _ctx} = rule.apply(ast, nil, ctx)
 
@@ -82,7 +82,7 @@ defmodule Deft.Rules.DeclarativeTest do
         context: nil
       }
 
-      rule = Declarative.Core.Rule_local
+      rule = Rules.Core.Rule_local
 
       {:ok, erased, type, bindings, _ctx} = rule.apply(ast, nil, ctx)
 
@@ -95,7 +95,7 @@ defmodule Deft.Rules.DeclarativeTest do
       local = %AST.Local{name: :x, meta: [], context: nil}
       ast = %AST.Annotation{pattern: local, type: Type.boolean(), meta: []}
 
-      rule = Declarative.Core.Rule_annotation
+      rule = Rules.Core.Rule_annotation
 
       {:ok, erased, type, bindings, _ctx} = rule.apply(ast, nil, ctx)
 
@@ -113,7 +113,7 @@ defmodule Deft.Rules.DeclarativeTest do
         meta: []
       }
 
-      rule = Declarative.Core.Rule_tuple
+      rule = Rules.Core.Rule_tuple
 
       {:ok, _erased, type, _bindings, _ctx} = rule.apply(ast, nil, ctx)
 
@@ -126,7 +126,7 @@ defmodule Deft.Rules.DeclarativeTest do
         snd: %AST.Literal{value: 42, meta: []}
       }
 
-      rule = Declarative.Core.Rule_pair
+      rule = Rules.Core.Rule_pair
 
       {:ok, erased, type, _bindings, _ctx} = rule.apply(ast, nil, ctx)
 
@@ -143,7 +143,7 @@ defmodule Deft.Rules.DeclarativeTest do
         ]
       }
 
-      rule = Declarative.Core.Rule_list
+      rule = Rules.Core.Rule_list
 
       {:ok, erased, type, _bindings, _ctx} = rule.apply(ast, nil, ctx)
 
@@ -152,7 +152,7 @@ defmodule Deft.Rules.DeclarativeTest do
     end
   end
 
-  describe "Function declarative rules" do
+  describe "Function rules" do
     setup do
       %{ctx: Context.new(__ENV__)}
     end
@@ -167,7 +167,7 @@ defmodule Deft.Rules.DeclarativeTest do
         arrow_meta: []
       }
 
-      rule = Declarative.Functions.Rule_fn
+      rule = Rules.Functions.Rule_fn
 
       {:ok, _erased, type, bindings, _ctx} = rule.apply(ast, nil, ctx)
 
@@ -176,7 +176,7 @@ defmodule Deft.Rules.DeclarativeTest do
     end
   end
 
-  describe "ControlFlow declarative rules" do
+  describe "ControlFlow rules" do
     setup do
       %{ctx: Context.new(__ENV__, features: [:exhaustiveness_checking])}
     end
@@ -189,7 +189,7 @@ defmodule Deft.Rules.DeclarativeTest do
         meta: []
       }
 
-      rule = Declarative.ControlFlow.Rule_if
+      rule = Rules.ControlFlow.Rule_if
 
       {:ok, _erased, type, _bindings, _ctx} = rule.apply(ast, nil, ctx)
 
@@ -206,7 +206,7 @@ defmodule Deft.Rules.DeclarativeTest do
         meta: []
       }
 
-      rule = Declarative.ControlFlow.Rule_match
+      rule = Rules.ControlFlow.Rule_match
 
       {:ok, _erased, type, bindings, _ctx} = rule.apply(ast, nil, ctx)
 
@@ -215,7 +215,7 @@ defmodule Deft.Rules.DeclarativeTest do
     end
   end
 
-  describe "Builtins declarative rules" do
+  describe "Builtins rules" do
     setup do
       %{ctx: Context.new(__ENV__)}
     end
@@ -227,7 +227,7 @@ defmodule Deft.Rules.DeclarativeTest do
         meta: []
       }
 
-      rule = Declarative.Builtins.Rule_local_call
+      rule = Rules.Builtins.Rule_local_call
 
       {:ok, _erased, type, _bindings, _ctx} = rule.apply(ast, nil, ctx)
 
@@ -241,7 +241,7 @@ defmodule Deft.Rules.DeclarativeTest do
         meta: []
       }
 
-      rule = Declarative.Builtins.Rule_local_call
+      rule = Rules.Builtins.Rule_local_call
 
       {:ok, _erased, type, _bindings, _ctx} = rule.apply(ast, nil, ctx)
 

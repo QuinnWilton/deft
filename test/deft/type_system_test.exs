@@ -20,34 +20,34 @@ defmodule Deft.TypeSystemTest do
       defmodule TestRuleModulesTypeSystem do
         use Deft.TypeSystem
 
-        include(Deft.Rules.Declarative.Core)
-        include(Deft.Rules.Declarative.Functions)
+        include(Deft.Rules.Core)
+        include(Deft.Rules.Functions)
       end
 
       modules = TestRuleModulesTypeSystem.rule_modules()
-      assert Deft.Rules.Declarative.Core in modules
-      assert Deft.Rules.Declarative.Functions in modules
+      assert Deft.Rules.Core in modules
+      assert Deft.Rules.Functions in modules
     end
 
     test "creates a module with all_rules/0" do
       defmodule TestAllRulesTypeSystem do
         use Deft.TypeSystem
 
-        include(Deft.Rules.Declarative.Core)
+        include(Deft.Rules.Core)
       end
 
       rules = TestAllRulesTypeSystem.all_rules()
       assert is_list(rules)
       assert length(rules) > 0
       # Should include Literal rule from Declarative.Core
-      assert Deft.Rules.Declarative.Core.Rule_literal in rules
+      assert Deft.Rules.Core.Rule_literal in rules
     end
 
     test "creates a module with registry/0" do
       defmodule TestRegistryTypeSystem do
         use Deft.TypeSystem
 
-        include(Deft.Rules.Declarative.Core)
+        include(Deft.Rules.Core)
       end
 
       registry = TestRegistryTypeSystem.registry()
@@ -72,12 +72,12 @@ defmodule Deft.TypeSystemTest do
       defmodule TestOrderingTypeSystem do
         use Deft.TypeSystem
 
-        include(Deft.Rules.Declarative.Core)
-        include(Deft.Rules.Declarative.Functions)
+        include(Deft.Rules.Core)
+        include(Deft.Rules.Functions)
       end
 
       modules = TestOrderingTypeSystem.rule_modules()
-      assert modules == [Deft.Rules.Declarative.Core, Deft.Rules.Declarative.Functions]
+      assert modules == [Deft.Rules.Core, Deft.Rules.Functions]
     end
 
     test "include_first adds rules at higher priority" do
@@ -88,7 +88,7 @@ defmodule Deft.TypeSystemTest do
       defmodule TestPriorityTypeSystem do
         use Deft.TypeSystem
 
-        include(Deft.Rules.Declarative.Core)
+        include(Deft.Rules.Core)
         include_first(PriorityRules)
       end
 
@@ -102,10 +102,10 @@ defmodule Deft.TypeSystemTest do
     test "includes standard rule sets" do
       modules = Deft.TypeSystem.Default.rule_modules()
 
-      assert Deft.Rules.Declarative.Core in modules
-      assert Deft.Rules.Declarative.Functions in modules
-      assert Deft.Rules.Declarative.ControlFlow in modules
-      assert Deft.Rules.Declarative.Builtins in modules
+      assert Deft.Rules.Core in modules
+      assert Deft.Rules.Functions in modules
+      assert Deft.Rules.ControlFlow in modules
+      assert Deft.Rules.Builtins in modules
     end
 
     test "has exhaustiveness_checking enabled" do

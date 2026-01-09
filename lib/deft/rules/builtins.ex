@@ -1,4 +1,4 @@
-defmodule Deft.Rules.Declarative.Builtins do
+defmodule Deft.Rules.Builtins do
   @moduledoc """
   Built-in typing rules implemented using the declarative DSL.
 
