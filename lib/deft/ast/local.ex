@@ -1,6 +1,8 @@
 defmodule Deft.AST.Local do
   alias Deft.AST
 
+  @type t :: %__MODULE__{}
+
   @enforce_keys [:name, :context, :meta]
   defstruct @enforce_keys
 

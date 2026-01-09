@@ -1,4 +1,6 @@
 defmodule Deft.Type.Variant do
+  @type t :: %__MODULE__{}
+
   @enforce_keys [:name, :adt_name, :columns]
   defstruct @enforce_keys
 

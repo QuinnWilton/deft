@@ -1,6 +1,8 @@
 defmodule Deft.Type.Fn do
   alias Deft.AST
 
+  @type t :: %__MODULE__{}
+
   @enforce_keys [:inputs, :output]
   defstruct @enforce_keys
 

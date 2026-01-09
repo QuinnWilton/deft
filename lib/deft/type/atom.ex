@@ -1,6 +1,8 @@
 defmodule Deft.Type.Atom do
   alias Deft.AST
 
+  @type t :: %__MODULE__{}
+
   @enforce_keys []
   defstruct @enforce_keys
 

@@ -1,6 +1,8 @@
 defmodule Deft.Type.FixedList do
   alias Deft.AST
 
+  @type t :: %__MODULE__{}
+
   @enforce_keys [:contents]
   defstruct @enforce_keys
 

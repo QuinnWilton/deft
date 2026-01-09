@@ -1,4 +1,6 @@
 defmodule Deft.Type.Alias do
+  @type t :: %__MODULE__{}
+
   @enforce_keys [:name, :context]
   defstruct @enforce_keys
 

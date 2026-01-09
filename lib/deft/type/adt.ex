@@ -1,4 +1,6 @@
 defmodule Deft.Type.ADT do
+  @type t :: %__MODULE__{}
+
   @enforce_keys [:name, :variants]
   defstruct @enforce_keys
 

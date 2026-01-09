@@ -1,4 +1,6 @@
 defmodule Deft.Type.Tuple do
+  @type t :: %__MODULE__{}
+
   @enforce_keys []
   defstruct @enforce_keys
 

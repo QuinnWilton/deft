@@ -1,6 +1,8 @@
 defmodule Deft.Type.FixedTuple do
   alias Deft.AST
 
+  @type t :: %__MODULE__{}
+
   @enforce_keys [:elements]
   defstruct @enforce_keys
 

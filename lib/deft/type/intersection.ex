@@ -1,6 +1,8 @@
 defmodule Deft.Type.Intersection do
   alias Deft.AST
 
+  @type t :: %__MODULE__{}
+
   @enforce_keys [:fst, :snd]
   defstruct @enforce_keys
 
