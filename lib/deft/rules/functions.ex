@@ -10,6 +10,7 @@ defmodule Deft.Rules.Functions do
   use Deft.Rules.DSL
 
   alias Deft.AST
+  alias Deft.AST.Erased
   alias Deft.Subtyping
   alias Deft.Type
 
@@ -28,7 +29,7 @@ defmodule Deft.Rules.Functions do
     (arg_bindings +++ body) ~> {erased_body, output_type}
 
     conclude(
-      {:fn, fn_meta, [{:->, arrow_meta, [erased_args, erased_body]}]}
+      Erased.fn_expr(fn_meta, arrow_meta, erased_args, erased_body)
       ~> Type.fun(input_types, output_type)
     )
   end
@@ -59,6 +60,6 @@ defmodule Deft.Rules.Functions do
       end
     end
 
-    conclude({{:., fun_meta, [erased_fun]}, args_meta, erased_args} ~> output)
+    conclude(Erased.fn_apply(fun_meta, args_meta, erased_fun, erased_args) ~> output)
   end
 end

@@ -10,6 +10,7 @@ defmodule Deft.Rules.Builtins do
   use Deft.Rules.DSL
 
   alias Deft.AST
+  alias Deft.AST.Erased
   alias Deft.Guards
   alias Deft.Subtyping
 
@@ -26,7 +27,7 @@ defmodule Deft.Rules.Builtins do
       end
     end
 
-    conclude({name, meta, erased_args} ~> type, bind: call_bindings)
+    conclude(Erased.local_call(meta, name, erased_args) ~> type, bind: call_bindings)
   end
 
   # ============================================================================
@@ -56,6 +57,6 @@ defmodule Deft.Rules.Builtins do
     # Build erased tuple representation
     columns = [name | erased_args]
 
-    conclude({:{}, meta, columns} ~> adt_type)
+    conclude(Erased.tuple(meta, columns) ~> adt_type)
   end
 end

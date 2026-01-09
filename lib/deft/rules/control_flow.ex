@@ -12,6 +12,7 @@ defmodule Deft.Rules.ControlFlow do
   use Deft.Rules.DSL
 
   alias Deft.AST
+  alias Deft.AST.Erased
   alias Deft.Context
   alias Deft.PatternMatching
   alias Deft.Subtyping
@@ -33,7 +34,7 @@ defmodule Deft.Rules.ControlFlow do
     else_branch ~> {erased_else, else_type}
 
     conclude(
-      {:if, meta, [erased_pred, [do: erased_do, else: erased_else]]}
+      Erased.if_expr(meta, erased_pred, erased_do, erased_else)
       ~> Type.union(do_type, else_type)
     )
   end
@@ -50,12 +51,12 @@ defmodule Deft.Rules.ControlFlow do
 
         {erased_body, body_type, _} = Deft.Rules.DSL.Helpers.synth!(body, [], ctx)
 
-        {{:->, branch_meta, [[erased_pred], erased_body]}, body_type}
+        {Erased.branch(branch_meta, erased_pred, erased_body), body_type}
       end)
       |> Enum.unzip()
     end
 
-    conclude({:cond, meta, [[do: erased_branches]]} ~> union_types(types))
+    conclude(Erased.cond_expr(meta, erased_branches) ~> union_types(types))
   end
 
   # ============================================================================
@@ -79,7 +80,7 @@ defmodule Deft.Rules.ControlFlow do
         {erased_body, body_type, _} =
           Deft.Rules.DSL.Helpers.synth!(body, all_bindings, ctx)
 
-        {{:->, branch_meta, [[erased_pattern], erased_body]}, pattern_type, body_type}
+        {Erased.branch(branch_meta, erased_pattern, erased_body), pattern_type, body_type}
       end)
       |> Enum.reduce({[], [], []}, fn {e, p, b}, {es, ps, bs} ->
         {es ++ [e], ps ++ [p], bs ++ [b]}
@@ -92,7 +93,7 @@ defmodule Deft.Rules.ControlFlow do
     end
 
     conclude(
-      {:case, meta, [erased_subject, [do: erased_branches]]}
+      Erased.case_expr(meta, erased_subject, erased_branches)
       ~> union_types(branch_types)
     )
   end
@@ -135,7 +136,7 @@ defmodule Deft.Rules.ControlFlow do
       {erased_pattern, pattern_bindings}
     end
 
-    conclude({:=, meta, [erased_pattern, erased_value]} ~> value_type,
+    conclude(Erased.match(meta, erased_pattern, erased_value) ~> value_type,
       bind: pattern_bindings
     )
   end

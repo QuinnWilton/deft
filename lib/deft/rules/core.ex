@@ -14,6 +14,7 @@ defmodule Deft.Rules.Core do
   use Deft.Rules.DSL
 
   alias Deft.AST
+  alias Deft.AST.Erased
   alias Deft.Helpers
   alias Deft.Type
   alias Deft.TypeChecker
@@ -63,7 +64,7 @@ defmodule Deft.Rules.Core do
       Deft.Rules.Core.check_block_exprs(exprs, ctx)
     end
 
-    conclude({:__block__, meta, erased_exprs} ~> final_type)
+    conclude(Erased.block(meta, erased_exprs) ~> final_type)
   end
 
   @doc false
@@ -113,7 +114,7 @@ defmodule Deft.Rules.Core do
   defrule :tuple, %AST.Tuple{elements: elements, meta: meta} do
     elements ~>> {erased_elements, types}
 
-    conclude({:{}, meta, erased_elements} ~> Type.fixed_tuple(types))
+    conclude(Erased.tuple(meta, erased_elements) ~> Type.fixed_tuple(types))
   end
 
   # ============================================================================
@@ -124,7 +125,7 @@ defmodule Deft.Rules.Core do
     fst ~> {erased_fst, fst_type}
     snd ~> {erased_snd, snd_type}
 
-    conclude({erased_fst, erased_snd} ~> Type.fixed_tuple([fst_type, snd_type]))
+    conclude(Erased.pair(erased_fst, erased_snd) ~> Type.fixed_tuple([fst_type, snd_type]))
   end
 
   # ============================================================================
