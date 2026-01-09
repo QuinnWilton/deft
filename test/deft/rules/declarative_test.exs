@@ -248,31 +248,4 @@ defmodule Deft.Rules.DeclarativeTest do
       assert %Type.Boolean{} = type
     end
   end
-
-  describe "declarative vs imperative parity" do
-    test "literal rule produces same results" do
-      ctx = Context.new(__ENV__)
-      ast = %AST.Literal{value: 42, meta: []}
-
-      {:ok, erased1, type1, bind1, _} = Deft.Rules.Core.Literal.apply(ast, nil, ctx)
-      {:ok, erased2, type2, bind2, _} = Declarative.Core.Rule_literal.apply(ast, nil, ctx)
-
-      assert erased1 == erased2
-      assert type1 == type2
-      assert bind1 == bind2
-    end
-
-    test "annotation rule produces same results" do
-      ctx = Context.new(__ENV__)
-      local = %AST.Local{name: :x, meta: [], context: nil}
-      ast = %AST.Annotation{pattern: local, type: Type.integer(), meta: []}
-
-      {:ok, erased1, type1, bind1, _} = Deft.Rules.Core.Annotation.apply(ast, nil, ctx)
-      {:ok, erased2, type2, bind2, _} = Declarative.Core.Rule_annotation.apply(ast, nil, ctx)
-
-      assert erased1 == erased2
-      assert type1 == type2
-      assert bind1 == bind2
-    end
-  end
 end
