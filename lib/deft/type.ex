@@ -2,6 +2,25 @@ defmodule Deft.Type do
   alias Deft.Subtyping
   alias Deft.Type
 
+  @type t ::
+          Type.ADT.t()
+          | Type.Alias.t()
+          | Type.Atom.t()
+          | Type.Boolean.t()
+          | Type.Bottom.t()
+          | Type.FixedList.t()
+          | Type.FixedTuple.t()
+          | Type.Float.t()
+          | Type.Fn.t()
+          | Type.Integer.t()
+          | Type.Intersection.t()
+          | Type.List.t()
+          | Type.Number.t()
+          | Type.Top.t()
+          | Type.Tuple.t()
+          | Type.Union.t()
+          | Type.Variant.t()
+
   @types [
     Type.Atom,
     Type.Boolean,
