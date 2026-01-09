@@ -4,9 +4,13 @@ defmodule Deft.Guards do
 
   This module defines the type signatures and checking logic for
   Elixir's built-in guard functions that can be used in typed code.
+
+  The signatures are backed by the `Deft.Signatures` registry, which
+  provides a centralized lookup for function types.
   """
 
   alias Deft.Context
+  alias Deft.Signatures
   alias Deft.Subtyping
   alias Deft.Type
   alias Deft.TypeChecker
@@ -73,18 +77,39 @@ defmodule Deft.Guards do
 
   @doc """
   Returns true if the given function name and arity is a supported guard.
+
+  First checks the signature registry, then falls back to the hardcoded list.
   """
-  def supported?(name, arity), do: {name, arity} in @supported_guards
+  def supported?(name, arity) do
+    Signatures.registered?({Kernel, name, arity}) or {name, arity} in @supported_guards
+  end
+
+  @doc """
+  Looks up a signature from the registry.
+
+  Returns `{:ok, signature}` if found, `:error` otherwise.
+  """
+  @spec lookup_signature(atom(), non_neg_integer()) :: {:ok, Type.Fn.t()} | :error
+  def lookup_signature(name, arity) do
+    Signatures.lookup({Kernel, name, arity})
+  end
 
   @doc """
   Type checks a guard function call.
 
   Returns `{erased_args, result_type, bindings}`.
+
+  For functions in the signature registry, uses the registered signature.
+  For special cases (like hd, tl, elem), uses custom logic to preserve type information.
   """
   @spec handle_guard(atom(), [term()], Context.t()) :: {[term()], Type.t(), [term()]}
   def handle_guard(name, args, %Context{} = ctx) do
     do_handle_guard(name, args, ctx)
   end
+
+  # ============================================================================
+  # Guard Handlers
+  # ============================================================================
 
   # Comparison operators: any types, returns boolean
   defp do_handle_guard(name, [fst, snd], ctx) when name in @comparisons do
@@ -213,7 +238,7 @@ defmodule Deft.Guards do
     {[term], term_t, bindings}
   end
 
-  # hd: list(a) -> a
+  # hd: list(a) -> a (preserves element type)
   defp do_handle_guard(:hd, [term], ctx) do
     {:ok, term, term_t, bindings, _} = TypeChecker.check(term, ctx)
 
@@ -224,7 +249,7 @@ defmodule Deft.Guards do
     {[term], Type.FixedList.contents(term_t), bindings}
   end
 
-  # tl: list(a) -> list(a)
+  # tl: list(a) -> list(a) (preserves list type)
   defp do_handle_guard(:tl, [term], ctx) do
     {:ok, term, term_t, bindings, _} = TypeChecker.check(term, ctx)
 
@@ -254,5 +279,36 @@ defmodule Deft.Guards do
       |> Enum.reduce(Type.bottom(), &Type.union/2)
 
     {[tuple, index], type, tuple_bindings ++ index_bindings}
+  end
+
+  # Fallback: try to use signature registry
+  defp do_handle_guard(name, args, ctx) do
+    arity = length(args)
+
+    case lookup_signature(name, arity) do
+      {:ok, %Type.Fn{inputs: input_types, output: output_type}} ->
+        handle_with_signature(name, args, input_types, output_type, ctx)
+
+      :error ->
+        raise Deft.UnsupportedLocalCall, name: name, arity: arity
+    end
+  end
+
+  # Handle a guard using a registered signature
+  defp handle_with_signature(_name, args, input_types, output_type, ctx) do
+    {erased_args, bindings} =
+      args
+      |> Enum.zip(input_types)
+      |> Enum.reduce({[], []}, fn {arg, expected_type}, {erased_acc, bindings_acc} ->
+        {:ok, erased, actual_type, bindings, _} = TypeChecker.check(arg, ctx)
+
+        unless Subtyping.subtype_of?(expected_type, actual_type) do
+          raise Deft.TypecheckingError, expected: expected_type, actual: actual_type
+        end
+
+        {erased_acc ++ [erased], bindings_acc ++ bindings}
+      end)
+
+    {erased_args, output_type, bindings}
   end
 end
