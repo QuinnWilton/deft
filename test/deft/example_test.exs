@@ -9,7 +9,7 @@ defmodule Deft.ExampleTest do
   test "medium example" do
     {result, type} =
       Deft.compile do
-        people = [
+        [alice, bob, eve] = [
           {:alice, :f, 24},
           {:bob, :m, 15},
           {:eve, :f, 17}
@@ -31,10 +31,6 @@ defmodule Deft.ExampleTest do
               :minor
           end
         end
-
-        alice = hd(people)
-        [_, bob | eve_list = [_]] = people
-        eve = hd(eve_list)
 
         [
           {alice, category.(alice)},
@@ -141,29 +137,32 @@ defmodule Deft.ExampleTest do
              }
 
     assert type ==
-             Type.adt(%AST.Local{context: nil, meta: [line: 107], name: :scene}, [
+             Type.adt(%AST.Local{context: nil, meta: [line: 103, column: 17], name: :scene}, [
                Type.variant(
                  :scene,
-                 %AST.Local{context: nil, meta: [line: 107], name: :scene},
+                 %AST.Local{context: nil, meta: [line: 103, column: 17], name: :scene},
                  [
                    Type.fixed_list(
-                     Type.adt(%AST.Local{context: nil, meta: [line: 102], name: :shape}, [
-                       Type.variant(
-                         :circle,
-                         %AST.Local{context: nil, meta: [line: 102], name: :shape},
-                         [
-                           Type.float()
-                         ]
-                       ),
-                       Type.variant(
-                         :rectangle,
-                         %AST.Local{context: nil, meta: [line: 102], name: :shape},
-                         [
-                           Type.float(),
-                           Type.float()
-                         ]
-                       )
-                     ])
+                     Type.adt(
+                       %AST.Local{context: nil, meta: [line: 98, column: 11], name: :shape},
+                       [
+                         Type.variant(
+                           :circle,
+                           %AST.Local{context: nil, meta: [line: 98, column: 11], name: :shape},
+                           [
+                             Type.float()
+                           ]
+                         ),
+                         Type.variant(
+                           :rectangle,
+                           %AST.Local{context: nil, meta: [line: 98, column: 11], name: :shape},
+                           [
+                             Type.float(),
+                             Type.float()
+                           ]
+                         )
+                       ]
+                     )
                    )
                  ]
                )
