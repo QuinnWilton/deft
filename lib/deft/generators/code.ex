@@ -39,13 +39,13 @@ defmodule Deft.Generators.Code do
   end
 
   def annotation_node() do
-    map({local_node(), Generators.Types.compound_type()}, fn {pattern, type} ->
+    map(tuple({local_node(), Generators.Types.compound_type()}), fn {pattern, type} ->
       {AST.Annotation.new(pattern, type), type}
     end)
   end
 
   def case_branch_node(subject_type, child_data \\ literal_node()) do
-    map({pattern(subject_type), child_data}, fn {pattern, {body, body_type}} ->
+    map(tuple({pattern(subject_type), child_data}), fn {pattern, {body, body_type}} ->
       {AST.CaseBranch.new(pattern, body), body_type}
     end)
   end
@@ -75,7 +75,7 @@ defmodule Deft.Generators.Code do
   end
 
   def cond_branch_node(child_data \\ literal_node()) do
-    map({predicate(child_data), child_data}, fn {{predicate, _}, {body, body_type}} ->
+    map(tuple({predicate(child_data), child_data}), fn {{predicate, _}, {body, body_type}} ->
       {AST.CondBranch.new(predicate, body), body_type}
     end)
   end
@@ -116,7 +116,7 @@ defmodule Deft.Generators.Code do
 
   def if_node(child_data \\ literal_node()) do
     # TODO: Limited predicate generation
-    map({predicate(child_data), child_data, child_data}, fn
+    map(tuple({predicate(child_data), child_data, child_data}), fn
       {
         {predicate, _},
         {do_branch, do_type},
@@ -238,8 +238,8 @@ defmodule Deft.Generators.Code do
   def local_call_node(child_data \\ literal_node()) do
     arguments =
       one_of([
-        {child_data},
-        {child_data, child_data}
+        tuple({child_data}),
+        tuple({child_data, child_data})
       ])
 
     guards =
@@ -300,7 +300,7 @@ defmodule Deft.Generators.Code do
   end
 
   def pair_node(child_data \\ literal_node()) do
-    map({child_data, child_data}, fn {{fst, fst_type}, {snd, snd_type}} ->
+    map(tuple({child_data, child_data}), fn {{fst, fst_type}, {snd, snd_type}} ->
       {AST.Pair.new(fst, snd), Type.fixed_tuple([fst_type, snd_type])}
     end)
   end
