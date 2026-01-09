@@ -4,49 +4,38 @@ defmodule Deft.RulesDSLTest do
   alias Deft.Context
   alias Deft.Type
 
-  describe "defrule macro" do
+  describe "defrule macro with declarative syntax" do
     test "defines a rule with the correct name" do
       defmodule TestNameRule do
         use Deft.Rules.DSL
 
-        defrule(:test_name,
-          match: %{test: _},
-          do: emit(:ok, Type.atom())
-        )
+        defrule :test_name, %{test: _} do
+          conclude(:ok ~> Type.atom())
+        end
       end
 
       assert TestNameRule.Rule_test_name.name() == :test_name
     end
 
-    test "defines a rule with the correct judgment" do
+    test "defines a rule with synth judgment by default" do
       defmodule TestJudgmentRule do
         use Deft.Rules.DSL
 
-        defrule(:synth_rule,
-          match: %{synth: _},
-          judgment: :synth,
-          do: emit(:ok, Type.atom())
-        )
-
-        defrule(:check_rule,
-          match: %{check: _},
-          judgment: :check,
-          do: emit(:ok, Type.atom())
-        )
+        defrule :synth_rule, %{synth: _} do
+          conclude(:ok ~> Type.atom())
+        end
       end
 
       assert TestJudgmentRule.Rule_synth_rule.judgment() == :synth
-      assert TestJudgmentRule.Rule_check_rule.judgment() == :check
     end
 
     test "matches? returns true for matching patterns" do
       defmodule TestMatchRule do
         use Deft.Rules.DSL
 
-        defrule(:match_test,
-          match: %{value: 42},
-          do: emit(:ok, Type.integer())
-        )
+        defrule :match_test, %{value: 42} do
+          conclude(:ok ~> Type.integer())
+        end
       end
 
       assert TestMatchRule.Rule_match_test.matches?(%{value: 42})
@@ -58,10 +47,9 @@ defmodule Deft.RulesDSLTest do
       defmodule TestApplyRule do
         use Deft.Rules.DSL
 
-        defrule(:apply_test,
-          match: %{value: value},
-          do: emit(value, Type.integer())
-        )
+        defrule :apply_test, %{value: value} do
+          conclude(value ~> Type.integer())
+        end
       end
 
       ctx = Context.new(__ENV__)
@@ -78,15 +66,13 @@ defmodule Deft.RulesDSLTest do
       defmodule TestRulesCollection do
         use Deft.Rules.DSL
 
-        defrule(:first_rule,
-          match: %{first: _},
-          do: emit(:first, Type.atom())
-        )
+        defrule :first_rule, %{first: _} do
+          conclude(:first ~> Type.atom())
+        end
 
-        defrule(:second_rule,
-          match: %{second: _},
-          do: emit(:second, Type.atom())
-        )
+        defrule :second_rule, %{second: _} do
+          conclude(:second ~> Type.atom())
+        end
       end
 
       rules = TestRulesCollection.rules()
@@ -114,15 +100,6 @@ defmodule Deft.RulesDSLTest do
       assert %Type.Integer{} = union_types([Type.integer()])
       assert %Type.Union{} = union_types([Type.integer(), Type.boolean()])
     end
-
-    test "bind creates binding tuple" do
-      import Deft.Rules.DSL.Helpers
-
-      var = :x
-      type = Type.integer()
-
-      assert {^var, ^type} = bind(var, type)
-    end
   end
 
   describe "feature flags in rules" do
@@ -130,11 +107,11 @@ defmodule Deft.RulesDSLTest do
       defmodule TestFeatureRule do
         use Deft.Rules.DSL
 
-        defrule(:needs_feature,
-          match: %{featured: _},
-          requires: [:special_feature],
-          do: emit(:ok, Type.atom())
-        )
+        defrule :needs_feature, %{featured: _} do
+          conclude(:ok ~> Type.atom())
+
+          requires([:special_feature])
+        end
       end
 
       ctx = Context.new(__ENV__, features: [])
@@ -147,11 +124,11 @@ defmodule Deft.RulesDSLTest do
       defmodule TestFeatureEnabledRule do
         use Deft.Rules.DSL
 
-        defrule(:needs_feature,
-          match: %{featured: _},
-          requires: [:special_feature],
-          do: emit(:ok, Type.atom())
-        )
+        defrule :needs_feature, %{featured: _} do
+          conclude(:ok ~> Type.atom())
+
+          requires([:special_feature])
+        end
       end
 
       ctx = Context.new(__ENV__, features: [:special_feature])

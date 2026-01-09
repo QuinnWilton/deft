@@ -17,57 +17,48 @@ defmodule Deft.Rules.Functions do
   # Anonymous Function Rule
   # ============================================================================
 
-  defrule(:fn,
-    match: %AST.Fn{},
-    judgment: :synth,
-    do:
-      (
-        %AST.Fn{args: args, body: body, fn_meta: fn_meta, arrow_meta: arrow_meta} = ast
+  defrule :fn, %AST.Fn{args: args, body: body, fn_meta: fn_meta, arrow_meta: arrow_meta} do
+    # Synthesize arguments (which should be annotations, producing bindings)
+    # These bindings are scoped to the function body, not returned to caller
+    compute {erased_args, input_types, arg_bindings} do
+      synth_all!(args, ctx)
+    end
 
-        # Type check arguments (which should be annotations)
-        {erased_args, input_types, arg_bindings} = check_all!(args, ctx)
+    # Synthesize body with argument bindings in scope
+    (arg_bindings +++ body) ~> {erased_body, output_type}
 
-        # Type check body with argument bindings injected
-        {erased_body, output_type, _body_bindings} = synth_with_bindings!(body, arg_bindings, ctx)
-
-        type = Type.fun(input_types, output_type)
-        erased = {:fn, fn_meta, [{:->, arrow_meta, [erased_args, erased_body]}]}
-
-        emit(erased, type)
-      )
-  )
+    conclude(
+      {:fn, fn_meta, [{:->, arrow_meta, [erased_args, erased_body]}]}
+      ~> Type.fun(input_types, output_type)
+    )
+  end
 
   # ============================================================================
   # Function Application Rule
   # ============================================================================
 
-  defrule(:fn_application,
-    match: %AST.FnApplication{},
-    judgment: :synth,
-    do:
-      (
-        %AST.FnApplication{fun: fun, args: args, fun_meta: fun_meta, args_meta: args_meta} = ast
+  defrule :fn_application, %AST.FnApplication{fun: fun, args: args, fun_meta: fun_meta, args_meta: args_meta} do
+    # Synthesize the function
+    fun ~> {erased_fun, fun_type}
 
-        # Type check the function
-        {erased_fun, fun_type, fun_bindings} = synth!(fun, ctx)
+    # Synthesize arguments
+    args ~>> {erased_args, arg_types}
 
-        # Type check arguments
-        {erased_args, arg_types, arg_bindings} = check_all!(args, ctx)
+    # Validate and extract output type
+    compute output do
+      case fun_type do
+        %Type.Fn{inputs: inputs, output: output} ->
+          if length(inputs) == length(arg_types) and Subtyping.subtypes_of?(inputs, arg_types) do
+            output
+          else
+            raise Deft.TypecheckingError, expected: inputs, actual: arg_types
+          end
 
-        # Validate function type and arguments
-        case fun_type do
-          %Type.Fn{inputs: inputs, output: output} ->
-            if length(inputs) == length(arg_types) and Subtyping.subtypes_of?(inputs, arg_types) do
-              erased = {{:., fun_meta, [erased_fun]}, args_meta, erased_args}
-              bindings = fun_bindings ++ arg_bindings
-              emit(erased, output, bindings)
-            else
-              {:error, %Deft.TypecheckingError{expected: inputs, actual: arg_types}}
-            end
+        _ ->
+          raise "Expected function type, got: #{inspect(fun_type)}"
+      end
+    end
 
-          _ ->
-            {:error, {:not_a_function, fun_type}}
-        end
-      )
-  )
+    conclude({{:., fun_meta, [erased_fun]}, args_meta, erased_args} ~> output)
+  end
 end

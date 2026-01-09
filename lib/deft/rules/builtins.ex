@@ -17,54 +17,45 @@ defmodule Deft.Rules.Builtins do
   # Local Call Rule (Guards and Built-in Functions)
   # ============================================================================
 
-  defrule(:local_call,
-    match: %AST.LocalCall{},
-    judgment: :synth,
-    do:
-      (
-        %AST.LocalCall{name: name, args: args, meta: meta} = ast
+  defrule :local_call, %AST.LocalCall{name: name, args: args, meta: meta} do
+    compute {erased_args, type, call_bindings} do
+      if Guards.supported?(name, length(args)) do
+        Guards.handle_guard(name, args, ctx)
+      else
+        raise Deft.UnsupportedLocalCall, name: name, arity: length(args)
+      end
+    end
 
-        if Guards.supported?(name, length(args)) do
-          {erased_args, type, bindings} = Guards.handle_guard(name, args, ctx)
-          erased = {name, meta, erased_args}
-          emit(erased, type, bindings)
-        else
-          {:error, %Deft.UnsupportedLocalCall{name: name, arity: length(args)}}
-        end
-      )
-  )
+    conclude({name, meta, erased_args} ~> type, bind: call_bindings)
+  end
 
   # ============================================================================
   # Type Constructor Call Rule (ADT Constructors)
   # ============================================================================
 
-  defrule(:type_constructor_call,
-    match: %AST.TypeConstructorCall{},
-    judgment: :synth,
-    do:
-      (
-        %AST.TypeConstructorCall{
-          name: name,
-          args: args,
-          type: adt_type,
-          variant: variant,
-          meta: meta
-        } = ast
+  defrule :type_constructor_call, %AST.TypeConstructorCall{
+    name: name,
+    args: args,
+    type: adt_type,
+    variant: variant,
+    meta: meta
+  } do
+    # Synthesize arguments
+    args ~>> {erased_args, arg_types}
 
-        # Type check arguments
-        {erased_args, arg_types, bindings} = check_all!(args, ctx)
+    # Validate arguments match variant columns
+    compute :ok do
+      unless length(variant.columns) == length(arg_types) and
+               Subtyping.subtypes_of?(variant.columns, arg_types) do
+        raise Deft.TypecheckingError, expected: variant.columns, actual: arg_types
+      end
 
-        # Validate arguments match variant columns
-        unless length(variant.columns) == length(arg_types) and
-                 Subtyping.subtypes_of?(variant.columns, arg_types) do
-          raise Deft.TypecheckingError, expected: variant.columns, actual: arg_types
-        end
+      :ok
+    end
 
-        # Build erased tuple representation
-        columns = [name | erased_args]
-        erased = {:{}, meta, columns}
+    # Build erased tuple representation
+    columns = [name | erased_args]
 
-        emit(erased, adt_type, bindings)
-      )
-  )
+    conclude({:{}, meta, columns} ~> adt_type)
+  end
 end
