@@ -34,7 +34,10 @@ defmodule Deft.SubtypingTest do
     defp sample_instance(Type.FixedList), do: Type.fixed_list(Type.integer())
     defp sample_instance(Type.Fn), do: Type.fun([Type.integer()], Type.boolean())
     defp sample_instance(Type.Union), do: Type.Union.new(Type.integer(), Type.boolean())
-    defp sample_instance(Type.Intersection), do: Type.Intersection.new(Type.integer(), Type.boolean())
+
+    defp sample_instance(Type.Intersection),
+      do: Type.Intersection.new(Type.integer(), Type.boolean())
+
     defp sample_instance(mod), do: mod.new()
 
     test "supertypes_of returns correct transitive closure" do

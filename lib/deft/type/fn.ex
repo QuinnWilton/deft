@@ -1,10 +1,10 @@
 defmodule Deft.Type.Fn do
   use Deft.Subtyping.DSL
 
-  parameter :inputs, variance: :contravariant
-  parameter :output, variance: :covariant
+  parameter(:inputs, variance: :contravariant)
+  parameter(:output, variance: :covariant)
 
-  structural_rule fn sub, super ->
+  structural_rule(fn sub, super ->
     # Contravariant inputs: super's inputs must be subtypes of sub's inputs
     # Covariant output: sub's output must be subtype of super's output
     length(sub.inputs) == length(super.inputs) and
@@ -13,7 +13,7 @@ defmodule Deft.Type.Fn do
         Deft.Subtyping.subtype_of?(sub_in, super_in)
       end) and
       Deft.Subtyping.subtype_of?(super.output, sub.output)
-  end
+  end)
 
   alias Deft.AST
 

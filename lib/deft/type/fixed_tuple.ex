@@ -1,17 +1,17 @@
 defmodule Deft.Type.FixedTuple do
   use Deft.Subtyping.DSL
 
-  subtype_of Deft.Type.Tuple
+  subtype_of(Deft.Type.Tuple)
 
-  parameter :elements, variance: :covariant
+  parameter(:elements, variance: :covariant)
 
-  structural_rule fn sub, super ->
+  structural_rule(fn sub, super ->
     length(sub.elements) == length(super.elements) and
       Enum.zip(sub.elements, super.elements)
       |> Enum.all?(fn {sub_elem, super_elem} ->
         Deft.Subtyping.subtype_of?(super_elem, sub_elem)
       end)
-  end
+  end)
 
   alias Deft.AST
 

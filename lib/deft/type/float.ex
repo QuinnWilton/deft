@@ -1,7 +1,7 @@
 defmodule Deft.Type.Float do
   use Deft.Subtyping.DSL
 
-  subtype_of Deft.Type.Number
+  subtype_of(Deft.Type.Number)
 
   alias Deft.AST
 

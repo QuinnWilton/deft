@@ -1,13 +1,13 @@
 defmodule Deft.Type.FixedList do
   use Deft.Subtyping.DSL
 
-  subtype_of Deft.Type.List
+  subtype_of(Deft.Type.List)
 
-  parameter :contents, variance: :covariant
+  parameter(:contents, variance: :covariant)
 
-  structural_rule fn sub, super ->
+  structural_rule(fn sub, super ->
     Deft.Subtyping.subtype_of?(super.contents, sub.contents)
-  end
+  end)
 
   alias Deft.AST
 

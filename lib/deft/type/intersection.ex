@@ -1,8 +1,8 @@
 defmodule Deft.Type.Intersection do
   use Deft.Subtyping.DSL
 
-  parameter :fst, variance: :covariant
-  parameter :snd, variance: :covariant
+  parameter(:fst, variance: :covariant)
+  parameter(:snd, variance: :covariant)
 
   alias Deft.AST
 
