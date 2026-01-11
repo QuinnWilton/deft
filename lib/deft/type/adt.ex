@@ -1,4 +1,8 @@
 defmodule Deft.Type.ADT do
+  use Deft.Subtyping.DSL
+
+  # ADT/Variant subtyping is handled directly in Deft.Subtyping
+
   @type t :: %__MODULE__{}
 
   @enforce_keys [:name, :variants]
@@ -22,7 +26,7 @@ defmodule Deft.Type.ADT do
 
       concat([
         string("adt("),
-        Inspect.inspect(t.name.name, opts),
+        Inspect.inspect(t.name, opts),
         string(", "),
         variants,
         string(")")

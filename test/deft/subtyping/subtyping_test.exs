@@ -7,10 +7,70 @@ defmodule Deft.SubtypingTest do
   - Bottom <: T for all T (Bottom is the universal subtype)
   - T <: Top for all T (Top is the universal supertype)
   - Integer <: Number, Float <: Number (specific numeric types are subtypes of Number)
+
+  The lattice is defined declaratively in each type module using Deft.Subtyping.DSL.
+  These tests verify both the declared relationships and derived properties.
   """
   use Deft.TypeCase, async: true
 
+  alias Deft.Subtyping.Lattice
   alias Deft.Type
+
+  # ============================================================================
+  # Auto-generated tests from lattice introspection
+  # ============================================================================
+
+  describe "lattice structure" do
+    test "all declared edges are valid subtype relationships" do
+      for {sub_mod, super_mod} <- Lattice.edges() do
+        sub = sample_instance(sub_mod)
+        super = sample_instance(super_mod)
+        assert_subtype(sub, super, "declared edge #{inspect(sub_mod)} <: #{inspect(super_mod)}")
+      end
+    end
+
+    # Create sample instances for types, handling parametric types.
+    defp sample_instance(Type.FixedTuple), do: Type.fixed_tuple([Type.integer()])
+    defp sample_instance(Type.FixedList), do: Type.fixed_list(Type.integer())
+    defp sample_instance(Type.Fn), do: Type.fun([Type.integer()], Type.boolean())
+    defp sample_instance(Type.Union), do: Type.Union.new(Type.integer(), Type.boolean())
+    defp sample_instance(Type.Intersection), do: Type.Intersection.new(Type.integer(), Type.boolean())
+    defp sample_instance(mod), do: mod.new()
+
+    test "supertypes_of returns correct transitive closure" do
+      # Integer's supertypes should include Number and Top
+      supers = Lattice.supertypes_of(Type.Integer)
+      assert Type.Number in supers
+      assert Type.Top in supers
+    end
+
+    test "subtypes_of returns correct transitive closure" do
+      # Number's subtypes should include Integer, Float, and Bottom
+      subs = Lattice.subtypes_of(Type.Number)
+      assert Type.Integer in subs
+      assert Type.Float in subs
+      assert Type.Bottom in subs
+    end
+
+    test "variance_of returns correct parameter variance" do
+      # Fn has contravariant inputs, covariant output
+      fn_variance = Lattice.variance_of(Type.Fn)
+      assert fn_variance[:inputs] == :contravariant
+      assert fn_variance[:output] == :covariant
+
+      # FixedTuple has covariant elements
+      tuple_variance = Lattice.variance_of(Type.FixedTuple)
+      assert tuple_variance[:elements] == :covariant
+    end
+
+    test "has_structural_rule? identifies types with structural rules" do
+      assert Lattice.has_structural_rule?(Type.Fn)
+      assert Lattice.has_structural_rule?(Type.FixedTuple)
+      assert Lattice.has_structural_rule?(Type.FixedList)
+      refute Lattice.has_structural_rule?(Type.Integer)
+      refute Lattice.has_structural_rule?(Type.Boolean)
+    end
+  end
 
   describe "reflexivity" do
     test "primitive types are subtypes of themselves" do

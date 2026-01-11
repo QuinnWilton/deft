@@ -1,4 +1,20 @@
 defmodule Deft.Type.Fn do
+  use Deft.Subtyping.DSL
+
+  parameter :inputs, variance: :contravariant
+  parameter :output, variance: :covariant
+
+  structural_rule fn sub, super ->
+    # Contravariant inputs: super's inputs must be subtypes of sub's inputs
+    # Covariant output: sub's output must be subtype of super's output
+    length(sub.inputs) == length(super.inputs) and
+      Enum.zip(sub.inputs, super.inputs)
+      |> Enum.all?(fn {sub_in, super_in} ->
+        Deft.Subtyping.subtype_of?(sub_in, super_in)
+      end) and
+      Deft.Subtyping.subtype_of?(super.output, sub.output)
+  end
+
   alias Deft.AST
 
   @type t :: %__MODULE__{}

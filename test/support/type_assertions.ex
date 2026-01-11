@@ -98,10 +98,11 @@ defmodule Deft.TestHelpers.TypeAssertions do
 
       assert_subtype(Type.integer(), Type.number())
       assert_subtype(Type.bottom(), Type.integer())
+      assert_subtype(Type.integer(), Type.number(), "custom message")
   """
-  def assert_subtype(sub, super) do
+  def assert_subtype(sub, super, message \\ nil) do
     assert Subtyping.subtype_of?(super, sub),
-           "Expected #{inspect(sub)} <: #{inspect(super)}, but subtyping does not hold"
+           message || "Expected #{inspect(sub)} <: #{inspect(super)}, but subtyping does not hold"
   end
 
   @doc """

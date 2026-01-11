@@ -1,4 +1,8 @@
 defmodule Deft.Type.Integer do
+  use Deft.Subtyping.DSL
+
+  subtype_of Deft.Type.Number
+
   alias Deft.AST
 
   @type t :: %__MODULE__{}

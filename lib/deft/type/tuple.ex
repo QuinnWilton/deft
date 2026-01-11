@@ -1,4 +1,6 @@
 defmodule Deft.Type.Tuple do
+  use Deft.Subtyping.DSL
+
   @type t :: %__MODULE__{}
 
   @enforce_keys []

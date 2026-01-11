@@ -1,90 +1,87 @@
 defmodule Deft.Subtyping do
+  @moduledoc """
+  Subtyping relation built from the declarative type lattice.
+
+  The lattice is defined declaratively in each type module using `Deft.Subtyping.DSL`.
+
+  ## Introspection
+
+      Deft.Subtyping.Lattice.subtypes_of(Deft.Type.Number)
+      Deft.Subtyping.Lattice.supertypes_of(Deft.Type.Integer)
+      Deft.Subtyping.Lattice.edges()
+  """
+
+  alias Deft.Subtyping.Lattice
   alias Deft.Type
 
-  def subtypes_of?(t1s, t2s) do
-    ts = Enum.zip(t1s, t2s)
-
-    Enum.all?(ts, fn {t1, t2} ->
-      subtype_of?(t1, t2)
-    end)
+  @doc """
+  Checks if all types in `supers` are supertypes of corresponding types in `subs`.
+  """
+  @spec subtypes_of?([Type.t()], [Type.t()]) :: boolean()
+  def subtypes_of?(supers, subs) do
+    length(supers) == length(subs) and
+      Enum.zip(supers, subs)
+      |> Enum.all?(fn {super, sub} -> subtype_of?(super, sub) end)
   end
 
-  def subtype_of?(%Type.Top{}, _) do
-    true
+  @doc """
+  Returns true if `sub` is a subtype of `super`.
+
+  Note: The argument order is `subtype_of?(super, sub)`.
+  """
+  @spec subtype_of?(Type.t(), Type.t()) :: boolean()
+
+  # Top is supertype of everything
+  def subtype_of?(%Type.Top{}, _sub), do: true
+
+  # Bottom is subtype of everything
+  def subtype_of?(_super, %Type.Bottom{}), do: true
+
+  # Reflexivity
+  def subtype_of?(t, t), do: true
+
+  # Union as sub: Union(a, b) <: super if a <: super AND b <: super
+  # (Must be checked before Union as super when both args are Unions)
+  def subtype_of?(super, %Type.Union{fst: fst, snd: snd}) do
+    subtype_of?(super, fst) and subtype_of?(super, snd)
   end
 
-  def subtype_of?(_, %Type.Bottom{}) do
-    true
+  # Union as super: sub <: Union(a, b) if sub <: a OR sub <: b
+  def subtype_of?(%Type.Union{fst: fst, snd: snd}, sub) do
+    subtype_of?(fst, sub) or subtype_of?(snd, sub)
   end
 
-  def subtype_of?(%Type.Tuple{}, %Type.FixedTuple{}) do
-    true
+  # Intersection as sub: Intersection(a, b) <: super if a <: super OR b <: super
+  # (Must be checked before Intersection as super when both args are Intersections)
+  def subtype_of?(super, %Type.Intersection{fst: fst, snd: snd}) do
+    subtype_of?(super, fst) or subtype_of?(super, snd)
   end
 
-  def subtype_of?(%Type.List{}, %Type.FixedList{}) do
-    true
+  # Intersection as super: sub <: Intersection(a, b) if sub <: a AND sub <: b
+  def subtype_of?(%Type.Intersection{fst: fst, snd: snd}, sub) do
+    subtype_of?(fst, sub) and subtype_of?(snd, sub)
   end
 
-  def subtype_of?(%Type.Number{}, t)
-      when is_struct(t, Type.Number)
-      when is_struct(t, Type.Integer)
-      when is_struct(t, Type.Float) do
-    true
-  end
-
-  def subtype_of?(t, t) do
-    true
-  end
-
-  def subtype_of?(%Type.Fn{} = t1, %Type.Fn{} = t2) do
-    inputs = Enum.zip(t1.inputs, t2.inputs)
-
-    inputs_subtype? =
-      length(t1.inputs) == length(t2.inputs) and
-        Enum.all?(inputs, fn {ti1, ti2} ->
-          subtype_of?(ti2, ti1)
-        end)
-
-    output_subtype? = subtype_of?(t1.output, t2.output)
-
-    inputs_subtype? and output_subtype?
-  end
-
-  def subtype_of?(%Type.FixedList{} = t1, %Type.FixedList{} = t2) do
-    subtype_of?(Type.FixedList.contents(t1), Type.FixedList.contents(t2))
-  end
-
-  def subtype_of?(%Type.FixedTuple{} = t1, %Type.FixedTuple{} = t2) do
-    elements = Enum.zip(t1.elements, t2.elements)
-
-    length(t1.elements) == length(t2.elements) and
-      Enum.all?(elements, fn {te1, te2} ->
-        subtype_of?(te1, te2)
-      end)
-  end
-
-  def subtype_of?(t1, %Type.Union{} = t2) do
-    subtype_of?(t1, t2.fst) and subtype_of?(t1, t2.snd)
-  end
-
-  def subtype_of?(%Type.Union{} = t1, t2) do
-    subtype_of?(t1.fst, t2) or subtype_of?(t1.snd, t2)
-  end
-
-  def subtype_of?(t1, %Type.Intersection{} = t2) do
-    subtype_of?(t1, t2.fst) or subtype_of?(t1, t2.snd)
-  end
-
-  def subtype_of?(%Type.Intersection{} = t1, t2) do
-    subtype_of?(t2, t1.fst) and subtype_of?(t2, t1.snd)
-  end
-
+  # ADT/Variant relationship: Variant <: ADT if variant belongs to ADT
   def subtype_of?(%Type.ADT{} = adt, %Type.Variant{} = variant) do
-    adt.name == variant.adt_name and
-      variant in adt.variants
+    adt.name == variant.adt_name and variant in adt.variants
   end
 
-  def subtype_of?(_, _) do
-    false
+  # Same type constructor - try structural rule
+  def subtype_of?(%{__struct__: mod} = super, %{__struct__: mod} = sub) do
+    if Lattice.has_structural_rule?(mod) do
+      mod.structural_subtype?(sub, super)
+    else
+      # No structural rule, not reflexively equal (checked above)
+      false
+    end
   end
+
+  # Different type constructors - check declared lattice edges
+  def subtype_of?(%{__struct__: super_mod}, %{__struct__: sub_mod}) do
+    super_mod in Lattice.supertypes_of(sub_mod)
+  end
+
+  # Fallback
+  def subtype_of?(_super, _sub), do: false
 end
