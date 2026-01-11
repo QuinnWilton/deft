@@ -294,6 +294,11 @@ defmodule Deft do
   defp parse_type({:boolean, _, _}), do: quote(do: Deft.Type.boolean())
   defp parse_type({:atom, _, _}), do: quote(do: Deft.Type.atom())
   defp parse_type({:binary, _, _}), do: quote(do: Deft.Type.binary())
+
+  defp parse_type({:list, _, [elem_type]}) do
+    quote do: Deft.Type.fixed_list(unquote(parse_type(elem_type)))
+  end
+
   defp parse_type({:list, _, _}), do: quote(do: Deft.Type.list())
   defp parse_type({:tuple, _, _}), do: quote(do: Deft.Type.tuple())
   defp parse_type({:top, _, _}), do: quote(do: Deft.Type.top())
