@@ -13,7 +13,6 @@ defmodule Deft.Rules.ControlFlow do
 
   alias Deft.AST
   alias Deft.AST.Erased
-  alias Deft.Context
   alias Deft.PatternMatching
   alias Deft.Subtyping
   alias Deft.Type

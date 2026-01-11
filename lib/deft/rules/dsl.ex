@@ -91,6 +91,9 @@ defmodule Deft.Rules.DSL do
     # Generate the conclusion code
     conclusion_code = generate_conclusion_code(conclusion)
 
+    # Generate the apply body, conditionally including feature check
+    apply_body = generate_apply_body(premises_code, conclusion_code, requires)
+
     quote do
       @__rule_module_name__ Module.concat(__MODULE__, unquote(rule_module_suffix))
 
@@ -112,8 +115,6 @@ defmodule Deft.Rules.DSL do
         @impl true
         def judgment, do: :synth
 
-        @required_features unquote(requires)
-
         @impl true
         def matches?(unquote(matches_pattern)), do: true
         def matches?(_), do: false
@@ -123,25 +124,55 @@ defmodule Deft.Rules.DSL do
           # Initialize bindings accumulator
           var!(bindings, nil) = []
 
-          if features_enabled?(var!(ctx, nil), @required_features) do
-            # Execute premises
-            unquote_splicing(premises_code)
-
-            # Execute conclusion
-            unquote(conclusion_code)
-          else
-            {:error, {:missing_features, @required_features}}
-          end
+          unquote(apply_body)
         end
 
-        defp features_enabled?(_ctx, []), do: true
-
-        defp features_enabled?(ctx, features) do
-          Enum.all?(features, &Context.feature_enabled?(ctx, &1))
-        end
+        unquote(generate_feature_helpers(requires))
       end
 
       @deft_rules @__rule_module_name__
+    end
+  end
+
+  # Generate apply body - only include feature check if there are required features
+  defp generate_apply_body(premises_code, conclusion_code, []) do
+    # No required features - execute directly
+    quote do
+      # Execute premises
+      unquote_splicing(premises_code)
+
+      # Execute conclusion
+      unquote(conclusion_code)
+    end
+  end
+
+  defp generate_apply_body(premises_code, conclusion_code, requires) do
+    # Has required features - wrap in feature check
+    quote do
+      if features_enabled?(var!(ctx, nil), unquote(requires)) do
+        # Execute premises
+        unquote_splicing(premises_code)
+
+        # Execute conclusion
+        unquote(conclusion_code)
+      else
+        {:error, {:missing_features, unquote(requires)}}
+      end
+    end
+  end
+
+  # Generate feature helper functions only when needed
+  defp generate_feature_helpers([]) do
+    # No features required - no helper functions needed
+    quote do
+    end
+  end
+
+  defp generate_feature_helpers(_requires) do
+    quote do
+      defp features_enabled?(ctx, features) do
+        Enum.all?(features, &Context.feature_enabled?(ctx, &1))
+      end
     end
   end
 

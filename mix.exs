@@ -7,7 +7,11 @@ defmodule Deft.MixProject do
       version: "0.1.0",
       elixir: "~> 1.19",
       start_permanent: Mix.env() == :prod,
-      deps: deps()
+      deps: deps(),
+      dialyzer: [
+        plt_add_apps: [:ex_unit],
+        flags: [:error_handling, :unknown]
+      ]
     ]
   end
 
@@ -21,7 +25,8 @@ defmodule Deft.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:stream_data, "~> 1.2"}
+      {:stream_data, "~> 1.2"},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
     ]
   end
 end
