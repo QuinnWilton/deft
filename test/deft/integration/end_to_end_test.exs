@@ -174,7 +174,7 @@ defmodule Deft.Integration.EndToEndTest do
       {result, type} =
         Deft.compile do
           cond do
-            false -> :a
+            1 > 2 -> :a
             true -> :b
           end
         end

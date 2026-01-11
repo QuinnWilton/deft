@@ -14,7 +14,7 @@ defmodule Deft.RulesDSLTest do
         end
       end
 
-      assert TestNameRule.Rule_test_name.name() == :test_name
+      assert apply(TestNameRule.Rule_test_name, :name, []) == :test_name
     end
 
     test "defines a rule with synth judgment by default" do
@@ -26,7 +26,7 @@ defmodule Deft.RulesDSLTest do
         end
       end
 
-      assert TestJudgmentRule.Rule_synth_rule.judgment() == :synth
+      assert apply(TestJudgmentRule.Rule_synth_rule, :judgment, []) == :synth
     end
 
     test "matches? returns true for matching patterns" do
@@ -55,7 +55,7 @@ defmodule Deft.RulesDSLTest do
       ctx = Context.new(__ENV__)
 
       {:ok, erased, type, bindings, _ctx} =
-        TestApplyRule.Rule_apply_test.apply(%{value: 42}, nil, ctx)
+        apply(TestApplyRule.Rule_apply_test, :apply, [%{value: 42}, nil, ctx])
 
       assert erased == 42
       assert %Type.Integer{} = type
@@ -115,7 +115,7 @@ defmodule Deft.RulesDSLTest do
       end
 
       ctx = Context.new(__ENV__, features: [])
-      result = TestFeatureRule.Rule_needs_feature.apply(%{featured: true}, nil, ctx)
+      result = apply(TestFeatureRule.Rule_needs_feature, :apply, [%{featured: true}, nil, ctx])
 
       assert {:error, {:missing_features, [:special_feature]}} = result
     end
@@ -134,7 +134,7 @@ defmodule Deft.RulesDSLTest do
       ctx = Context.new(__ENV__, features: [:special_feature])
 
       {:ok, erased, _type, _bindings, _ctx} =
-        TestFeatureEnabledRule.Rule_needs_feature.apply(%{featured: true}, nil, ctx)
+        apply(TestFeatureEnabledRule.Rule_needs_feature, :apply, [%{featured: true}, nil, ctx])
 
       assert erased == :ok
     end
