@@ -92,7 +92,7 @@ defmodule Deft.Subtyping.DSL do
         {name, variance}
       end)
 
-    # Generate the structural_subtype? function if a rule was defined
+    # Generate the structural_subtype? function only if a rule was defined
     structural_fun =
       if structural_rule do
         quote do
@@ -101,11 +101,6 @@ defmodule Deft.Subtyping.DSL do
             fun = unquote(structural_rule)
             fun.(sub, super)
           end
-        end
-      else
-        quote do
-          @doc false
-          def structural_subtype?(_sub, _super), do: nil
         end
       end
 
