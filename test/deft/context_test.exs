@@ -165,25 +165,6 @@ defmodule Deft.ContextTest do
     end
   end
 
-  describe "to_opts/1" do
-    test "converts context to legacy opts format" do
-      callback = fn _ast, _type -> :ok end
-      ctx = Context.new(__ENV__, on_compute: callback)
-
-      opts = Context.to_opts(ctx)
-
-      assert opts[:on_compute] == callback
-    end
-
-    test "returns empty opts when no options set" do
-      ctx = Context.new(__ENV__)
-
-      opts = Context.to_opts(ctx)
-
-      assert opts == []
-    end
-  end
-
   # ============================================================================
   # Error Accumulation Tests
   # ============================================================================

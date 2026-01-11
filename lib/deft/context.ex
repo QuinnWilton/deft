@@ -179,16 +179,6 @@ defmodule Deft.Context do
     adt_env ++ type_env
   end
 
-  @doc """
-  Converts context back to legacy opts format for gradual migration.
-  """
-  @spec to_opts(t()) :: keyword()
-  def to_opts(%__MODULE__{} = ctx) do
-    opts = []
-    opts = if ctx.on_compute, do: [{:on_compute, ctx.on_compute} | opts], else: opts
-    opts
-  end
-
   # ============================================================================
   # Error Accumulation
   # ============================================================================

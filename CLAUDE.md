@@ -2,6 +2,18 @@
 
 This document provides guidance for contributors working on this project, with specific sections for both human and AI-assisted contributions.
 
+## Architecture Reference
+
+**ARCHITECTURE.md** contains a comprehensive description of the codebase architecture, including:
+
+- Core concepts (bidirectional type checking, type erasure, rule-based extensibility)
+- Module organization and file structure
+- Key architectural patterns (compilation pipeline, context threading, rule DSL)
+- Type system design (type lattice, subtyping relations)
+- Extension points for custom rules and type systems
+
+**For LLMs**: Load `ARCHITECTURE.md` at the start of a new context window when working on this codebase. It provides the necessary context to understand the system design and make informed changes.
+
 ## For Humans
 
 LLM-assisted contributions must **aim for a higher standard of excellence** than with humans alone. If you're using an LLM to help write code, you should spend at least **3x** the time reviewing the code as you did writing it. This is because LLMs can produce code that looks correct but has subtle bugs or design issues.

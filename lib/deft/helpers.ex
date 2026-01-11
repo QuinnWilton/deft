@@ -26,37 +26,6 @@ defmodule Deft.Helpers do
   end
 
   @doc """
-  Annotates an AST node with bindings in its metadata.
-  """
-  def annotate_bindings(e, bindings) when is_list(e) do
-    e
-    |> Keyword.put_new(:__deft_bindings__, [])
-    |> Keyword.update!(:__deft_bindings__, &(&1 ++ bindings))
-  end
-
-  def annotate_bindings(e, bindings) do
-    Macro.update_meta(e, &annotate_bindings(&1, bindings))
-  end
-
-  @doc """
-  Removes type annotations from an AST node.
-  """
-  def delete_annotations(e) do
-    e
-    |> Macro.update_meta(&Keyword.delete(&1, :__deft_type__))
-    |> Macro.update_meta(&Keyword.delete(&1, :__deft_bindings__))
-  end
-
-  @doc """
-  Extracts bindings from an AST node's metadata.
-  """
-  def bindings_for({_, meta, _}) do
-    Keyword.get(meta, :__deft_bindings__, [])
-  end
-
-  def bindings_for(_), do: []
-
-  @doc """
   Extracts the type from an AST node's metadata.
   """
   def type_of({_, meta, _}) do
