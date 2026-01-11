@@ -116,6 +116,28 @@ defmodule Deft.Compiler do
     AST.RemoteCall.new(module, function, args, meta)
   end
 
+  # Remote function capture: &Module.function/arity (aliased module)
+  def compile(
+        {:&, meta,
+         [{:/, _, [{{:., _, [{:__aliases__, _, module_parts}, function]}, _, _}, arity]}]}
+      )
+      when is_atom(function) and is_integer(arity) do
+    module = Module.concat(module_parts)
+    AST.Capture.new(module, function, arity, meta)
+  end
+
+  # Remote function capture: &Module.function/arity (atom module)
+  def compile({:&, meta, [{:/, _, [{{:., _, [module, function]}, _, _}, arity]}]})
+      when is_atom(module) and is_atom(function) and is_integer(arity) do
+    AST.Capture.new(module, function, arity, meta)
+  end
+
+  # Local function capture: &function/arity
+  def compile({:&, meta, [{:/, _, [{function, _, context}, arity]}]})
+      when is_atom(function) and is_atom(context) and is_integer(arity) do
+    AST.Capture.new(nil, function, arity, meta)
+  end
+
   def compile({name, meta, args}) when is_list(args) do
     args = Enum.map(args, &compile/1)
 

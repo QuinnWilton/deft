@@ -101,6 +101,30 @@ defmodule Deft.Rules.Builtins do
   end
 
   # ============================================================================
+  # Function Capture Rule (&function/arity or &Module.function/arity)
+  # ============================================================================
+
+  defrule :capture, %AST.Capture{module: module, function: function, arity: arity, meta: meta} do
+    compute fn_type do
+      # Determine the module to look up: explicit module for remote, ctx.env.module for local
+      lookup_module = module || (ctx.env && ctx.env.module)
+
+      case lookup_module && Signatures.lookup({lookup_module, function, arity}) do
+        {:ok, %Type.Fn{} = fn_type} ->
+          fn_type
+
+        _ ->
+          # Not found in signatures - error
+          name = if module, do: {module, function}, else: function
+
+          Deft.Error.raise!(Deft.Error.unsupported_call(name: name, arity: arity))
+      end
+    end
+
+    conclude(Erased.capture(meta, module, function, arity) ~> fn_type)
+  end
+
+  # ============================================================================
   # Type Constructor Call Rule (ADT Constructors)
   # ============================================================================
 

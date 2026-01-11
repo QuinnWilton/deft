@@ -149,6 +149,31 @@ defmodule Deft.AST.Erased do
   end
 
   @doc """
+  Builds a function capture AST.
+
+  For local captures (&function/arity):
+      iex> Erased.capture([], nil, :double, 1)
+      {:&, [], [{:/, [], [{:double, [], Elixir}, 1]}]}
+
+  For remote captures (&Module.function/arity):
+      iex> Erased.capture([], String, :to_integer, 1)
+      {:&, [], [{:/, [], [{{:., [], [String, :to_integer]}, [no_parens: true], []}, 1]}]}
+  """
+  @spec capture(keyword(), module() | nil, atom(), non_neg_integer()) :: Macro.t()
+  def capture(meta, nil, function, arity) do
+    name = {function, [], Elixir}
+    slash = {:/, [], [name, arity]}
+    {:&, meta, [slash]}
+  end
+
+  def capture(meta, module, function, arity) do
+    dot = {:., [], [module, function]}
+    call = {dot, [no_parens: true], []}
+    slash = {:/, [], [call, arity]}
+    {:&, meta, [slash]}
+  end
+
+  @doc """
   Builds a remote function call AST (Module.function(args)).
 
       iex> Erased.remote_call([], String, :to_integer, ["123"])
