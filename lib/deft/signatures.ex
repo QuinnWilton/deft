@@ -119,9 +119,11 @@ defmodule Deft.Signatures do
   """
   @spec init() :: :ok
   def init do
-    # Create table if it doesn't exist
-    if :ets.whereis(@table_name) == :undefined do
+    # Create table if it doesn't exist, handling race condition
+    try do
       :ets.new(@table_name, [:named_table, :set, :public, read_concurrency: true])
+    rescue
+      ArgumentError -> :ok
     end
 
     # Load built-in signatures
