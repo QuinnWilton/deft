@@ -8,9 +8,21 @@ defmodule Deft.Context do
   - ADT definitions
   - Feature flags for optional type system features
   - Error accumulation support
+  - Source location tracking
+
+  ## Error Accumulation
+
+  The context supports accumulating multiple errors during type checking
+  rather than failing on the first error. This provides better UX by
+  showing all errors at once.
+
+      ctx = Context.new(env, error_mode: :accumulate)
+      # ... type checking ...
+      errors = Context.get_errors(ctx)
   """
 
   alias Deft.Type
+  alias Deft.Error
 
   defstruct [
     # Elixir macro environment from __CALLER__
@@ -26,8 +38,18 @@ defmodule Deft.Context do
     # Callback for type computation events (debugging/logging)
     on_compute: nil,
     # Source location tracking for error messages
-    source_map: %{}
+    source_map: %{},
+    # Error accumulation mode: :fail_fast | :accumulate
+    error_mode: :fail_fast,
+    # Accumulated errors (when error_mode is :accumulate)
+    errors: [],
+    # Current file being processed (for error locations)
+    current_file: nil,
+    # Source code lines (for error context display)
+    source_lines: nil
   ]
+
+  @type error_mode :: :fail_fast | :accumulate
 
   @type t :: %__MODULE__{
           env: Macro.Env.t() | nil,
@@ -36,7 +58,11 @@ defmodule Deft.Context do
           signature_env: map(),
           features: [atom()],
           on_compute: (term(), term() -> any()) | nil,
-          source_map: map()
+          source_map: map(),
+          error_mode: error_mode(),
+          errors: [Error.t()],
+          current_file: String.t() | nil,
+          source_lines: [String.t()] | nil
         }
 
   @type binding ::
@@ -54,13 +80,23 @@ defmodule Deft.Context do
 
   @doc """
   Creates a new context with options.
+
+  ## Options
+
+  - `:on_compute` - Callback function invoked on type computation
+  - `:features` - List of enabled type system features
+  - `:error_mode` - Error handling mode: `:fail_fast` (default) or `:accumulate`
+  - `:source_lines` - Source code lines for error context display
   """
   @spec new(Macro.Env.t(), keyword()) :: t()
   def new(env, opts) when is_list(opts) do
     %__MODULE__{
       env: env,
       on_compute: Keyword.get(opts, :on_compute),
-      features: Keyword.get(opts, :features, [])
+      features: Keyword.get(opts, :features, []),
+      error_mode: Keyword.get(opts, :error_mode, :fail_fast),
+      current_file: if(env, do: env.file, else: nil),
+      source_lines: Keyword.get(opts, :source_lines)
     }
   end
 
@@ -151,5 +187,141 @@ defmodule Deft.Context do
     opts = []
     opts = if ctx.on_compute, do: [{:on_compute, ctx.on_compute} | opts], else: opts
     opts
+  end
+
+  # ============================================================================
+  # Error Accumulation
+  # ============================================================================
+
+  @doc """
+  Adds an error to the context.
+
+  In `:fail_fast` mode, this will raise the error as an exception.
+  In `:accumulate` mode, the error is stored for later retrieval.
+  """
+  @spec add_error(t(), Error.t()) :: t() | no_return()
+  def add_error(%__MODULE__{error_mode: :fail_fast} = ctx, %Error{} = error) do
+    # In fail_fast mode, convert to exception and raise
+    raise error_to_exception(error, ctx)
+  end
+
+  def add_error(%__MODULE__{error_mode: :accumulate, errors: errors} = ctx, %Error{} = error) do
+    # Enrich error with context if not already set
+    error = enrich_error(error, ctx)
+    %{ctx | errors: errors ++ [error]}
+  end
+
+  @doc """
+  Returns all accumulated errors.
+  """
+  @spec get_errors(t()) :: [Error.t()]
+  def get_errors(%__MODULE__{errors: errors}), do: errors
+
+  @doc """
+  Returns true if there are any accumulated errors.
+  """
+  @spec has_errors?(t()) :: boolean()
+  def has_errors?(%__MODULE__{errors: errors}), do: errors != []
+
+  @doc """
+  Clears all accumulated errors.
+  """
+  @spec clear_errors(t()) :: t()
+  def clear_errors(%__MODULE__{} = ctx), do: %{ctx | errors: []}
+
+  @doc """
+  Records a source location in the source map for an AST node.
+  """
+  @spec record_location(t(), term(), Error.location()) :: t()
+  def record_location(%__MODULE__{source_map: source_map} = ctx, ast_node, location) do
+    %{ctx | source_map: Map.put(source_map, ast_node, location)}
+  end
+
+  @doc """
+  Gets the recorded location for an AST node.
+  """
+  @spec get_location(t(), term()) :: Error.location() | nil
+  def get_location(%__MODULE__{source_map: source_map}, ast_node) do
+    Map.get(source_map, ast_node)
+  end
+
+  @doc """
+  Attempts to run a function, catching errors in accumulate mode.
+
+  In `:fail_fast` mode, errors are raised normally.
+  In `:accumulate` mode, errors are caught, stored, and a recovery value is returned.
+  """
+  @spec with_error_handling(t(), (-> {:ok, term()} | {:error, Error.t()}), term()) ::
+          {:ok, term(), t()} | {:error, term(), t()}
+  def with_error_handling(%__MODULE__{error_mode: :fail_fast} = ctx, fun, _recovery) do
+    case fun.() do
+      {:ok, result} -> {:ok, result, ctx}
+      {:error, %Error{} = error} -> raise error_to_exception(error, ctx)
+      {:error, reason} -> {:error, reason, ctx}
+    end
+  end
+
+  def with_error_handling(%__MODULE__{error_mode: :accumulate} = ctx, fun, recovery) do
+    case fun.() do
+      {:ok, result} ->
+        {:ok, result, ctx}
+
+      {:error, %Error{} = error} ->
+        ctx = add_error(ctx, error)
+        {:ok, recovery, ctx}
+
+      {:error, reason} ->
+        {:error, reason, ctx}
+    end
+  end
+
+  @doc """
+  Gets source lines around a given line number for error context.
+  """
+  @spec get_source_context(t(), non_neg_integer(), non_neg_integer()) ::
+          {String.t() | nil, String.t() | nil, String.t() | nil}
+  def get_source_context(%__MODULE__{source_lines: nil}, _line, _context_lines) do
+    {nil, nil, nil}
+  end
+
+  def get_source_context(%__MODULE__{source_lines: lines}, line, context_lines)
+      when is_list(lines) do
+    # Line numbers are 1-indexed
+    idx = line - 1
+
+    before_start = max(0, idx - context_lines)
+    before_lines = Enum.slice(lines, before_start, idx - before_start)
+
+    current_line = Enum.at(lines, idx)
+
+    after_end = min(length(lines), idx + 1 + context_lines)
+    after_lines = Enum.slice(lines, idx + 1, after_end - idx - 1)
+
+    {
+      if(before_lines != [], do: Enum.join(before_lines, "\n"), else: nil),
+      current_line,
+      if(after_lines != [], do: Enum.join(after_lines, "\n"), else: nil)
+    }
+  end
+
+  # ============================================================================
+  # Private Helpers
+  # ============================================================================
+
+  defp enrich_error(%Error{location: nil} = error, %__MODULE__{current_file: file, env: env}) do
+    location =
+      if env do
+        {file || env.file, env.line, nil}
+      else
+        nil
+      end
+
+    %{error | location: location}
+  end
+
+  defp enrich_error(%Error{} = error, _ctx), do: error
+
+  defp error_to_exception(%Error{} = error, _ctx) do
+    Error.to_exception(error)
   end
 end

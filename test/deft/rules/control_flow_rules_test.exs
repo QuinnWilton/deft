@@ -167,7 +167,7 @@ defmodule Deft.Rules.ControlFlowRulesTest do
       ast = case_expr(union_value, [branch])
 
       # This should raise InexhaustivePatterns because we're not handling the boolean case
-      assert_raise Deft.InexhaustivePatterns, fn ->
+      assert_raise Deft.Error.Exception, fn ->
         TypeChecker.check(ast, ctx)
       end
     end

@@ -57,11 +57,22 @@ defmodule Deft.Rules.Functions do
           if length(inputs) == length(arg_types) and Subtyping.subtypes_of?(inputs, arg_types) do
             output
           else
-            raise Deft.TypecheckingError, expected: inputs, actual: arg_types
+            Deft.Error.raise!(
+              Deft.Error.type_mismatch(
+                expected: Type.fixed_tuple(inputs),
+                actual: Type.fixed_tuple(arg_types)
+              )
+            )
           end
 
         _ ->
-          raise "Expected function type, got: #{inspect(fun_type)}"
+          Deft.Error.raise!(
+            Deft.Error.type_mismatch(
+              expected: Type.fun([], Type.top()),
+              actual: fun_type,
+              notes: ["Expected a function type but got: #{inspect(fun_type)}"]
+            )
+          )
       end
     end
 

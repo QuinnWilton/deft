@@ -20,7 +20,7 @@ defmodule Deft.PatternMatching do
   @doc """
   Handles pattern matching against a type, returning erased pattern, type, and bindings.
 
-  Raises `Deft.UnreachableBranchError` if the pattern cannot match the given type.
+  Raises `Deft.Error.Exception` if the pattern cannot match the given type.
   """
   @spec handle_pattern(term(), Type.t(), Context.t()) :: result()
   def handle_pattern(pattern, type, %Context{} = ctx) do
@@ -29,7 +29,7 @@ defmodule Deft.PatternMatching do
         result
 
       {:error, pattern_type} ->
-        raise Deft.UnreachableBranchError, expected: type, actual: pattern_type
+        Deft.Error.raise!(Deft.Error.unreachable_branch(expected: type, actual: pattern_type))
     end
   end
 

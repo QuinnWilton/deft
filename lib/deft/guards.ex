@@ -124,7 +124,7 @@ defmodule Deft.Guards do
     {:ok, term, term_t, bindings, _} = TypeChecker.check(term, ctx)
 
     unless Subtyping.subtype_of?(Type.number(), term_t) do
-      raise Deft.TypecheckingError, expected: Type.number(), actual: term_t
+      Deft.Error.raise!(Deft.Error.type_mismatch(expected: Type.number(), actual: term_t))
     end
 
     {[term], term_t, bindings}
@@ -136,11 +136,11 @@ defmodule Deft.Guards do
     {:ok, snd, snd_t, snd_bindings, _} = TypeChecker.check(snd, ctx)
 
     unless Subtyping.subtype_of?(Type.number(), fst_t) do
-      raise Deft.TypecheckingError, expected: Type.number(), actual: fst_t
+      Deft.Error.raise!(Deft.Error.type_mismatch(expected: Type.number(), actual: fst_t))
     end
 
     unless Subtyping.subtype_of?(Type.number(), snd_t) do
-      raise Deft.TypecheckingError, expected: Type.number(), actual: snd_t
+      Deft.Error.raise!(Deft.Error.type_mismatch(expected: Type.number(), actual: snd_t))
     end
 
     # Compute result type: most specific common type
@@ -160,11 +160,11 @@ defmodule Deft.Guards do
     {:ok, snd, snd_t, snd_bindings, _} = TypeChecker.check(snd, ctx)
 
     unless Subtyping.subtype_of?(Type.integer(), fst_t) do
-      raise Deft.TypecheckingError, expected: Type.integer(), actual: fst_t
+      Deft.Error.raise!(Deft.Error.type_mismatch(expected: Type.integer(), actual: fst_t))
     end
 
     unless Subtyping.subtype_of?(Type.integer(), snd_t) do
-      raise Deft.TypecheckingError, expected: Type.integer(), actual: snd_t
+      Deft.Error.raise!(Deft.Error.type_mismatch(expected: Type.integer(), actual: snd_t))
     end
 
     {[fst, snd], Type.integer(), fst_bindings ++ snd_bindings}
@@ -176,11 +176,11 @@ defmodule Deft.Guards do
     {:ok, snd, snd_t, snd_bindings, _} = TypeChecker.check(snd, ctx)
 
     unless Subtyping.subtype_of?(Type.number(), fst_t) do
-      raise Deft.TypecheckingError, expected: Type.number(), actual: fst_t
+      Deft.Error.raise!(Deft.Error.type_mismatch(expected: Type.number(), actual: fst_t))
     end
 
     unless Subtyping.subtype_of?(Type.number(), snd_t) do
-      raise Deft.TypecheckingError, expected: Type.number(), actual: snd_t
+      Deft.Error.raise!(Deft.Error.type_mismatch(expected: Type.number(), actual: snd_t))
     end
 
     {[fst, snd], Type.float(), fst_bindings ++ snd_bindings}
@@ -191,7 +191,7 @@ defmodule Deft.Guards do
     {:ok, term, term_t, bindings, _} = TypeChecker.check(term, ctx)
 
     unless Subtyping.subtype_of?(Type.tuple(), term_t) do
-      raise Deft.TypecheckingError, expected: Type.tuple(), actual: term_t
+      Deft.Error.raise!(Deft.Error.type_mismatch(expected: Type.tuple(), actual: term_t))
     end
 
     {[term], Type.integer(), bindings}
@@ -202,7 +202,7 @@ defmodule Deft.Guards do
     {:ok, term, term_t, bindings, _} = TypeChecker.check(term, ctx)
 
     unless Subtyping.subtype_of?(Type.list(), term_t) do
-      raise Deft.TypecheckingError, expected: Type.list(), actual: term_t
+      Deft.Error.raise!(Deft.Error.type_mismatch(expected: Type.list(), actual: term_t))
     end
 
     {[term], Type.integer(), bindings}
@@ -221,7 +221,7 @@ defmodule Deft.Guards do
     {:ok, arity, arity_t, arity_bindings, _} = TypeChecker.check(arity, ctx)
 
     unless Subtyping.subtype_of?(Type.integer(), arity_t) do
-      raise Deft.TypecheckingError, expected: Type.integer(), actual: arity_t
+      Deft.Error.raise!(Deft.Error.type_mismatch(expected: Type.integer(), actual: arity_t))
     end
 
     {[fun, arity], Type.boolean(), fun_bindings ++ arity_bindings}
@@ -232,7 +232,7 @@ defmodule Deft.Guards do
     {:ok, term, term_t, bindings, _} = TypeChecker.check(term, ctx)
 
     unless Subtyping.subtype_of?(Type.boolean(), term_t) do
-      raise Deft.TypecheckingError, expected: Type.boolean(), actual: term_t
+      Deft.Error.raise!(Deft.Error.type_mismatch(expected: Type.boolean(), actual: term_t))
     end
 
     {[term], term_t, bindings}
@@ -243,7 +243,7 @@ defmodule Deft.Guards do
     {:ok, term, term_t, bindings, _} = TypeChecker.check(term, ctx)
 
     unless Subtyping.subtype_of?(Type.list(), term_t) do
-      raise Deft.TypecheckingError, expected: Type.list(), actual: term_t
+      Deft.Error.raise!(Deft.Error.type_mismatch(expected: Type.list(), actual: term_t))
     end
 
     {[term], Type.FixedList.contents(term_t), bindings}
@@ -254,7 +254,7 @@ defmodule Deft.Guards do
     {:ok, term, term_t, bindings, _} = TypeChecker.check(term, ctx)
 
     unless Subtyping.subtype_of?(Type.list(), term_t) do
-      raise Deft.TypecheckingError, expected: Type.list(), actual: term_t
+      Deft.Error.raise!(Deft.Error.type_mismatch(expected: Type.list(), actual: term_t))
     end
 
     {[term], term_t, bindings}
@@ -266,11 +266,11 @@ defmodule Deft.Guards do
     {:ok, index, index_t, index_bindings, _} = TypeChecker.check(index, ctx)
 
     unless Subtyping.subtype_of?(Type.tuple(), tuple_t) do
-      raise Deft.TypecheckingError, expected: Type.tuple(), actual: tuple_t
+      Deft.Error.raise!(Deft.Error.type_mismatch(expected: Type.tuple(), actual: tuple_t))
     end
 
     unless Subtyping.subtype_of?(Type.integer(), index_t) do
-      raise Deft.TypecheckingError, expected: Type.integer(), actual: index_t
+      Deft.Error.raise!(Deft.Error.type_mismatch(expected: Type.integer(), actual: index_t))
     end
 
     type =
@@ -290,7 +290,7 @@ defmodule Deft.Guards do
         handle_with_signature(name, args, input_types, output_type, ctx)
 
       :error ->
-        raise Deft.UnsupportedLocalCall, name: name, arity: arity
+        Deft.Error.raise!(Deft.Error.unsupported_call(name: name, arity: arity))
     end
   end
 
@@ -303,7 +303,9 @@ defmodule Deft.Guards do
         {:ok, erased, actual_type, bindings, _} = TypeChecker.check(arg, ctx)
 
         unless Subtyping.subtype_of?(expected_type, actual_type) do
-          raise Deft.TypecheckingError, expected: expected_type, actual: actual_type
+          Deft.Error.raise!(
+            Deft.Error.type_mismatch(expected: expected_type, actual: actual_type)
+          )
         end
 
         {erased_acc ++ [erased], bindings_acc ++ bindings}

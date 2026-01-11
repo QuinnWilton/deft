@@ -109,14 +109,14 @@ defmodule Deft.Rules.ControlFlow do
       unless Enum.any?(pattern_types, fn pattern ->
                Subtyping.subtype_of?(pattern, variant)
              end) do
-        raise Deft.InexhaustivePatterns, missing: variant
+        Deft.Error.raise!(Deft.Error.inexhaustive_patterns(missing: variant))
       end
     end
   end
 
   def exhaustive_check!(subject_type, pattern_types) do
     unless Enum.any?(pattern_types, &Subtyping.subtype_of?(&1, subject_type)) do
-      raise Deft.InexhaustivePatterns, missing: subject_type
+      Deft.Error.raise!(Deft.Error.inexhaustive_patterns(missing: subject_type))
     end
   end
 

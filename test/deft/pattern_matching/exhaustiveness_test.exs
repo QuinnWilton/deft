@@ -40,7 +40,7 @@ defmodule Deft.ExhaustivenessTest do
       # Wrong type!
       pattern_types = [Type.boolean()]
 
-      assert_raise Deft.InexhaustivePatterns, fn ->
+      assert_raise Deft.Error.Exception, fn ->
         ControlFlow.exhaustive_check!(subject_type, pattern_types)
       end
     end
@@ -50,11 +50,12 @@ defmodule Deft.ExhaustivenessTest do
       pattern_types = [Type.boolean()]
 
       error =
-        assert_raise Deft.InexhaustivePatterns, fn ->
+        assert_raise Deft.Error.Exception, fn ->
           ControlFlow.exhaustive_check!(subject_type, pattern_types)
         end
 
-      assert %Type.Integer{} = error.missing
+      assert error.error.code == :inexhaustive_patterns
+      assert Enum.any?(error.error.suggestions, &(&1 =~ "integer"))
     end
   end
 
@@ -81,7 +82,7 @@ defmodule Deft.ExhaustivenessTest do
       # Missing boolean
       pattern_types = [Type.integer()]
 
-      assert_raise Deft.InexhaustivePatterns, fn ->
+      assert_raise Deft.Error.Exception, fn ->
         ControlFlow.exhaustive_check!(union, pattern_types)
       end
     end
@@ -91,11 +92,12 @@ defmodule Deft.ExhaustivenessTest do
       pattern_types = [Type.integer()]
 
       error =
-        assert_raise Deft.InexhaustivePatterns, fn ->
+        assert_raise Deft.Error.Exception, fn ->
           ControlFlow.exhaustive_check!(union, pattern_types)
         end
 
-      assert %Type.Boolean{} = error.missing
+      assert error.error.code == :inexhaustive_patterns
+      assert Enum.any?(error.error.suggestions, &(&1 =~ "boolean"))
     end
 
     test "nested union requires coverage of all leaves" do
@@ -117,7 +119,7 @@ defmodule Deft.ExhaustivenessTest do
       # Missing atom
       pattern_types = [Type.integer(), Type.boolean()]
 
-      assert_raise Deft.InexhaustivePatterns, fn ->
+      assert_raise Deft.Error.Exception, fn ->
         ControlFlow.exhaustive_check!(outer_union, pattern_types)
       end
     end
@@ -154,7 +156,7 @@ defmodule Deft.ExhaustivenessTest do
       # Missing rectangle and triangle
       pattern_types = [circle]
 
-      assert_raise Deft.InexhaustivePatterns, fn ->
+      assert_raise Deft.Error.Exception, fn ->
         ControlFlow.exhaustive_check!(shape, pattern_types)
       end
     end
@@ -162,18 +164,19 @@ defmodule Deft.ExhaustivenessTest do
     test "error includes missing variant", %{
       circle: circle,
       rectangle: rectangle,
-      triangle: triangle,
+      triangle: _triangle,
       shape: shape
     } do
       # Missing triangle
       pattern_types = [circle, rectangle]
 
       error =
-        assert_raise Deft.InexhaustivePatterns, fn ->
+        assert_raise Deft.Error.Exception, fn ->
           ControlFlow.exhaustive_check!(shape, pattern_types)
         end
 
-      assert error.missing == triangle
+      assert error.error.code == :inexhaustive_patterns
+      assert Enum.any?(error.error.suggestions, &(&1 =~ "triangle"))
     end
 
     test "order of patterns doesn't matter", %{

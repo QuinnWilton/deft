@@ -1,80 +1,436 @@
-defmodule Deft.MissingTypeError do
-  defexception [:expr]
+defmodule Deft.Error do
+  @moduledoc """
+  Rich structured error type for Deft type checking.
 
-  @type t() :: %__MODULE__{
-          expr: term()
+  This module provides comprehensive error information including:
+  - Error code for programmatic handling
+  - Human-readable message
+  - Expected and actual types
+  - Source location (file, line, column)
+  - Expression context
+  - Suggestions for fixes
+  - Additional notes
+
+  ## Error Codes
+
+  Error codes follow the pattern `E0XXX`:
+  - `E0001` - Type mismatch (expected vs actual)
+  - `E0002` - Missing type annotation
+  - `E0003` - Malformed type expression
+  - `E0004` - Unsupported local call
+  - `E0005` - Inexhaustive patterns
+  - `E0006` - Unreachable branch
+  - `E0007` - No matching rule
+  - `E0008` - Missing features
+  - `E0009` - Subtype constraint violated
+
+  ## Usage
+
+      error = Deft.Error.type_mismatch(
+        expected: Type.integer(),
+        actual: Type.float(),
+        location: {file, line, column},
+        expression: expr
+      )
+  """
+
+  alias Deft.Type
+
+  @type error_code ::
+          :type_mismatch
+          | :missing_annotation
+          | :malformed_type
+          | :unsupported_call
+          | :inexhaustive_patterns
+          | :unreachable_branch
+          | :no_matching_rule
+          | :missing_features
+          | :subtype_violation
+
+  @type location :: {String.t() | nil, non_neg_integer() | nil, non_neg_integer() | nil}
+
+  @type t :: %__MODULE__{
+          code: error_code(),
+          message: String.t(),
+          expected: Type.t() | nil,
+          actual: Type.t() | nil,
+          location: location() | nil,
+          expression: term(),
+          context_before: String.t() | nil,
+          context_after: String.t() | nil,
+          suggestions: [String.t()],
+          notes: [String.t()],
+          severity: :error | :warning
         }
 
-  @impl true
-  def message(exception) do
-    "Expected type annotation on expression: #{Macro.to_string(exception.expr)}"
+  defstruct [
+    :code,
+    :message,
+    :expected,
+    :actual,
+    :location,
+    :expression,
+    :context_before,
+    :context_after,
+    suggestions: [],
+    notes: [],
+    severity: :error
+  ]
+
+  @error_codes %{
+    type_mismatch: "E0001",
+    missing_annotation: "E0002",
+    malformed_type: "E0003",
+    unsupported_call: "E0004",
+    inexhaustive_patterns: "E0005",
+    unreachable_branch: "E0006",
+    no_matching_rule: "E0007",
+    missing_features: "E0008",
+    subtype_violation: "E0009"
+  }
+
+  # ============================================================================
+  # Error Constructors
+  # ============================================================================
+
+  @doc """
+  Creates a type mismatch error.
+
+  ## Options
+
+  - `:expected` - The expected type (required)
+  - `:actual` - The actual type found (required)
+  - `:location` - Source location tuple `{file, line, column}`
+  - `:expression` - The AST expression that caused the error
+  - `:suggestions` - List of possible fixes
+  - `:notes` - Additional context notes
+  """
+  @spec type_mismatch(keyword()) :: t()
+  def type_mismatch(opts) do
+    expected = Keyword.fetch!(opts, :expected)
+    actual = Keyword.fetch!(opts, :actual)
+
+    %__MODULE__{
+      code: :type_mismatch,
+      message: build_type_mismatch_message(expected, actual),
+      expected: expected,
+      actual: actual,
+      location: Keyword.get(opts, :location),
+      expression: Keyword.get(opts, :expression),
+      suggestions: Keyword.get(opts, :suggestions, []),
+      notes: Keyword.get(opts, :notes, [])
+    }
   end
-end
 
-defmodule Deft.MalformedTypedError do
-  defexception [:expr]
+  @doc """
+  Creates a missing annotation error.
+  """
+  @spec missing_annotation(keyword()) :: t()
+  def missing_annotation(opts) do
+    expr = Keyword.fetch!(opts, :expression)
 
-  @type t() :: %__MODULE__{
-          expr: term()
-        }
-
-  @impl true
-  def message(exception) do
-    "Malformed type: #{Macro.to_string(exception.expr)}"
+    %__MODULE__{
+      code: :missing_annotation,
+      message: "Missing type annotation on expression",
+      expression: expr,
+      location: Keyword.get(opts, :location),
+      suggestions: ["Add a type annotation using the `::` operator"],
+      notes: Keyword.get(opts, :notes, [])
+    }
   end
-end
 
-defmodule Deft.TypecheckingError do
-  defexception [:expected, :actual]
+  @doc """
+  Creates a malformed type error.
+  """
+  @spec malformed_type(keyword()) :: t()
+  def malformed_type(opts) do
+    expr = Keyword.fetch!(opts, :expression)
 
-  @type t() :: %__MODULE__{
-          expected: term(),
-          actual: term()
-        }
-
-  @impl true
-  def message(exception) do
-    "Typechecking failed: expected #{inspect(exception.expected)}, got #{inspect(exception.actual)}"
+    %__MODULE__{
+      code: :malformed_type,
+      message: "Malformed type expression",
+      expression: expr,
+      location: Keyword.get(opts, :location),
+      suggestions: Keyword.get(opts, :suggestions, []),
+      notes: Keyword.get(opts, :notes, [])
+    }
   end
-end
 
-defmodule Deft.UnreachableBranchError do
-  defexception [:expected, :actual]
+  @doc """
+  Creates an unsupported local call error.
+  """
+  @spec unsupported_call(keyword()) :: t()
+  def unsupported_call(opts) do
+    name = Keyword.fetch!(opts, :name)
+    arity = Keyword.fetch!(opts, :arity)
 
-  @type t() :: %__MODULE__{
-          expected: term(),
-          actual: term()
-        }
-
-  @impl true
-  def message(exception) do
-    "Branch unreachable: value has type #{inspect(exception.expected)}, but pattern has type #{inspect(exception.actual)}"
+    %__MODULE__{
+      code: :unsupported_call,
+      message: "Call to unsupported function: #{name}/#{arity}",
+      expression: Keyword.get(opts, :expression),
+      location: Keyword.get(opts, :location),
+      suggestions:
+        Keyword.get(opts, :suggestions, [
+          "Register a type signature for this function",
+          "Use a supported built-in function"
+        ]),
+      notes: Keyword.get(opts, :notes, [])
+    }
   end
-end
 
-defmodule Deft.UnsupportedLocalCall do
-  defexception [:name, :arity]
+  @doc """
+  Creates an inexhaustive patterns error.
+  """
+  @spec inexhaustive_patterns(keyword()) :: t()
+  def inexhaustive_patterns(opts) do
+    missing = Keyword.fetch!(opts, :missing)
+    missing_list = List.wrap(missing)
 
-  @type t() :: %__MODULE__{
-          name: atom(),
-          arity: arity()
-        }
-
-  @impl true
-  def message(exception) do
-    "Call to unsupported local function: #{exception.name}/#{exception.arity}"
+    %__MODULE__{
+      code: :inexhaustive_patterns,
+      message: "Non-exhaustive pattern matching",
+      expression: Keyword.get(opts, :expression),
+      location: Keyword.get(opts, :location),
+      suggestions:
+        Enum.map(missing_list, fn m ->
+          "Add a case branch for: #{format_type(m)}"
+        end),
+      notes: ["Pattern matching must cover all possible values"]
+    }
   end
-end
 
-defmodule Deft.InexhaustivePatterns do
-  defexception [:missing]
+  @doc """
+  Creates an unreachable branch error.
+  """
+  @spec unreachable_branch(keyword()) :: t()
+  def unreachable_branch(opts) do
+    expected = Keyword.fetch!(opts, :expected)
+    actual = Keyword.fetch!(opts, :actual)
 
-  @type t() :: %__MODULE__{
-          missing: term()
-        }
+    %__MODULE__{
+      code: :unreachable_branch,
+      message: "Branch is unreachable",
+      expected: expected,
+      actual: actual,
+      expression: Keyword.get(opts, :expression),
+      location: Keyword.get(opts, :location),
+      suggestions: ["Remove this branch or fix the pattern"],
+      notes: [
+        "Value has type: #{format_type(expected)}",
+        "Pattern expects type: #{format_type(actual)}"
+      ]
+    }
+  end
 
-  @impl true
-  def message(exception) do
-    "Inexhaustive patterns: missing branch for #{inspect(exception.missing)}"
+  @doc """
+  Creates a no matching rule error.
+  """
+  @spec no_matching_rule(keyword()) :: t()
+  def no_matching_rule(opts) do
+    ast = Keyword.fetch!(opts, :ast)
+
+    %__MODULE__{
+      code: :no_matching_rule,
+      message: "No typing rule matches this expression",
+      expression: ast,
+      location: Keyword.get(opts, :location),
+      suggestions: ["This construct may not be supported"],
+      notes: Keyword.get(opts, :notes, [])
+    }
+  end
+
+  @doc """
+  Creates a missing features error.
+  """
+  @spec missing_features(keyword()) :: t()
+  def missing_features(opts) do
+    features = Keyword.fetch!(opts, :features)
+    features_list = List.wrap(features)
+
+    %__MODULE__{
+      code: :missing_features,
+      message: "Required type system features are not enabled",
+      expression: Keyword.get(opts, :expression),
+      location: Keyword.get(opts, :location),
+      suggestions:
+        Enum.map(features_list, fn f ->
+          "Enable feature: #{inspect(f)}"
+        end),
+      notes: ["Use `use Deft, features: #{inspect(features_list)}` to enable"]
+    }
+  end
+
+  @doc """
+  Creates a subtype constraint violation error.
+  """
+  @spec subtype_violation(keyword()) :: t()
+  def subtype_violation(opts) do
+    expected = Keyword.fetch!(opts, :expected)
+    actual = Keyword.fetch!(opts, :actual)
+
+    %__MODULE__{
+      code: :subtype_violation,
+      message: "Subtype constraint violated",
+      expected: expected,
+      actual: actual,
+      expression: Keyword.get(opts, :expression),
+      location: Keyword.get(opts, :location),
+      suggestions: Keyword.get(opts, :suggestions, []),
+      notes: [
+        "Expected subtype of: #{format_type(expected)}",
+        "Got: #{format_type(actual)}"
+      ]
+    }
+  end
+
+  # ============================================================================
+  # Error Code Lookup
+  # ============================================================================
+
+  @doc """
+  Returns the error code string for a given error code atom.
+  """
+  @spec error_code_string(error_code()) :: String.t()
+  def error_code_string(code) do
+    Map.get(@error_codes, code, "E0000")
+  end
+
+  # ============================================================================
+  # Location Helpers
+  # ============================================================================
+
+  @doc """
+  Extracts source location from AST metadata or expression.
+  """
+  @spec extract_location(term()) :: location() | nil
+  def extract_location({_, meta, _}) when is_list(meta) do
+    extract_location_from_meta(meta)
+  end
+
+  def extract_location(%{meta: meta}) when is_list(meta) do
+    extract_location_from_meta(meta)
+  end
+
+  def extract_location(_), do: nil
+
+  defp extract_location_from_meta(meta) do
+    line = Keyword.get(meta, :line)
+    column = Keyword.get(meta, :column)
+    file = Keyword.get(meta, :file)
+
+    if line do
+      {file, line, column}
+    else
+      nil
+    end
+  end
+
+  @doc """
+  Extracts location from a Macro.Env struct.
+  """
+  @spec extract_location_from_env(Macro.Env.t() | nil) :: location() | nil
+  def extract_location_from_env(nil), do: nil
+
+  def extract_location_from_env(%Macro.Env{file: file, line: line}) do
+    {file, line, nil}
+  end
+
+  # ============================================================================
+  # Type Formatting
+  # ============================================================================
+
+  @doc """
+  Formats a type for display in error messages.
+  """
+  @spec format_type(Type.t() | nil) :: String.t()
+  def format_type(nil), do: "unknown"
+  def format_type(%Type.Top{}), do: "any"
+  def format_type(%Type.Bottom{}), do: "never"
+  def format_type(%Type.Integer{}), do: "integer"
+  def format_type(%Type.Float{}), do: "float"
+  def format_type(%Type.Number{}), do: "number"
+  def format_type(%Type.Boolean{}), do: "boolean"
+  def format_type(%Type.Atom{}), do: "atom"
+
+  def format_type(%Type.Fn{inputs: inputs, output: output}) do
+    input_strs = Enum.map(inputs, &format_type/1)
+    "(#{Enum.join(input_strs, ", ")} -> #{format_type(output)})"
+  end
+
+  def format_type(%Type.Union{fst: fst, snd: snd}) do
+    "#{format_type(fst)} | #{format_type(snd)}"
+  end
+
+  def format_type(%Type.Intersection{fst: fst, snd: snd}) do
+    "#{format_type(fst)} & #{format_type(snd)}"
+  end
+
+  def format_type(%Type.FixedTuple{elements: elements}) do
+    elem_strs = Enum.map(elements, &format_type/1)
+    "{#{Enum.join(elem_strs, ", ")}}"
+  end
+
+  def format_type(%Type.FixedList{contents: contents}) do
+    "[#{format_type(contents)}]"
+  end
+
+  def format_type(%Type.List{}), do: "list"
+  def format_type(%Type.Tuple{}), do: "tuple"
+
+  def format_type(%Type.ADT{name: name}) do
+    format_adt_name(name)
+  end
+
+  def format_type(%Type.Variant{name: name, columns: columns}) do
+    col_strs = Enum.map(columns, &format_type/1)
+
+    if columns == [] do
+      "#{name}"
+    else
+      "#{name}(#{Enum.join(col_strs, ", ")})"
+    end
+  end
+
+  def format_type(%Type.Alias{name: name}) do
+    "#{name}"
+  end
+
+  def format_type(other), do: inspect(other)
+
+  defp format_adt_name(%{name: name}), do: "#{name}"
+  defp format_adt_name(name) when is_atom(name), do: "#{name}"
+  defp format_adt_name(other), do: inspect(other)
+
+  # ============================================================================
+  # Message Building
+  # ============================================================================
+
+  defp build_type_mismatch_message(expected, actual) do
+    "Type mismatch: expected `#{format_type(expected)}`, got `#{format_type(actual)}`"
+  end
+
+  # ============================================================================
+  # Exception Protocol Implementation
+  # ============================================================================
+
+  @doc """
+  Converts an Error struct to an exception that can be raised.
+
+  This allows using `raise Deft.Error.to_exception(error)` or
+  implementing the Exception protocol directly.
+
+  The Exception module is defined in `lib/deft/error/exception.ex`.
+  """
+  @spec to_exception(t()) :: Exception.t()
+  def to_exception(%__MODULE__{} = error) do
+    %Deft.Error.Exception{error: error}
+  end
+
+  @doc """
+  Raises an error as an exception.
+  """
+  @spec raise!(t()) :: no_return()
+  def raise!(%__MODULE__{} = error) do
+    raise to_exception(error)
   end
 end

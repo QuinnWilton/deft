@@ -84,7 +84,7 @@ defmodule Deft.Helpers do
   end
 
   def type_of(e) do
-    raise Deft.MissingTypeError, expr: e
+    Deft.Error.raise!(Deft.Error.missing_annotation(expression: e))
   end
 
   @doc """

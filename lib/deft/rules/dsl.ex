@@ -575,6 +575,7 @@ defmodule Deft.Rules.DSL.Helpers do
   """
 
   alias Deft.Context
+  alias Deft.Error
   alias Deft.Subtyping
   alias Deft.Type
   alias Deft.TypeChecker
@@ -590,6 +591,15 @@ defmodule Deft.Rules.DSL.Helpers do
     case TypeChecker.check(expr_with_bindings, ctx) do
       {:ok, erased, type, new_bindings, _ctx} ->
         {erased, type, new_bindings}
+
+      {:error, {:no_matching_rule, ast}} ->
+        error =
+          Error.no_matching_rule(
+            ast: ast,
+            location: Error.extract_location(ast)
+          )
+
+        raise_or_accumulate(ctx, error)
 
       {:error, reason} ->
         raise "Synthesis failed: #{inspect(reason)}"
@@ -607,6 +617,15 @@ defmodule Deft.Rules.DSL.Helpers do
       {:ok, erased, type, new_bindings, _ctx} ->
         {erased, type, new_bindings}
 
+      {:error, {:no_matching_rule, ast}} ->
+        error =
+          Error.no_matching_rule(
+            ast: ast,
+            location: Error.extract_location(ast)
+          )
+
+        raise_or_accumulate(ctx, error)
+
       {:error, reason} ->
         raise "Check failed: #{inspect(reason)}"
     end
@@ -614,11 +633,44 @@ defmodule Deft.Rules.DSL.Helpers do
 
   @doc """
   Asserts that actual is a subtype of expected.
+  Raises a TypecheckingError if the assertion fails.
   """
   def require_subtype!(actual, expected) do
+    require_subtype!(actual, expected, nil, nil)
+  end
+
+  @doc """
+  Asserts that actual is a subtype of expected with context.
+  """
+  def require_subtype!(actual, expected, expr, ctx) do
     unless Subtyping.subtype_of?(expected, actual) do
-      raise Deft.TypecheckingError, expected: expected, actual: actual
+      error =
+        Error.type_mismatch(
+          expected: expected,
+          actual: actual,
+          expression: expr,
+          location: if(expr, do: Error.extract_location(expr), else: nil)
+        )
+
+      if ctx do
+        raise_or_accumulate(ctx, error)
+      else
+        Error.raise!(error)
+      end
     end
+  end
+
+  # Handles error based on context's error_mode
+  defp raise_or_accumulate(%Context{error_mode: :accumulate} = ctx, error) do
+    # In accumulate mode, we add the error but can't easily return the updated context
+    # from the current API, so we still need to raise but with rich error info
+    Context.add_error(ctx, error)
+    {nil, Type.bottom(), []}
+  end
+
+  defp raise_or_accumulate(_ctx, %Error{} = error) do
+    # In fail_fast mode or no context, raise using the new error system
+    Error.raise!(error)
   end
 
   @doc """

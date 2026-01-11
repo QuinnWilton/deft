@@ -91,7 +91,7 @@ defmodule Deft.Rules.FunctionRulesTest do
       fun = fn_expr([annotation(:x, Type.integer())], typed_local(:x, Type.integer()))
       ast = fn_apply(fun, [])
 
-      assert_raise Deft.TypecheckingError, fn ->
+      assert_raise Deft.Error.Exception, fn ->
         TypeChecker.check(ast, ctx)
       end
     end
@@ -101,7 +101,7 @@ defmodule Deft.Rules.FunctionRulesTest do
       fun = fn_expr([annotation(:x, Type.integer())], typed_local(:x, Type.integer()))
       ast = fn_apply(fun, [literal(true)])
 
-      assert_raise Deft.TypecheckingError, fn ->
+      assert_raise Deft.Error.Exception, fn ->
         TypeChecker.check(ast, ctx)
       end
     end

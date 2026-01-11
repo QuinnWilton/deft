@@ -59,7 +59,7 @@ defmodule Deft.PatternMatchingTest do
     test "literal pattern fails for incompatible type", %{ctx: ctx} do
       pattern = literal(42)
 
-      assert_raise Deft.UnreachableBranchError, fn ->
+      assert_raise Deft.Error.Exception, fn ->
         PatternMatching.handle_pattern(pattern, Type.boolean(), ctx)
       end
     end
@@ -247,10 +247,10 @@ defmodule Deft.PatternMatchingTest do
   end
 
   describe "error cases" do
-    test "incompatible literal type raises UnreachableBranchError", %{ctx: ctx} do
+    test "incompatible literal type raises exception", %{ctx: ctx} do
       pattern = literal(42)
 
-      assert_raise Deft.UnreachableBranchError, fn ->
+      assert_raise Deft.Error.Exception, fn ->
         PatternMatching.handle_pattern(pattern, Type.boolean(), ctx)
       end
     end
@@ -259,12 +259,13 @@ defmodule Deft.PatternMatchingTest do
       pattern = literal(42)
 
       error =
-        assert_raise Deft.UnreachableBranchError, fn ->
+        assert_raise Deft.Error.Exception, fn ->
           PatternMatching.handle_pattern(pattern, Type.boolean(), ctx)
         end
 
-      assert %Type.Boolean{} = error.expected
-      assert %Type.Integer{} = error.actual
+      assert error.error.code == :unreachable_branch
+      assert %Type.Boolean{} = error.error.expected
+      assert %Type.Integer{} = error.error.actual
     end
   end
 end

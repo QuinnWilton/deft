@@ -206,7 +206,7 @@ defmodule Deft.Rules.BuiltinRulesTest do
       ast = local_call(:unsupported_function, [literal(42)])
       ctx = Context.new(__ENV__)
 
-      assert_raise Deft.UnsupportedLocalCall, fn ->
+      assert_raise Deft.Error.Exception, fn ->
         TypeChecker.check(ast, ctx)
       end
     end
@@ -216,12 +216,12 @@ defmodule Deft.Rules.BuiltinRulesTest do
       ctx = Context.new(__ENV__)
 
       error =
-        assert_raise Deft.UnsupportedLocalCall, fn ->
+        assert_raise Deft.Error.Exception, fn ->
           TypeChecker.check(ast, ctx)
         end
 
-      assert error.name == :my_unknown_fn
-      assert error.arity == 2
+      assert error.error.code == :unsupported_call
+      assert error.error.message =~ "my_unknown_fn/2"
     end
   end
 

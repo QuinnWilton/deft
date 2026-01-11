@@ -23,7 +23,7 @@ defmodule Deft.Rules.Builtins do
       if Guards.supported?(name, length(args)) do
         Guards.handle_guard(name, args, ctx)
       else
-        raise Deft.UnsupportedLocalCall, name: name, arity: length(args)
+        Deft.Error.raise!(Deft.Error.unsupported_call(name: name, arity: length(args)))
       end
     end
 
@@ -48,7 +48,12 @@ defmodule Deft.Rules.Builtins do
     compute :ok do
       unless length(variant.columns) == length(arg_types) and
                Subtyping.subtypes_of?(variant.columns, arg_types) do
-        raise Deft.TypecheckingError, expected: variant.columns, actual: arg_types
+        Deft.Error.raise!(
+          Deft.Error.type_mismatch(
+            expected: Deft.Type.fixed_tuple(variant.columns),
+            actual: Deft.Type.fixed_tuple(arg_types)
+          )
+        )
       end
 
       :ok
