@@ -80,6 +80,12 @@ defmodule Deft.PatternMatching do
     end
   end
 
+  # Literal patterns against Top: always match, infer type from literal
+  defp do_handle_pattern(%AST.Literal{value: value}, %Type.Top{}, _ctx) do
+    pattern_type = literal_type(value)
+    {:ok, {value, pattern_type, []}}
+  end
+
   # Local (variable) patterns: bind the variable to the type
   defp do_handle_pattern(%AST.Local{} = local, type, _ctx) do
     erased = {local.name, local.meta, local.context}
