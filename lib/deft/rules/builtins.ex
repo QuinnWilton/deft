@@ -12,7 +12,10 @@ defmodule Deft.Rules.Builtins do
   alias Deft.AST
   alias Deft.AST.Erased
   alias Deft.Guards
+  alias Deft.Signatures
   alias Deft.Subtyping
+  alias Deft.Type
+  alias Deft.TypeChecker
 
   # ============================================================================
   # Local Call Rule (Guards and Built-in Functions)
@@ -28,6 +31,43 @@ defmodule Deft.Rules.Builtins do
     end
 
     conclude(Erased.local_call(meta, name, erased_args) ~> type, bind: call_bindings)
+  end
+
+  # ============================================================================
+  # Remote Call Rule (Module.function(args))
+  # ============================================================================
+
+  defrule :remote_call, %AST.RemoteCall{module: module, function: function, args: args, meta: meta} do
+    compute {erased_args, type, call_bindings} do
+      arity = length(args)
+
+      case Signatures.lookup({module, function, arity}) do
+        {:ok, %Type.Fn{inputs: input_types, output: output_type}} ->
+          {erased_args, bindings} =
+            args
+            |> Enum.zip(input_types)
+            |> Enum.reduce({[], []}, fn {arg, expected_type}, {erased_acc, bindings_acc} ->
+              {:ok, erased, actual_type, bindings, _} = TypeChecker.check(arg, ctx)
+
+              unless Subtyping.subtype_of?(expected_type, actual_type) do
+                Deft.Error.raise!(
+                  Deft.Error.type_mismatch(expected: expected_type, actual: actual_type)
+                )
+              end
+
+              {erased_acc ++ [erased], bindings_acc ++ bindings}
+            end)
+
+          {erased_args, output_type, bindings}
+
+        :error ->
+          Deft.Error.raise!(
+            Deft.Error.unsupported_call(name: {module, function}, arity: arity)
+          )
+      end
+    end
+
+    conclude(Erased.remote_call(meta, module, function, erased_args) ~> type, bind: call_bindings)
   end
 
   # ============================================================================

@@ -103,7 +103,15 @@ defmodule Deft.Signatures do
       # Tuple operations
       {Kernel, :elem, 2} => Type.fun([Type.tuple(), Type.integer()], Type.top()),
       {Kernel, :tuple_size, 1} => Type.fun([Type.tuple()], Type.integer()),
-      {Kernel, :put_elem, 3} => Type.fun([Type.tuple(), Type.integer(), Type.top()], Type.tuple())
+      {Kernel, :put_elem, 3} =>
+        Type.fun([Type.tuple(), Type.integer(), Type.top()], Type.tuple()),
+
+      # String operations
+      {String, :to_integer, 1} => Type.fun([Type.binary()], Type.integer()),
+      {String, :to_float, 1} => Type.fun([Type.binary()], Type.float()),
+
+      # IO operations
+      {IO, :puts, 1} => Type.fun([Type.top()], Type.atom())
     }
   end
 

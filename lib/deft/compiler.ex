@@ -99,6 +99,23 @@ defmodule Deft.Compiler do
     AST.List.new(elements)
   end
 
+  # Remote function calls: Module.function(args) with aliased module
+  def compile({{:., _, [{:__aliases__, _, module_parts}, function]}, meta, args})
+      when is_atom(function) do
+    module = Module.concat(module_parts)
+    args = Enum.map(args, &compile/1)
+
+    AST.RemoteCall.new(module, function, args, meta)
+  end
+
+  # Remote function calls: Module.function(args) with atom module
+  def compile({{:., _, [module, function]}, meta, args})
+      when is_atom(module) and is_atom(function) do
+    args = Enum.map(args, &compile/1)
+
+    AST.RemoteCall.new(module, function, args, meta)
+  end
+
   def compile({name, meta, args}) when is_list(args) do
     args = Enum.map(args, &compile/1)
 

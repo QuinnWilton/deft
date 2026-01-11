@@ -148,6 +148,18 @@ defmodule Deft.AST.Erased do
     {name, meta, args}
   end
 
+  @doc """
+  Builds a remote function call AST (Module.function(args)).
+
+      iex> Erased.remote_call([], String, :to_integer, ["123"])
+      {{:., [], [String, :to_integer]}, [], ["123"]}
+  """
+  @spec remote_call(keyword(), module(), atom(), [term()]) :: Macro.t()
+  def remote_call(meta, module, function, args) do
+    dot_meta = Keyword.take(meta, [:line, :column])
+    {{:., dot_meta, [module, function]}, meta, args}
+  end
+
   # ============================================================================
   # Pattern Matching
   # ============================================================================
