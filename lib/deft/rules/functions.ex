@@ -38,7 +38,12 @@ defmodule Deft.Rules.Functions do
   # Function Application Rule
   # ============================================================================
 
-  defrule :fn_application, %AST.FnApplication{fun: fun, args: args, fun_meta: fun_meta, args_meta: args_meta} do
+  defrule :fn_application, %AST.FnApplication{
+    fun: fun,
+    args: args,
+    fun_meta: fun_meta,
+    args_meta: args_meta
+  } do
     # Synthesize the function
     fun ~> {erased_fun, fun_type}
 

@@ -22,20 +22,20 @@ defmodule Deft.Rules.ControlFlow do
   # If Expression Rule
   # ============================================================================
 
-  defrule :if, %AST.If{predicate: predicate, do: do_branch, else: else_branch, meta: meta} do
+  defrule :if, %AST.If{predicate: pred, do: do_, else: else_, meta: meta} do
     # Synthesize predicate
-    predicate ~> {erased_pred, pred_type}
+    pred ~> {pred_e, pred_t}
 
-    # Check predicate is boolean
-    pred_type <<< Type.boolean()
+    # Check predicate type subtypes boolean
+    pred_t <<< Type.boolean()
 
-    # Synthesize branches (bindings from predicate flow automatically)
-    do_branch ~> {erased_do, do_type}
-    else_branch ~> {erased_else, else_type}
+    # Synthesize branches
+    do_ ~> {do_e, do_t}
+    else_ ~> {else_e, else_t}
 
     conclude(
-      Erased.if_expr(meta, erased_pred, erased_do, erased_else)
-      ~> Type.union(do_type, else_type)
+      Erased.if_expr(meta, pred_e, do_e, else_e)
+      ~> Type.union(do_t, else_t)
     )
   end
 
