@@ -111,6 +111,7 @@ defmodule Deft.Compiler do
 
   def compile(literal)
       when is_atom(literal)
+      when is_binary(literal)
       when is_boolean(literal)
       when is_float(literal)
       when is_integer(literal)
@@ -127,6 +128,7 @@ defmodule Deft.Compiler do
 
   def compile_pattern(literal)
       when is_atom(literal)
+      when is_binary(literal)
       when is_boolean(literal)
       when is_float(literal)
       when is_integer(literal)

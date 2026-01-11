@@ -709,6 +709,7 @@ defmodule Deft.Rules.DSL.Helpers do
   """
   def type_of_literal(v) when is_boolean(v), do: Type.boolean()
   def type_of_literal(v) when is_atom(v), do: Type.atom()
+  def type_of_literal(v) when is_binary(v), do: Type.binary()
   def type_of_literal(v) when is_integer(v), do: Type.integer()
   def type_of_literal(v) when is_float(v), do: Type.float()
 

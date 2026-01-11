@@ -9,6 +9,7 @@ defmodule Deft.Helpers do
 
   defguard is_literal_type(term)
            when is_struct(term, Type.Atom) or
+                  is_struct(term, Type.Binary) or
                   is_struct(term, Type.Boolean) or
                   is_struct(term, Type.Float) or
                   is_struct(term, Type.Integer) or
@@ -41,6 +42,7 @@ defmodule Deft.Helpers do
   # is_boolean/1 must be checked before is_atom/1
   def type_of(e) when is_boolean(e), do: Type.boolean()
   def type_of(e) when is_atom(e), do: Type.atom()
+  def type_of(e) when is_binary(e), do: Type.binary()
   def type_of(e) when is_integer(e), do: Type.integer()
   def type_of(e) when is_float(e), do: Type.float()
   def type_of(e) when is_number(e), do: Type.number()

@@ -6,6 +6,7 @@ defmodule Deft.Type do
           Type.ADT.t()
           | Type.Alias.t()
           | Type.Atom.t()
+          | Type.Binary.t()
           | Type.Boolean.t()
           | Type.Bottom.t()
           | Type.FixedList.t()
@@ -23,6 +24,7 @@ defmodule Deft.Type do
 
   @types [
     Type.Atom,
+    Type.Binary,
     Type.Boolean,
     Type.Bottom,
     Type.FixedList,
@@ -44,6 +46,10 @@ defmodule Deft.Type do
 
   def atom() do
     Type.Atom.new()
+  end
+
+  def binary() do
+    Type.Binary.new()
   end
 
   def boolean() do

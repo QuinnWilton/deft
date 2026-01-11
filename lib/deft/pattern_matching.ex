@@ -236,6 +236,7 @@ defmodule Deft.PatternMatching do
   # Helper to get the type of a literal value
   defp literal_type(v) when is_boolean(v), do: Type.boolean()
   defp literal_type(v) when is_atom(v), do: Type.atom()
+  defp literal_type(v) when is_binary(v), do: Type.binary()
   defp literal_type(v) when is_integer(v), do: Type.integer()
   defp literal_type(v) when is_float(v), do: Type.float()
   defp literal_type(_), do: Type.top()

@@ -9,6 +9,10 @@ defmodule Deft.Annotations do
     Type.atom()
   end
 
+  def parse({:binary, _, _}) do
+    Type.binary()
+  end
+
   def parse({:float, _, _}) do
     Type.float()
   end
