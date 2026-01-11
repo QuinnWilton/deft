@@ -152,33 +152,75 @@ defmodule Deft do
 
     # Create function signature for registration
     arity = length(params)
+    module = __CALLER__.module
 
-    # Build the type list as a proper Elixir list expression
+    # Evaluate parameter types to get actual Type structs
+    evaluated_param_types =
+      Enum.map(param_types, fn type_ast ->
+        {type, _} = Code.eval_quoted(type_ast, [], __CALLER__)
+        type
+      end)
+
+    # Evaluate return type
+    {evaluated_return_type, _} = Code.eval_quoted(return_type_parsed, [], __CALLER__)
+
+    # Build the signature immediately and register it during macro expansion
+    # This allows other deft functions defined later to reference this function
+    signature = Deft.Type.fun(evaluated_param_types, evaluated_return_type)
+    Deft.Signatures.register({module, name, arity}, signature)
+
+    # Build the type list as a proper Elixir list expression (for runtime registration)
     param_types_list =
       quote do
         [unquote_splicing(param_types)]
       end
 
-    signature =
+    signature_ast =
       quote do
         Deft.Type.fun(unquote(param_types_list), unquote(return_type_parsed))
       end
 
-    # Type check the body at compile time
+    # Compile and type-check the body
+    compiled_body = Compiler.compile(body)
+    ctx = Context.new(__CALLER__)
+
+    # Build parameter bindings: [{AST.Local, type}, ...]
+    # The bindings are injected into the AST by annotating matching locals with their types
+    param_bindings =
+      Enum.zip(params, evaluated_param_types)
+      |> Enum.map(fn {{param_name, meta, param_context}, type} ->
+        # Create an AST.Local to match against
+        local = Deft.AST.Local.new(param_name, param_context, meta)
+        {local, type}
+      end)
+
+    # Inject bindings into the compiled body (annotates matching locals with types)
+    compiled_body = Deft.Helpers.inject_bindings(compiled_body, param_bindings)
+
+    # Type-check the body
+    erased_body =
+      case Deft.TypeChecker.check(compiled_body, ctx) do
+        {:ok, erased, _type, _bindings, _ctx} ->
+          erased
+
+        {:error, reason} ->
+          raise "Type checking failed in deft #{name}/#{arity}: #{inspect(reason)}"
+      end
+
     quote do
-      # Register signature with the registry
+      # Register signature with the registry (also at runtime for recompilation)
       Deft.Signatures.register(
         {__MODULE__, unquote(name), unquote(arity)},
-        unquote(signature)
+        unquote(signature_ast)
       )
 
       # Store for @before_compile verification
       @deft {unquote(name), unquote(arity), unquote(Macro.escape(param_types)),
              unquote(Macro.escape(return_type_parsed))}
 
-      # Define the actual function
+      # Define the actual function with type-erased body
       def unquote(name)(unquote_splicing(params)) do
-        unquote(body)
+        unquote(erased_body)
       end
     end
   end

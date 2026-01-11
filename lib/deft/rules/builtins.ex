@@ -23,10 +23,37 @@ defmodule Deft.Rules.Builtins do
 
   defrule :local_call, %AST.LocalCall{name: name, args: args, meta: meta} do
     compute {erased_args, type, call_bindings} do
-      if Guards.supported?(name, length(args)) do
-        Guards.handle_guard(name, args, ctx)
-      else
-        Deft.Error.raise!(Deft.Error.unsupported_call(name: name, arity: length(args)))
+      arity = length(args)
+
+      cond do
+        # First, check if it's a built-in guard/operator
+        Guards.supported?(name, arity) ->
+          Guards.handle_guard(name, args, ctx)
+
+        # Check current module's signatures (for deft-defined functions)
+        ctx.env && Signatures.registered?({ctx.env.module, name, arity}) ->
+          {:ok, %Type.Fn{inputs: input_types, output: output_type}} =
+            Signatures.lookup({ctx.env.module, name, arity})
+
+          {erased_args, bindings} =
+            args
+            |> Enum.zip(input_types)
+            |> Enum.reduce({[], []}, fn {arg, expected_type}, {erased_acc, bindings_acc} ->
+              {:ok, erased, actual_type, bindings, _} = TypeChecker.check(arg, ctx)
+
+              unless Subtyping.subtype_of?(expected_type, actual_type) do
+                Deft.Error.raise!(
+                  Deft.Error.type_mismatch(expected: expected_type, actual: actual_type)
+                )
+              end
+
+              {erased_acc ++ [erased], bindings_acc ++ bindings}
+            end)
+
+          {erased_args, output_type, bindings}
+
+        true ->
+          Deft.Error.raise!(Deft.Error.unsupported_call(name: name, arity: arity))
       end
     end
 
@@ -37,7 +64,12 @@ defmodule Deft.Rules.Builtins do
   # Remote Call Rule (Module.function(args))
   # ============================================================================
 
-  defrule :remote_call, %AST.RemoteCall{module: module, function: function, args: args, meta: meta} do
+  defrule :remote_call, %AST.RemoteCall{
+    module: module,
+    function: function,
+    args: args,
+    meta: meta
+  } do
     compute {erased_args, type, call_bindings} do
       arity = length(args)
 
@@ -61,9 +93,7 @@ defmodule Deft.Rules.Builtins do
           {erased_args, output_type, bindings}
 
         :error ->
-          Deft.Error.raise!(
-            Deft.Error.unsupported_call(name: {module, function}, arity: arity)
-          )
+          Deft.Error.raise!(Deft.Error.unsupported_call(name: {module, function}, arity: arity))
       end
     end
 

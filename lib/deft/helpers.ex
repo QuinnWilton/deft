@@ -94,10 +94,16 @@ defmodule Deft.Helpers do
             other
         end)
 
-      {%AST.Local{name: name, context: context} = x, t}, acc ->
+      {%AST.Local{name: name} = x, t}, acc ->
+        # Match on name only - context can differ between macro expansion phases
+        # (nil vs Elixir). Counter check ensures we don't cross hygiene boundaries.
         Walker.postwalk(acc, fn
-          %AST.Local{name: ^name, context: ^context} = local ->
-            if Keyword.get(local.meta, :counter) == Keyword.get(x.meta, :counter) do
+          %AST.Local{name: ^name} = local ->
+            x_counter = Keyword.get(x.meta, :counter)
+            local_counter = Keyword.get(local.meta, :counter)
+
+            # Match if both counters are nil OR both are equal
+            if x_counter == local_counter do
               meta = annotate_type(local.meta, t)
               %{local | meta: meta}
             else
