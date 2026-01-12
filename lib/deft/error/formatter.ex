@@ -29,7 +29,8 @@ defmodule Deft.Error.Formatter do
 
   @type format_options :: [
           colors: boolean(),
-          context_lines: non_neg_integer()
+          context_lines: non_neg_integer(),
+          source_lines: [String.t()] | nil
         ]
 
   @default_options [
@@ -56,11 +57,12 @@ defmodule Deft.Error.Formatter do
   def format(%Error{} = error, opts \\ []) do
     opts = Keyword.merge(@default_options, opts)
     use_colors = Keyword.get(opts, :colors, true) and IO.ANSI.enabled?()
+    source_lines = Keyword.get(opts, :source_lines)
 
     [
       format_header(error, use_colors),
       format_location(error, use_colors),
-      format_source_context(error, opts, use_colors),
+      format_source_context(error, source_lines, opts, use_colors),
       format_notes(error, use_colors),
       format_suggestions(error, use_colors)
     ]
@@ -137,15 +139,16 @@ defmodule Deft.Error.Formatter do
   # Source Context Formatting
   # ============================================================================
 
-  defp format_source_context(%Error{location: nil}, _opts, _use_colors), do: nil
+  defp format_source_context(%Error{location: nil}, _source_lines, _opts, _use_colors), do: nil
 
   defp format_source_context(
          %Error{location: {_file, line, column}, expression: expr} = error,
+         source_lines,
          _opts,
          use_colors
        ) do
-    # Try to get source context from expression or generate from AST
-    source_line = get_source_line(expr)
+    # Try to get source line from provided source_lines list, or fall back to expression
+    source_line = get_source_line(source_lines, line) || get_source_line_from_expr(expr)
 
     if source_line do
       format_source_with_pointer(line, column, source_line, error, use_colors)
@@ -154,7 +157,7 @@ defmodule Deft.Error.Formatter do
     end
   end
 
-  defp format_source_context(_error, _opts, _use_colors), do: nil
+  defp format_source_context(_error, _source_lines, _opts, _use_colors), do: nil
 
   defp format_source_with_pointer(line, column, source_line, error, use_colors) do
     line_num_width = String.length(Integer.to_string(line))
@@ -294,32 +297,88 @@ defmodule Deft.Error.Formatter do
   defp severity_color(:error), do: @colors.error
   defp severity_color(:warning), do: @colors.warning
 
-  defp get_source_line({_, meta, _}) when is_list(meta) do
+  # Get source line from provided source_lines list (1-indexed line numbers)
+  defp get_source_line(source_lines, line) when is_list(source_lines) and is_integer(line) do
+    Enum.at(source_lines, line - 1)
+  end
+
+  defp get_source_line(_, _), do: nil
+
+  defp get_source_line_from_expr({_, meta, _}) when is_list(meta) do
     # If the AST has source attached (from Code.string_to_quoted)
     nil
   end
 
-  defp get_source_line(_), do: nil
+  defp get_source_line_from_expr(_), do: nil
 
   defp get_expression_width(nil), do: nil
 
   defp get_expression_width(expr) do
-    str =
-      try do
-        Macro.to_string(expr)
-      rescue
-        _ -> nil
-      end
+    # First try to get width from metadata (most accurate)
+    case get_width_from_meta(expr) do
+      width when is_integer(width) and width > 0 ->
+        width
 
-    if str do
-      # Just use the first line if multi-line
-      str
-      |> String.split("\n")
-      |> List.first()
-      |> String.length()
-      |> min(20)
-    else
-      nil
+      _ ->
+        # Fall back to stringifying the expression
+        str =
+          try do
+            expr
+            |> to_raw_ast()
+            |> Macro.to_string()
+          rescue
+            _ -> nil
+          end
+
+        if str do
+          # Just use the first line if multi-line
+          str
+          |> String.split("\n")
+          |> List.first()
+          |> String.length()
+          |> min(40)
+        else
+          nil
+        end
     end
   end
+
+  # Try to get width from expression metadata (column and end_column)
+  defp get_width_from_meta(%{meta: meta}) when is_list(meta) do
+    with col when is_integer(col) <- Keyword.get(meta, :column),
+         end_col when is_integer(end_col) <- Keyword.get(meta, :end_column) do
+      end_col - col
+    else
+      _ -> nil
+    end
+  end
+
+  defp get_width_from_meta({_, meta, _}) when is_list(meta) do
+    with col when is_integer(col) <- Keyword.get(meta, :column),
+         end_col when is_integer(end_col) <- Keyword.get(meta, :end_column) do
+      end_col - col
+    else
+      _ -> nil
+    end
+  end
+
+  defp get_width_from_meta(_), do: nil
+
+  # Convert Deft AST structs to raw Elixir AST for Macro.to_string
+  defp to_raw_ast(%_mod{} = struct) do
+    if function_exported?(Deft.AST, :to_raw_ast, 1) do
+      Deft.AST.to_raw_ast(struct)
+    else
+      # Fallback: try common struct fields
+      cond do
+        Map.has_key?(struct, :name) and Map.has_key?(struct, :meta) ->
+          {struct.name, struct.meta, nil}
+
+        true ->
+          struct
+      end
+    end
+  end
+
+  defp to_raw_ast(ast), do: ast
 end
