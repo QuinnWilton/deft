@@ -64,7 +64,7 @@ case error_type do
       """
       use Deft, features: [:exhaustiveness_checking]
 
-      defdata option :: some(integer) | none()
+      defdata(option :: some(integer) | none())
 
       deft unwrap(opt :: option) :: integer do
         # Missing the none() case
