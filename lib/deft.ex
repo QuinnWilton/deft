@@ -308,11 +308,12 @@ defmodule Deft do
 
     # Type-check all function bodies and generate function definitions
     function_defs =
-      Enum.map(definitions, fn {name, arity, params, param_types, _return_type, body, caller_escaped, _meta} ->
+      Enum.map(definitions, fn {name, arity, params, param_types, return_type, body, caller_escaped, meta} ->
         caller = Code.eval_quoted(caller_escaped) |> elem(0)
 
-        # Resolve alias types in parameter types
+        # Resolve alias types in parameter types and return type
         resolved_param_types = Enum.map(param_types, &resolve_aliases(&1, alias_map))
+        resolved_return_type = resolve_aliases(return_type, alias_map)
 
         # Compile and type-check the body
         compiled_body = Compiler.compile(body)
@@ -351,8 +352,25 @@ defmodule Deft do
 
         erased_body =
           case {result, errors} do
-            {{:ok, erased, _type, _bindings, _ctx}, []} ->
-              erased
+            {{:ok, erased, body_type, _bindings, _ctx}, []} ->
+              # Check that body type is a subtype of declared return type
+              if Deft.Subtyping.subtype_of?(resolved_return_type, body_type) do
+                erased
+              else
+                location = {caller.file, Keyword.get(meta, :line), Keyword.get(meta, :column)}
+
+                error =
+                  Deft.Error.type_mismatch(
+                    expected: resolved_return_type,
+                    actual: body_type,
+                    location: location,
+                    expression: nil,
+                    notes: ["Function `#{name}/#{arity}` body type is not compatible with declared return type."],
+                    suggestions: ["Change the return type annotation or fix the function body."]
+                  )
+
+                raise_type_errors([error], source_lines)
+              end
 
             {_, errors} when errors != [] ->
               raise_type_errors(errors, source_lines)
