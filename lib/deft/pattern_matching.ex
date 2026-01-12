@@ -239,6 +239,73 @@ defmodule Deft.PatternMatching do
     end
   end
 
+  # Catch-all for unhandled pattern/type combinations.
+  defp do_handle_pattern(pattern, type, _ctx) do
+    {notes, suggestions} = unhandled_pattern_hints(pattern, type)
+
+    error =
+      Deft.Error.unsupported_pattern(
+        expression: pattern,
+        location: extract_pattern_location(pattern),
+        suggestions: suggestions,
+        notes: notes
+      )
+
+    Deft.Error.raise!(error)
+  end
+
+  # ============================================================================
+  # Error Helpers
+  # ============================================================================
+
+  defp extract_pattern_location(%{meta: meta}) when is_list(meta) do
+    line = Keyword.get(meta, :line)
+    column = Keyword.get(meta, :column)
+    file = Keyword.get(meta, :file)
+
+    if line, do: {file, line, column}, else: nil
+  end
+
+  defp extract_pattern_location(_), do: nil
+
+  defp unhandled_pattern_hints(pattern, type) do
+    pattern_desc = describe_pattern(pattern)
+    type_desc = Deft.Error.format_type(type)
+
+    notes = ["Cannot match #{pattern_desc} against type `#{type_desc}`."]
+
+    suggestions =
+      case {pattern, type} do
+        {%AST.Tuple{}, %Type.FixedList{}} ->
+          ["Tuple patterns can only match tuple types, not list types."]
+
+        {%AST.List{}, %Type.FixedTuple{}} ->
+          ["List patterns can only match list types, not tuple types."]
+
+        {%AST.TypeConstructorCall{}, type} when not is_struct(type, Type.ADT) ->
+          ["ADT constructor patterns can only match ADT types."]
+
+        _ ->
+          ["Check that the pattern structure matches the expected type."]
+      end
+
+    {notes, suggestions}
+  end
+
+  defp describe_pattern(%AST.Literal{value: v}) when is_atom(v), do: "atom pattern `#{v}`"
+  defp describe_pattern(%AST.Literal{value: v}) when is_integer(v), do: "integer pattern `#{v}`"
+  defp describe_pattern(%AST.Literal{value: v}) when is_float(v), do: "float pattern `#{v}`"
+  defp describe_pattern(%AST.Literal{}), do: "literal pattern"
+  defp describe_pattern(%AST.Local{name: name}), do: "variable pattern `#{name}`"
+  defp describe_pattern(%AST.Tuple{}), do: "tuple pattern"
+  defp describe_pattern(%AST.List{}), do: "list pattern"
+  defp describe_pattern(%AST.Cons{}), do: "cons pattern [h|t]"
+  defp describe_pattern(%AST.Pin{expr: %AST.Local{name: name}}), do: "pin pattern `^#{name}`"
+  defp describe_pattern(%AST.Pin{}), do: "pin pattern"
+  defp describe_pattern(%AST.Match{}), do: "match pattern (=)"
+  defp describe_pattern(%AST.TypeConstructorCall{name: name}), do: "constructor pattern `#{name}`"
+  defp describe_pattern(_), do: "pattern"
+
   # Helper to get the type of a literal value
   defp literal_type(v) when is_boolean(v), do: Type.boolean()
   defp literal_type(v) when is_atom(v), do: Type.atom()

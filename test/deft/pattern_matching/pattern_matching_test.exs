@@ -268,4 +268,48 @@ defmodule Deft.PatternMatchingTest do
       assert %Type.Integer{} = error.error.actual
     end
   end
+
+  # ============================================================================
+  # Unsupported Pattern/Type Combinations
+  # ============================================================================
+
+  describe "unsupported pattern/type combinations" do
+    test "tuple pattern against list type raises descriptive error", %{ctx: ctx} do
+      pattern = tuple([local(:a), local(:b)])
+
+      error =
+        assert_raise Deft.Error.Exception, fn ->
+          PatternMatching.handle_pattern(pattern, Type.fixed_list(Type.integer()), ctx)
+        end
+
+      assert error.error.code == :unsupported_pattern
+      assert Enum.any?(error.error.notes, &String.contains?(&1, "tuple pattern"))
+      assert Enum.any?(error.error.suggestions, &String.contains?(&1, "Tuple patterns can only match tuple types"))
+    end
+
+    test "list pattern against tuple type raises descriptive error", %{ctx: ctx} do
+      pattern = list([local(:a), local(:b)])
+
+      error =
+        assert_raise Deft.Error.Exception, fn ->
+          PatternMatching.handle_pattern(pattern, Type.fixed_tuple([Type.integer(), Type.integer()]), ctx)
+        end
+
+      assert error.error.code == :unsupported_pattern
+      assert Enum.any?(error.error.notes, &String.contains?(&1, "list pattern"))
+      assert Enum.any?(error.error.suggestions, &String.contains?(&1, "List patterns can only match list types"))
+    end
+
+    test "error message includes type description", %{ctx: ctx} do
+      pattern = tuple([local(:a)])
+
+      error =
+        assert_raise Deft.Error.Exception, fn ->
+          PatternMatching.handle_pattern(pattern, Type.integer(), ctx)
+        end
+
+      assert error.error.code == :unsupported_pattern
+      assert Enum.any?(error.error.notes, &String.contains?(&1, "integer"))
+    end
+  end
 end
