@@ -261,9 +261,9 @@ defmodule Deft.Error.Formatter do
 
         closing =
           if use_colors do
-            "#{padding} #{@colors.dim}#{@box.bottom_left}#{@box.horizontal}#{@colors.reset}"
+            "#{padding} #{@colors.dim}#{@box.bottom_left}#{String.duplicate(@box.horizontal, 5)}#{@colors.reset}"
           else
-            "#{padding} #{@box.bottom_left}#{@box.horizontal}"
+            "#{padding} #{@box.bottom_left}#{String.duplicate(@box.horizontal, 5)}"
           end
 
         ([separator] ++ formatted_lines ++ [separator, closing])
@@ -467,9 +467,9 @@ defmodule Deft.Error.Formatter do
 
     closing =
       if use_colors do
-        "#{padding} #{@colors.dim}#{@box.bottom_left}#{@box.horizontal}#{@colors.reset}"
+        "#{padding} #{@colors.dim}#{@box.bottom_left}#{String.duplicate(@box.horizontal, 5)}#{@colors.reset}"
       else
-        "#{padding} #{@box.bottom_left}#{@box.horizontal}"
+        "#{padding} #{@box.bottom_left}#{String.duplicate(@box.horizontal, 5)}"
       end
 
     if Enum.empty?(formatted_lines) do
