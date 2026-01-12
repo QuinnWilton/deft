@@ -50,6 +50,15 @@ defmodule Deft.Error.Formatter do
     underline: IO.ANSI.underline()
   }
 
+  # Unicode box drawing characters for Miette-style borders
+  @box %{
+    vertical: "│",
+    horizontal: "─",
+    top_left: "╭",
+    bottom_left: "╰",
+    dot: "•"
+  }
+
   @doc """
   Formats a single error for display.
   """
@@ -126,9 +135,9 @@ defmodule Deft.Error.Formatter do
     location_str = format_location_string(file, line, column)
 
     if use_colors do
-      "  #{@colors.dim}-->#{@colors.reset} #{location_str}"
+      "   #{@colors.dim}#{@box.top_left}#{@box.horizontal}[#{@colors.reset}#{location_str}#{@colors.dim}]#{@colors.reset}"
     else
-      "  --> #{location_str}"
+      "   #{@box.top_left}#{@box.horizontal}[#{location_str}]"
     end
   end
 
@@ -222,12 +231,19 @@ defmodule Deft.Error.Formatter do
       else
         separator =
           if use_colors do
-            "#{padding} #{@colors.dim}|#{@colors.reset}"
+            "#{padding} #{@colors.dim}#{@box.vertical}#{@colors.reset}"
           else
-            "#{padding} |"
+            "#{padding} #{@box.vertical}"
           end
 
-        ([separator] ++ formatted_lines ++ [separator])
+        closing =
+          if use_colors do
+            "   #{@colors.dim}#{@box.bottom_left}#{@box.horizontal}#{@colors.reset}"
+          else
+            "   #{@box.bottom_left}#{@box.horizontal}"
+          end
+
+        ([separator] ++ formatted_lines ++ [separator, closing])
         |> Enum.join("\n")
       end
     end
@@ -238,9 +254,9 @@ defmodule Deft.Error.Formatter do
     line_str = String.pad_leading(Integer.to_string(line_num), line_num_width)
 
     if use_colors do
-      "#{@colors.dim}#{line_str} |#{@colors.reset} #{source_line}"
+      "#{@colors.dim}#{line_str} #{@box.vertical}#{@colors.reset} #{source_line}"
     else
-      "#{line_str} | #{source_line}"
+      "#{line_str} #{@box.vertical} #{source_line}"
     end
   end
 
@@ -253,9 +269,9 @@ defmodule Deft.Error.Formatter do
 
     source =
       if use_colors do
-        "#{@colors.dim}#{line_str}#{@colors.reset} #{@colors.dim}|#{@colors.reset} #{source_line}"
+        "#{@colors.dim}#{line_str}#{@colors.reset} #{@colors.dim}#{@box.vertical}#{@colors.reset} #{source_line}"
       else
-        "#{line_str} | #{source_line}"
+        "#{line_str} #{@box.vertical} #{source_line}"
       end
 
     # Format pointer lines for each span
@@ -266,7 +282,7 @@ defmodule Deft.Error.Formatter do
     [source | pointer_lines]
   end
 
-  # Format the pointer line for a span
+  # Format the pointer line for a span (annotation line uses dot border)
   defp format_span_pointer(%{location: {_, _, column}, label: label, type: type} = span, source_line, padding, use_colors) do
     # For pattern spans, adjust column to point at pattern start
     col =
@@ -297,11 +313,12 @@ defmodule Deft.Error.Formatter do
     full_label = "#{label}#{type_str}"
     span_kind = Map.get(span, :kind, :primary)
 
+    # Annotation lines use dot (•) instead of vertical bar
     if use_colors do
       span_color = span_kind_color(span_kind)
-      "#{padding} #{@colors.dim}|#{@colors.reset} #{pointer_padding}#{span_color}#{pointer}#{@colors.reset} #{full_label}"
+      "#{padding} #{@colors.dim}#{@box.dot}#{@colors.reset} #{pointer_padding}#{span_color}#{pointer}#{@colors.reset} #{full_label}"
     else
-      "#{padding} | #{pointer_padding}#{pointer} #{full_label}"
+      "#{padding} #{@box.dot} #{pointer_padding}#{pointer} #{full_label}"
     end
   end
 
@@ -374,9 +391,9 @@ defmodule Deft.Error.Formatter do
     # Format the separator line
     separator =
       if use_colors do
-        "#{padding} #{@colors.dim}|#{@colors.reset}"
+        "#{padding} #{@colors.dim}#{@box.vertical}#{@colors.reset}"
       else
-        "#{padding} |"
+        "#{padding} #{@box.vertical}"
       end
 
     # Get all source lines in range
@@ -401,14 +418,21 @@ defmodule Deft.Error.Formatter do
         end
       end)
 
+    closing =
+      if use_colors do
+        "   #{@colors.dim}#{@box.bottom_left}#{@box.horizontal}#{@colors.reset}"
+      else
+        "   #{@box.bottom_left}#{@box.horizontal}"
+      end
+
     if Enum.empty?(formatted_lines) do
       # Fall back to just showing the single line we have
       line_str = String.pad_leading(Integer.to_string(line), line_num_width)
       source =
         if use_colors do
-          "#{@colors.dim}#{line_str}#{@colors.reset} #{@colors.dim}|#{@colors.reset} #{source_line}"
+          "#{@colors.dim}#{line_str}#{@colors.reset} #{@colors.dim}#{@box.vertical}#{@colors.reset} #{source_line}"
         else
-          "#{line_str} | #{source_line}"
+          "#{line_str} #{@box.vertical} #{source_line}"
         end
 
       col = column || 1
@@ -419,15 +443,15 @@ defmodule Deft.Error.Formatter do
       pointer_line =
         if use_colors do
           error_color = severity_color(error.severity)
-          "#{padding} #{@colors.dim}|#{@colors.reset} #{pointer_padding}#{error_color}#{pointer}#{@colors.reset} #{format_pointer_message(error, use_colors)}"
+          "#{padding} #{@colors.dim}#{@box.dot}#{@colors.reset} #{pointer_padding}#{error_color}#{pointer}#{@colors.reset} #{format_pointer_message(error, use_colors)}"
         else
-          "#{padding} | #{pointer_padding}#{pointer} #{format_pointer_message(error, false)}"
+          "#{padding} #{@box.dot} #{pointer_padding}#{pointer} #{format_pointer_message(error, false)}"
         end
 
-      [separator, source, pointer_line, separator]
+      [separator, source, pointer_line, separator, closing]
       |> Enum.join("\n")
     else
-      ([separator] ++ formatted_lines ++ [separator])
+      ([separator] ++ formatted_lines ++ [separator, closing])
       |> Enum.join("\n")
     end
   end
@@ -438,9 +462,9 @@ defmodule Deft.Error.Formatter do
 
     source =
       if use_colors do
-        "#{@colors.dim}#{line_str}#{@colors.reset} #{@colors.dim}|#{@colors.reset} #{source_line}"
+        "#{@colors.dim}#{line_str}#{@colors.reset} #{@colors.dim}#{@box.vertical}#{@colors.reset} #{source_line}"
       else
-        "#{line_str} | #{source_line}"
+        "#{line_str} #{@box.vertical} #{source_line}"
       end
 
     col = column || 1
@@ -448,12 +472,13 @@ defmodule Deft.Error.Formatter do
     pointer_width = get_expression_width(error.expression) || 1
     pointer = String.duplicate("^", pointer_width)
 
+    # Annotation line uses dot border
     pointer_line =
       if use_colors do
         error_color = severity_color(error.severity)
-        "#{padding} #{@colors.dim}|#{@colors.reset} #{pointer_padding}#{error_color}#{pointer}#{@colors.reset} #{format_pointer_message(error, use_colors)}"
+        "#{padding} #{@colors.dim}#{@box.dot}#{@colors.reset} #{pointer_padding}#{error_color}#{pointer}#{@colors.reset} #{format_pointer_message(error, use_colors)}"
       else
-        "#{padding} | #{pointer_padding}#{pointer} #{format_pointer_message(error, false)}"
+        "#{padding} #{@box.dot} #{pointer_padding}#{pointer} #{format_pointer_message(error, false)}"
       end
 
     [source, pointer_line]
@@ -483,9 +508,9 @@ defmodule Deft.Error.Formatter do
       end
 
     if use_colors do
-      "     #{@colors.dim}|#{@colors.reset}\n     #{@colors.dim}|#{@colors.reset} in: #{expr_str}\n     #{@colors.dim}|#{@colors.reset}"
+      "     #{@colors.dim}#{@box.vertical}#{@colors.reset}\n     #{@colors.dim}#{@box.vertical}#{@colors.reset} in: #{expr_str}\n     #{@colors.dim}#{@box.vertical}#{@colors.reset}"
     else
-      "     |\n     | in: #{expr_str}\n     |"
+      "     #{@box.vertical}\n     #{@box.vertical} in: #{expr_str}\n     #{@box.vertical}"
     end
   end
 
@@ -524,7 +549,7 @@ defmodule Deft.Error.Formatter do
 
   defp format_notes(%Error{notes: notes}, use_colors) do
     notes
-    |> Enum.map(&format_note(&1, use_colors))
+    |> Enum.map(fn note -> format_note(note, use_colors) end)
     |> Enum.join("\n")
   end
 
@@ -532,9 +557,9 @@ defmodule Deft.Error.Formatter do
     formatted_note = bold_backtick_content(note, use_colors)
 
     if use_colors do
-      "     #{@colors.note}= note#{@colors.reset}: #{formatted_note}"
+      "      #{@colors.note}note#{@colors.reset}: #{formatted_note}"
     else
-      "     = note: #{formatted_note}"
+      "      note: #{formatted_note}"
     end
   end
 
@@ -542,7 +567,7 @@ defmodule Deft.Error.Formatter do
 
   defp format_suggestions(%Error{suggestions: suggestions}, use_colors) do
     suggestions
-    |> Enum.map(&format_suggestion(&1, use_colors))
+    |> Enum.map(fn suggestion -> format_suggestion(suggestion, use_colors) end)
     |> Enum.join("\n")
   end
 
@@ -550,9 +575,9 @@ defmodule Deft.Error.Formatter do
     formatted_suggestion = bold_backtick_content(suggestion, use_colors)
 
     if use_colors do
-      "     #{@colors.help}= help#{@colors.reset}: #{formatted_suggestion}"
+      "      #{@colors.help}help#{@colors.reset}: #{formatted_suggestion}"
     else
-      "     = help: #{formatted_suggestion}"
+      "      help: #{formatted_suggestion}"
     end
   end
 

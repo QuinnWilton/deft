@@ -29,7 +29,7 @@ defmodule Deft.Error.FormatterTest do
 
       formatted = Formatter.format(error, colors: false)
 
-      assert formatted =~ "--> lib/my_app.ex:15:10"
+      assert formatted =~ "╭─[lib/my_app.ex:15:10]"
     end
 
     test "formats error with notes" do
@@ -42,8 +42,8 @@ defmodule Deft.Error.FormatterTest do
 
       formatted = Formatter.format(error, colors: false)
 
-      assert formatted =~ "= note: This is a note"
-      assert formatted =~ "= note: Another note"
+      assert formatted =~ "note: This is a note"
+      assert formatted =~ "note: Another note"
     end
 
     test "formats error with suggestions" do
@@ -56,8 +56,8 @@ defmodule Deft.Error.FormatterTest do
 
       formatted = Formatter.format(error, colors: false)
 
-      assert formatted =~ "= help: Use trunc/1"
-      assert formatted =~ "= help: Change type"
+      assert formatted =~ "help: Use trunc/1"
+      assert formatted =~ "help: Change type"
     end
 
     test "formats error with expression context" do

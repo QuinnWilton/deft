@@ -49,7 +49,7 @@ defmodule Deft.Error.FormattedErrorsTest do
       assert formatted =~ "Type mismatch"
       assert formatted =~ "expected `integer`"
       assert formatted =~ "found `float`"
-      assert formatted =~ "--> lib/example.ex:9:9"
+      assert formatted =~ "╭─[lib/example.ex:9:9"
     end
 
     test "formats type mismatch with source context" do
@@ -64,8 +64,8 @@ defmodule Deft.Error.FormattedErrorsTest do
 
       # Should show the source line
       assert formatted =~ "x = 1.5"
-      # Should have line number
-      assert formatted =~ "9 |"
+      # Should have line number with unicode border
+      assert formatted =~ "9 │"
     end
 
     test "formats complex type mismatch" do
@@ -122,9 +122,9 @@ defmodule Deft.Error.FormattedErrorsTest do
       # Should show multi-span output with both locations
       assert formatted =~ "parameter declared as"
       assert formatted =~ "argument has type"
-      # Both lines should be shown
-      assert formatted =~ "4 |"
-      assert formatted =~ "9 |"
+      # Both lines should be shown with unicode borders
+      assert formatted =~ "4 │"
+      assert formatted =~ "9 │"
     end
   end
 
@@ -142,7 +142,7 @@ defmodule Deft.Error.FormattedErrorsTest do
 
       assert formatted =~ "error[E0002]"
       assert formatted =~ "Missing type annotation"
-      assert formatted =~ "= help: Add a type annotation"
+      assert formatted =~ "help: Add a type annotation"
     end
   end
 
@@ -162,8 +162,8 @@ defmodule Deft.Error.FormattedErrorsTest do
 
       assert formatted =~ "error[E0003]"
       assert formatted =~ "Malformed type"
-      assert formatted =~ "= help: Check the type syntax"
-      assert formatted =~ "= note: Type expressions must be valid"
+      assert formatted =~ "help: Check the type syntax"
+      assert formatted =~ "note: Type expressions must be valid"
     end
   end
 
@@ -181,7 +181,7 @@ defmodule Deft.Error.FormattedErrorsTest do
       assert formatted =~ "error[E0004]"
       assert formatted =~ "unsupported function"
       assert formatted =~ "undefined_function/2"
-      assert formatted =~ "= help: Register a type signature"
+      assert formatted =~ "help: Register a type signature"
     end
 
     test "formats unsupported call with expression context" do
@@ -215,8 +215,8 @@ defmodule Deft.Error.FormattedErrorsTest do
 
       assert formatted =~ "error[E0005]"
       assert formatted =~ "Non-exhaustive pattern"
-      assert formatted =~ "= help: Add a case branch for `none`"
-      assert formatted =~ "= note: Pattern matching must cover all possible values"
+      assert formatted =~ "help: Add a case branch for `none`"
+      assert formatted =~ "note: Pattern matching must cover all possible values"
     end
 
     test "formats inexhaustive patterns error with multiple missing" do
@@ -233,8 +233,8 @@ defmodule Deft.Error.FormattedErrorsTest do
 
       formatted = Formatter.format(error, colors: false, source_lines: @sample_source)
 
-      assert formatted =~ "= help: Add a case branch for `some(integer)`"
-      assert formatted =~ "= help: Add a case branch for `none`"
+      assert formatted =~ "help: Add a case branch for `some(integer)`"
+      assert formatted =~ "help: Add a case branch for `none`"
     end
 
     test "formats inexhaustive patterns with complex variants" do
@@ -265,8 +265,8 @@ defmodule Deft.Error.FormattedErrorsTest do
       formatted = Formatter.format(error, colors: false, source_lines: @sample_source)
 
       assert formatted =~ "error[E0005]"
-      assert formatted =~ "= note: Covered patterns: `some(integer)`"
-      assert formatted =~ "= help: Add a case branch for `none`"
+      assert formatted =~ "note: Covered patterns: `some(integer)`"
+      assert formatted =~ "help: Add a case branch for `none`"
     end
   end
 
@@ -283,9 +283,9 @@ defmodule Deft.Error.FormattedErrorsTest do
 
       assert formatted =~ "error[E0006]"
       assert formatted =~ "Pattern `atom` can never match subject of type `integer`"
-      assert formatted =~ "= help: Remove this unreachable branch"
-      assert formatted =~ "= note: The case subject has type `integer`"
-      assert formatted =~ "= note: But this pattern only matches `atom`"
+      assert formatted =~ "help: Remove this unreachable branch"
+      assert formatted =~ "note: The case subject has type `integer`"
+      assert formatted =~ "note: But this pattern only matches `atom`"
     end
 
     test "formats unreachable branch with complex types" do
@@ -316,7 +316,7 @@ defmodule Deft.Error.FormattedErrorsTest do
 
       assert formatted =~ "error[E0007]"
       assert formatted =~ "No typing rule matches"
-      assert formatted =~ "= help: This construct may not be supported"
+      assert formatted =~ "help: This construct may not be supported"
     end
 
     test "formats no matching rule with notes" do
@@ -331,7 +331,7 @@ defmodule Deft.Error.FormattedErrorsTest do
 
       formatted = Formatter.format(error, colors: false, source_lines: @sample_source)
 
-      assert formatted =~ "= note: receive blocks are not yet supported"
+      assert formatted =~ "note: receive blocks are not yet supported"
     end
   end
 
@@ -347,8 +347,8 @@ defmodule Deft.Error.FormattedErrorsTest do
 
       assert formatted =~ "error[E0008]"
       assert formatted =~ "Required type system features are not enabled"
-      assert formatted =~ "= help: Enable feature `:polymorphism"
-      assert formatted =~ "= note: Use `use Deft, features:"
+      assert formatted =~ "help: Enable feature `:polymorphism"
+      assert formatted =~ "note: Use `use Deft, features:"
     end
 
     test "formats missing features error with multiple features" do
@@ -360,9 +360,9 @@ defmodule Deft.Error.FormattedErrorsTest do
 
       formatted = Formatter.format(error, colors: false, source_lines: @sample_source)
 
-      assert formatted =~ "= help: Enable feature `:polymorphism"
-      assert formatted =~ "= help: Enable feature `:effects"
-      assert formatted =~ "= help: Enable feature `:refinement_types"
+      assert formatted =~ "help: Enable feature `:polymorphism"
+      assert formatted =~ "help: Enable feature `:effects"
+      assert formatted =~ "help: Enable feature `:refinement_types"
     end
   end
 
@@ -379,8 +379,8 @@ defmodule Deft.Error.FormattedErrorsTest do
 
       assert formatted =~ "error[E0009]"
       assert formatted =~ "Subtype constraint violated"
-      assert formatted =~ "= note: Expected subtype of `number`"
-      assert formatted =~ "= note: Found `atom`"
+      assert formatted =~ "note: Expected subtype of `number`"
+      assert formatted =~ "note: Found `atom`"
     end
 
     test "formats subtype violation with complex types" do
@@ -409,8 +409,8 @@ defmodule Deft.Error.FormattedErrorsTest do
 
       formatted = Formatter.format(error, colors: false, source_lines: @sample_source)
 
-      # Should contain line number and separator
-      assert formatted =~ "9 |"
+      # Should contain line number and unicode border
+      assert formatted =~ "9 │"
       # Should contain the source line content
       assert formatted =~ "x = 1.5"
       # Should contain pointer characters
@@ -547,7 +547,7 @@ defmodule Deft.Error.FormattedErrorsTest do
 
       formatted = Formatter.format(error, colors: false)
 
-      assert formatted =~ "--> lib/my_app/module.ex:42:15"
+      assert formatted =~ "╭─[lib/my_app/module.ex:42:15"
     end
 
     test "formats location without column" do
@@ -560,7 +560,7 @@ defmodule Deft.Error.FormattedErrorsTest do
 
       formatted = Formatter.format(error, colors: false)
 
-      assert formatted =~ "--> lib/example.ex:10"
+      assert formatted =~ "╭─[lib/example.ex:10"
       refute formatted =~ "lib/example.ex:10:"
     end
 
@@ -574,7 +574,7 @@ defmodule Deft.Error.FormattedErrorsTest do
 
       formatted = Formatter.format(error, colors: false)
 
-      assert formatted =~ "--> line 10:5"
+      assert formatted =~ "╭─[line 10:5"
     end
 
     test "omits location section when no location" do
@@ -605,9 +605,9 @@ defmodule Deft.Error.FormattedErrorsTest do
 
       formatted = Formatter.format(error, colors: false)
 
-      assert formatted =~ "= note: First note"
-      assert formatted =~ "= note: Second note"
-      assert formatted =~ "= note: Third note"
+      assert formatted =~ "note: First note"
+      assert formatted =~ "note: Second note"
+      assert formatted =~ "note: Third note"
     end
 
     test "formats multiple suggestions" do
@@ -624,9 +624,9 @@ defmodule Deft.Error.FormattedErrorsTest do
 
       formatted = Formatter.format(error, colors: false)
 
-      assert formatted =~ "= help: Use trunc/1"
-      assert formatted =~ "= help: Change the expected type"
-      assert formatted =~ "= help: Use round/1"
+      assert formatted =~ "help: Use trunc/1"
+      assert formatted =~ "help: Change the expected type"
+      assert formatted =~ "help: Use round/1"
     end
 
     test "omits notes section when no notes" do
@@ -639,7 +639,7 @@ defmodule Deft.Error.FormattedErrorsTest do
 
       formatted = Formatter.format(error, colors: false)
 
-      refute formatted =~ "= note:"
+      refute formatted =~ "note:"
     end
 
     test "omits suggestions section when no suggestions" do
@@ -652,7 +652,7 @@ defmodule Deft.Error.FormattedErrorsTest do
 
       formatted = Formatter.format(error, colors: false)
 
-      refute formatted =~ "= help:"
+      refute formatted =~ "help:"
     end
   end
 
