@@ -10,21 +10,29 @@ defmodule Examples.Geometry do
 
   use Deft
 
-  # Helper functions must be defined before they're used
+  # Define Shape ADT with three variants at module level
+  defdata(
+    shape ::
+      rectangle(number, number)
+      | square(number)
+      | triangle(number, number)
+  )
+
+  # CLI dispatch - parses args and calls compute
+  # Note: main can call parse_shape even though it's defined later
+  deft main(args :: list(binary)) :: atom do
+    {shape, f} = parse_shape(args)
+    result = f.(shape)
+
+    IO.puts(result)
+  end
+
+  # Helper functions
   deft parse(s :: binary) :: integer do
     String.to_integer(s)
   end
 
-  # CLI dispatch - parses args and calls compute
-  deft main(args :: list(binary)) :: atom do
-    # Define Shape ADT with three variants
-    defdata(
-      shape ::
-        rectangle(number, number)
-        | square(number)
-        | triangle(number, number)
-    )
-
+  deft parse_shape(args :: list(binary)) :: {shape, (shape -> number)} do
     # Area function using pattern matching on ADT variants
     area = fn s :: shape ->
       case s do
@@ -43,18 +51,13 @@ defmodule Examples.Geometry do
       end
     end
 
-    {shape, f} =
-      case args do
-        ["rectangle", "area", w, h] -> {rectangle(parse(w), parse(h)), area}
-        ["rectangle", "perimeter", w, h] -> {rectangle(parse(w), parse(h)), perimeter}
-        ["square", "area", s] -> {square(parse(s)), area}
-        ["square", "perimeter", s] -> {square(parse(s)), perimeter}
-        ["triangle", "area", b, h] -> {triangle(parse(b), parse(h)), area}
-      end
-
-    result = f.(shape)
-
-    IO.puts(result)
+    case args do
+      ["rectangle", "area", w, h] -> {rectangle(parse(w), parse(h)), area}
+      ["rectangle", "perimeter", w, h] -> {rectangle(parse(w), parse(h)), perimeter}
+      ["square", "area", s] -> {square(parse(s)), area}
+      ["square", "perimeter", s] -> {square(parse(s)), perimeter}
+      ["triangle", "area", b, h] -> {triangle(parse(b), parse(h)), area}
+    end
   end
 end
 
