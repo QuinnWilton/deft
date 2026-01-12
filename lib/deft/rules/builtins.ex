@@ -138,18 +138,15 @@ defmodule Deft.Rules.Builtins do
     # Synthesize arguments
     args ~>> {erased_args, arg_types}
 
-    # Validate arguments match variant columns
+    # Validate arguments match variant columns using detailed checking.
     compute :ok do
-      unless length(variant.columns) == length(arg_types) and
-               Subtyping.subtypes_of?(variant.columns, arg_types) do
-        Deft.Error.raise!(
-          Deft.Error.type_mismatch(
-            expected: Deft.Type.fixed_tuple(variant.columns),
-            actual: Deft.Type.fixed_tuple(arg_types)
-          )
-        )
-      end
-
+      expected = Deft.Type.fixed_tuple(variant.columns)
+      actual = Deft.Type.fixed_tuple(arg_types)
+      ctx = var!(ctx, nil)
+      # Pass the original args for element-level span tracking.
+      require_subtype!(actual, expected, %AST.TypeConstructorCall{
+        name: name, args: args, type: adt_type, variant: variant, meta: meta
+      }, ctx)
       :ok
     end
 

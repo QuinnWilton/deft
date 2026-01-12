@@ -76,9 +76,10 @@ defmodule Deft.Helpers do
   @spec inject_bindings(term(), [term()]) :: term()
   def inject_bindings(ast, bindings) do
     Enum.reduce(bindings, ast, fn
-      {:adt, %AST.Local{name: name, context: context}, %Type.ADT{} = type}, acc ->
+      {:adt, %AST.Local{name: name}, %Type.ADT{} = type}, acc ->
+        # Match on name only - context can differ between macro expansion phases
         Walker.postwalk(acc, fn
-          %Type.Alias{name: ^name, context: ^context} ->
+          %Type.Alias{name: ^name} ->
             type
 
           other ->

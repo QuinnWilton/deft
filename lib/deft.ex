@@ -38,6 +38,7 @@ defmodule Deft do
 
   alias Deft.Compiler
   alias Deft.Context
+  alias Deft.Error.Formatter
 
   @doc """
   Compiles a typed code block, returning the result and its type.
@@ -64,7 +65,7 @@ defmodule Deft do
         error_mode: :accumulate
       )
 
-    # Initialize process dictionary for error accumulation
+    # Initialize error accumulator.
     Process.put(:deft_accumulated_errors, [])
 
     result = Deft.TypeChecker.check(block, ctx)
@@ -76,13 +77,7 @@ defmodule Deft do
         {erased, Macro.escape(type)}
 
       {_, errors} when errors != [] ->
-        formatted =
-          Deft.Error.Formatter.format_all(errors,
-            colors: true,
-            source_lines: source_lines
-          )
-
-        raise CompileError, description: formatted
+        raise_type_errors(errors, source_lines)
 
       {{:error, reason}, _} ->
         raise CompileError, description: "Type checking failed: #{inspect(reason)}"
@@ -95,15 +90,31 @@ defmodule Deft do
   Useful for inspecting the type structure of expressions.
   """
   defmacro bindings(do: block) do
+    source_lines = read_source_lines(__CALLER__.file)
     block = Compiler.compile(block)
-    ctx = Context.new(__CALLER__)
 
-    case Deft.TypeChecker.check(block, ctx) do
-      {:ok, _erased, type, bindings, _ctx} ->
+    ctx =
+      Context.new(__CALLER__,
+        source_lines: source_lines,
+        error_mode: :accumulate
+      )
+
+    # Initialize error accumulator.
+    Process.put(:deft_accumulated_errors, [])
+
+    result = Deft.TypeChecker.check(block, ctx)
+    errors = Process.get(:deft_accumulated_errors, [])
+    Process.delete(:deft_accumulated_errors)
+
+    case {result, errors} do
+      {{:ok, _erased, type, bindings, _ctx}, []} ->
         Macro.escape({type, bindings})
 
-      {:error, reason} ->
-        raise "Type checking failed: #{inspect(reason)}"
+      {_, errors} when errors != [] ->
+        raise_type_errors(errors, source_lines)
+
+      {{:error, reason}, _} ->
+        raise CompileError, description: "Type checking failed: #{inspect(reason)}"
     end
   end
 
@@ -141,10 +152,13 @@ defmodule Deft do
     features = Keyword.get(opts, :features, [])
 
     quote do
-      import Deft, only: [compile: 1, deft: 2]
+      import Deft, only: [compile: 1, deft: 2, defdata: 1]
       require Deft
 
       Module.register_attribute(__MODULE__, :deft, accumulate: true)
+      Module.register_attribute(__MODULE__, :deft_definitions, accumulate: true)
+      Module.register_attribute(__MODULE__, :deft_adts, accumulate: true)
+      Module.register_attribute(__MODULE__, :deft_adt_names, accumulate: true)
       Module.register_attribute(__MODULE__, :deft_features, persist: true)
       Module.put_attribute(__MODULE__, :deft_features, unquote(features))
 
@@ -153,10 +167,47 @@ defmodule Deft do
   end
 
   @doc """
+  Defines an algebraic data type (ADT) at the module level.
+
+  The ADT is available throughout the module, in all `deft` function bodies.
+
+  ## Example
+
+      defmodule Shapes do
+        use Deft
+
+        defdata(
+          shape ::
+            rectangle(number, number)
+            | square(number)
+            | circle(number)
+        )
+
+        deft area(s :: shape) :: number do
+          case s do
+            rectangle(w, h) -> w * h
+            square(side) -> side * side
+            circle(r) -> 3.14159 * r * r
+          end
+        end
+      end
+  """
+  defmacro defdata({:"::", _, [{name, _, _ctx}, _variants]} = type_def) do
+    # Store the raw type definition for processing in __before_compile__
+    quote do
+      @deft_adts unquote(Macro.escape(type_def))
+
+      # Also store the name for quick lookup
+      @deft_adt_names unquote(name)
+    end
+  end
+
+  @doc """
   Defines a typed function with inline type annotations.
 
   The function signature is extracted from the parameter annotations
-  and the return type annotation. Type checking happens at compile time.
+  and the return type annotation. Type checking happens at compile time,
+  after all function signatures in the module have been registered.
 
   ## Example
 
@@ -167,7 +218,7 @@ defmodule Deft do
   This defines a function `add/2` that takes two integers and returns
   an integer. The implementation is type-checked at compile time.
   """
-  defmacro deft({:"::", _, [{name, _, args}, return_type]}, do: body) when is_atom(name) do
+  defmacro deft({:"::", _, [{name, meta, args}, return_type]}, do: body) when is_atom(name) do
     # Parse arguments and extract types
     {params, param_types} = parse_typed_params(args)
     return_type_parsed = parse_type(return_type)
@@ -187,63 +238,25 @@ defmodule Deft do
     {evaluated_return_type, _} = Code.eval_quoted(return_type_parsed, [], __CALLER__)
 
     # Build the signature immediately and register it during macro expansion
-    # This allows other deft functions defined later to reference this function
+    # This ensures all signatures are known before type checking begins
     signature = Deft.Type.fun(evaluated_param_types, evaluated_return_type)
     Deft.Signatures.register({module, name, arity}, signature)
 
-    # Build the type list as a proper Elixir list expression (for runtime registration)
-    param_types_list =
-      quote do
-        [unquote_splicing(param_types)]
-      end
-
-    signature_ast =
-      quote do
-        Deft.Type.fun(unquote(param_types_list), unquote(return_type_parsed))
-      end
-
-    # Compile and type-check the body
-    compiled_body = Compiler.compile(body)
-    ctx = Context.new(__CALLER__)
-
-    # Build parameter bindings: [{AST.Local, type}, ...]
-    # The bindings are injected into the AST by annotating matching locals with their types
-    param_bindings =
-      Enum.zip(params, evaluated_param_types)
-      |> Enum.map(fn {{param_name, meta, param_context}, type} ->
-        # Create an AST.Local to match against
-        local = Deft.AST.Local.new(param_name, param_context, meta)
-        {local, type}
-      end)
-
-    # Inject bindings into the compiled body (annotates matching locals with types)
-    compiled_body = Deft.Helpers.inject_bindings(compiled_body, param_bindings)
-
-    # Type-check the body
-    erased_body =
-      case Deft.TypeChecker.check(compiled_body, ctx) do
-        {:ok, erased, _type, _bindings, _ctx} ->
-          erased
-
-        {:error, reason} ->
-          raise "Type checking failed in deft #{name}/#{arity}: #{inspect(reason)}"
-      end
+    # Store definition for deferred type-checking in __before_compile__
+    # We store: {name, arity, params, evaluated_param_types, evaluated_return_type, body, caller, meta}
+    definition = {
+      name,
+      arity,
+      params,
+      evaluated_param_types,
+      evaluated_return_type,
+      body,
+      Macro.escape(__CALLER__),
+      meta
+    }
 
     quote do
-      # Register signature with the registry (also at runtime for recompilation)
-      Deft.Signatures.register(
-        {__MODULE__, unquote(name), unquote(arity)},
-        unquote(signature_ast)
-      )
-
-      # Store for @before_compile verification
-      @deft {unquote(name), unquote(arity), unquote(Macro.escape(param_types)),
-             unquote(Macro.escape(return_type_parsed))}
-
-      # Define the actual function with type-erased body
-      def unquote(name)(unquote_splicing(params)) do
-        unquote(erased_body)
-      end
+      @deft_definitions unquote(Macro.escape(definition))
     end
   end
 
@@ -255,31 +268,174 @@ defmodule Deft do
 
   @doc false
   defmacro __before_compile__(env) do
-    deft_sigs = Module.get_attribute(env.module, :deft) || []
+    definitions = Module.get_attribute(env.module, :deft_definitions) || []
+    adts = Module.get_attribute(env.module, :deft_adts) || []
     features = Module.get_attribute(env.module, :deft_features) || []
 
-    # Generate compile-time validation for signatures
-    validations =
-      for {name, arity, _param_types, return_type} <- deft_sigs do
+    # Process ADT definitions to create bindings
+    adt_bindings = process_adts(adts)
+
+    # Read source once for all functions
+    source_lines = read_source_lines(env.file)
+
+    # Build a map from alias names to ADT types for resolution
+    alias_map = build_alias_map(adt_bindings)
+
+    # Type-check all function bodies and generate function definitions
+    function_defs =
+      Enum.map(definitions, fn {name, arity, params, param_types, _return_type, body, caller_escaped, _meta} ->
+        caller = Code.eval_quoted(caller_escaped) |> elem(0)
+
+        # Resolve alias types in parameter types
+        resolved_param_types = Enum.map(param_types, &resolve_aliases(&1, alias_map))
+
+        # Compile and type-check the body
+        compiled_body = Compiler.compile(body)
+
+        ctx =
+          Context.new(caller,
+            source_lines: source_lines,
+            error_mode: :accumulate
+          )
+
+        # Add ADT bindings to context
+        ctx = Context.bind_all(ctx, adt_bindings)
+
+        # Build parameter bindings with resolved types
+        param_bindings =
+          Enum.zip(params, resolved_param_types)
+          |> Enum.map(fn {{param_name, meta, param_context}, type} ->
+            local = Deft.AST.Local.new(param_name, param_context, meta)
+            {local, type}
+          end)
+
+        # Inject all bindings into the compiled body:
+        # - ADT bindings resolve Type.Alias -> Type.ADT and LocalCall -> TypeConstructorCall
+        # - Parameter bindings annotate locals with their types
+        all_bindings = adt_bindings ++ param_bindings
+        compiled_body = Deft.Helpers.inject_bindings(compiled_body, all_bindings)
+
+        # Initialize error accumulator
+        Process.put(:deft_accumulated_errors, [])
+
+        # Type-check the body
+        result = Deft.TypeChecker.check(compiled_body, ctx)
+        errors = Process.get(:deft_accumulated_errors, [])
+        Process.delete(:deft_accumulated_errors)
+
+        erased_body =
+          case {result, errors} do
+            {{:ok, erased, _type, _bindings, _ctx}, []} ->
+              erased
+
+            {_, errors} when errors != [] ->
+              raise_type_errors(errors, source_lines)
+
+            {{:error, reason}, _} ->
+              raise CompileError,
+                description: "Type checking failed in deft #{name}/#{arity}: #{inspect(reason)}"
+          end
+
         quote do
-          # Validate the signature is well-formed
-          unless Deft.Type.well_formed?(unquote(return_type)) do
-            raise CompileError,
-              description:
-                "Invalid return type in @deft #{unquote(name)}/#{unquote(arity)}: " <>
-                  "#{inspect(unquote(return_type))}"
+          def unquote(name)(unquote_splicing(params)) do
+            unquote(erased_body)
           end
         end
-      end
+      end)
 
     # Store module metadata for introspection
+    sigs =
+      Enum.map(definitions, fn {name, arity, _params, param_types, return_type, _body, _caller, _meta} ->
+        {name, arity, param_types, return_type}
+      end)
+
     quote do
-      unquote_splicing(validations)
+      unquote_splicing(function_defs)
 
       @doc false
-      def __deft__(:signatures), do: unquote(Macro.escape(deft_sigs))
+      def __deft__(:signatures), do: unquote(Macro.escape(sigs))
       def __deft__(:features), do: unquote(Macro.escape(features))
+      def __deft__(:adts), do: unquote(Macro.escape(adt_bindings))
     end
+  end
+
+  # Process ADT definitions into bindings for type checking context
+  defp process_adts(adts) do
+    Enum.flat_map(adts, fn {:"::", _, [{name, _, _ctx}, variants]} ->
+      # Create a fake AST.Local for the ADT name
+      adt_name = Deft.AST.Local.new(name, nil, [])
+
+      # Parse variants
+      variant_types = parse_adt_variants(variants, adt_name)
+
+      # Create the ADT type
+      adt_type = Deft.Type.adt(adt_name, variant_types)
+
+      # Return bindings for the ADT and all its variants
+      adt_binding = {:adt, adt_name, adt_type}
+
+      variant_bindings =
+        Enum.map(variant_types, fn variant ->
+          {:adt_variant, variant.name, adt_type, variant}
+        end)
+
+      [adt_binding | variant_bindings]
+    end)
+  end
+
+  # Parse ADT variant definitions
+  defp parse_adt_variants({:|, _, [first, rest]}, adt_name) do
+    [parse_adt_variant(first, adt_name) | parse_adt_variants(rest, adt_name)]
+  end
+
+  defp parse_adt_variants(variant, adt_name) do
+    [parse_adt_variant(variant, adt_name)]
+  end
+
+  defp parse_adt_variant({name, _meta, columns}, adt_name) when is_list(columns) do
+    column_types = Enum.map(columns, &parse_type_to_struct/1)
+    Deft.Type.variant(name, adt_name, column_types)
+  end
+
+  defp parse_adt_variant({name, _meta, nil}, adt_name) do
+    Deft.Type.variant(name, adt_name, [])
+  end
+
+  # Parse type syntax directly to Type structs (for ADT processing at compile time)
+  defp parse_type_to_struct({:integer, _, _}), do: Deft.Type.integer()
+  defp parse_type_to_struct({:float, _, _}), do: Deft.Type.float()
+  defp parse_type_to_struct({:number, _, _}), do: Deft.Type.number()
+  defp parse_type_to_struct({:boolean, _, _}), do: Deft.Type.boolean()
+  defp parse_type_to_struct({:atom, _, _}), do: Deft.Type.atom()
+  defp parse_type_to_struct({:binary, _, _}), do: Deft.Type.binary()
+  defp parse_type_to_struct({:list, _, [elem]}), do: Deft.Type.fixed_list(parse_type_to_struct(elem))
+  defp parse_type_to_struct({:list, _, _}), do: Deft.Type.list()
+  defp parse_type_to_struct({:tuple, _, _}), do: Deft.Type.tuple()
+  defp parse_type_to_struct({:top, _, _}), do: Deft.Type.top()
+  defp parse_type_to_struct({:bottom, _, _}), do: Deft.Type.bottom()
+
+  defp parse_type_to_struct({:{}, _, types}) do
+    Deft.Type.fixed_tuple(Enum.map(types, &parse_type_to_struct/1))
+  end
+
+  defp parse_type_to_struct({type1, type2}) do
+    Deft.Type.fixed_tuple([parse_type_to_struct(type1), parse_type_to_struct(type2)])
+  end
+
+  defp parse_type_to_struct({:|, _, [left, right]}) do
+    Deft.Type.union(parse_type_to_struct(left), parse_type_to_struct(right))
+  end
+
+  defp parse_type_to_struct({:->, _, [args, ret]}) do
+    arg_types = Enum.map(List.wrap(args), &parse_type_to_struct/1)
+    Deft.Type.fun(arg_types, parse_type_to_struct(ret))
+  end
+
+  defp parse_type_to_struct([{:->, _, _} = fn_type]), do: parse_type_to_struct(fn_type)
+  defp parse_type_to_struct([elem]), do: Deft.Type.fixed_list(parse_type_to_struct(elem))
+
+  defp parse_type_to_struct(other) do
+    raise ArgumentError, "Unknown type syntax in defdata: #{Macro.to_string(other)}"
   end
 
   # ============================================================================
@@ -359,12 +515,88 @@ defmodule Deft do
     quote do: Deft.Type.fun(unquote(arg_types), unquote(return_type))
   end
 
+  # ADT type reference (simple identifier like `shape`)
+  defp parse_type({name, _, context}) when is_atom(name) and is_atom(context) do
+    # This is a reference to a module-level ADT type
+    quote do: Deft.Type.alias(unquote(name), nil)
+  end
+
   # Fallback for unknown types
   defp parse_type(other) do
     raise ArgumentError, "Unknown type syntax: #{Macro.to_string(other)}"
   end
 
-  # Reads source file contents for error display
+  # Build a map from alias names to ADT types for resolution
+  defp build_alias_map(adt_bindings) do
+    Enum.reduce(adt_bindings, %{}, fn
+      {:adt, %Deft.AST.Local{name: name}, %Deft.Type.ADT{} = adt_type}, acc ->
+        Map.put(acc, name, adt_type)
+
+      _, acc ->
+        acc
+    end)
+  end
+
+  # Recursively resolve Type.Alias references to actual ADT types
+  defp resolve_aliases(%Deft.Type.Alias{name: name}, alias_map) do
+    case Map.get(alias_map, name) do
+      nil -> raise CompileError, description: "Unknown type: #{name}"
+      adt_type -> adt_type
+    end
+  end
+
+  defp resolve_aliases(%Deft.Type.FixedTuple{elements: elements}, alias_map) do
+    %Deft.Type.FixedTuple{elements: Enum.map(elements, &resolve_aliases(&1, alias_map))}
+  end
+
+  defp resolve_aliases(%Deft.Type.FixedList{contents: contents}, alias_map) do
+    %Deft.Type.FixedList{contents: resolve_aliases(contents, alias_map)}
+  end
+
+  defp resolve_aliases(%Deft.Type.Fn{inputs: inputs, output: output}, alias_map) do
+    %Deft.Type.Fn{
+      inputs: Enum.map(inputs, &resolve_aliases(&1, alias_map)),
+      output: resolve_aliases(output, alias_map)
+    }
+  end
+
+  defp resolve_aliases(%Deft.Type.Union{fst: fst, snd: snd}, alias_map) do
+    %Deft.Type.Union{
+      fst: resolve_aliases(fst, alias_map),
+      snd: resolve_aliases(snd, alias_map)
+    }
+  end
+
+  defp resolve_aliases(%Deft.Type.Intersection{fst: fst, snd: snd}, alias_map) do
+    %Deft.Type.Intersection{
+      fst: resolve_aliases(fst, alias_map),
+      snd: resolve_aliases(snd, alias_map)
+    }
+  end
+
+  # Base types pass through unchanged
+  defp resolve_aliases(type, _alias_map), do: type
+
+  # Raises a compile error with a user-friendly stacktrace pointing to the error location.
+  # This provides a much better developer experience than showing internal Deft stacktraces.
+  defp raise_type_errors(errors, source_lines) do
+    formatted = Formatter.format_all(errors, colors: true, source_lines: source_lines)
+    exception = %CompileError{description: formatted}
+
+    # Build a stacktrace pointing to the first error's location
+    stacktrace =
+      case errors do
+        [%{location: {file, line, _col}} | _] when is_binary(file) and is_integer(line) ->
+          [{:elixir_compiler, :__FILE__, 1, [file: String.to_charlist(file), line: line]}]
+
+        _ ->
+          []
+      end
+
+    :erlang.raise(:error, exception, stacktrace)
+  end
+
+  # Reads source lines from a file for error context display.
   defp read_source_lines(file) when is_binary(file) do
     case File.read(file) do
       {:ok, content} -> String.split(content, "\n")

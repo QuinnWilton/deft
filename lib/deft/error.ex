@@ -112,7 +112,7 @@ defmodule Deft.Error do
 
     %__MODULE__{
       code: :type_mismatch,
-      message: build_type_mismatch_message(expected, actual),
+      message: "Type mismatch: expected `#{format_type(expected)}`, got `#{format_type(actual)}`",
       expected: expected,
       actual: actual,
       location: Keyword.get(opts, :location),
@@ -400,14 +400,6 @@ defmodule Deft.Error do
   defp format_adt_name(%{name: name}), do: "#{name}"
   defp format_adt_name(name) when is_atom(name), do: "#{name}"
   defp format_adt_name(other), do: inspect(other)
-
-  # ============================================================================
-  # Message Building
-  # ============================================================================
-
-  defp build_type_mismatch_message(expected, actual) do
-    "Type mismatch: expected `#{format_type(expected)}`, got `#{format_type(actual)}`"
-  end
 
   # ============================================================================
   # Exception Protocol Implementation

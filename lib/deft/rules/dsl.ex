@@ -673,10 +673,12 @@ defmodule Deft.Rules.DSL.Helpers do
 
   @doc """
   Asserts that actual is a subtype of expected with context.
-  Uses detailed subtype checking to provide element-specific error locations.
+
+  Uses detailed subtype checking to provide element-specific error messages
+  for compound types like tuples.
   """
   def require_subtype!(actual, expected, expr, ctx) do
-    # Extract sub-expressions for element-level span tracking
+    # Extract sub-expressions for element-level span tracking.
     sub_exprs = extract_sub_exprs(expr)
 
     case Subtyping.check_subtype(expected, actual, sub_exprs) do
@@ -684,7 +686,7 @@ defmodule Deft.Rules.DSL.Helpers do
         :ok
 
       {:mismatch, %{expected: exp_elem, actual: act_elem, expr: fail_expr}} ->
-        # Use the failing element's expression for location if available
+        # Use the failing element's expression for location if available.
         location_expr = fail_expr || expr
 
         error =
@@ -703,24 +705,47 @@ defmodule Deft.Rules.DSL.Helpers do
     end
   end
 
-  # Extracts child expressions from an AST node for element-level span tracking
-  defp extract_sub_exprs(%AST.Tuple{elements: elements}), do: elements
-  defp extract_sub_exprs(%AST.LocalCall{args: args}), do: args
-  defp extract_sub_exprs(_), do: nil
+  @doc """
+  Extracts child expressions from an AST node for element-level span tracking.
 
-  # Handles error based on context's error_mode
+  Returns a list of sub-expressions for compound types, or nil for simple types.
+  """
+  def extract_sub_exprs(%AST.Tuple{elements: elements}), do: elements
+  def extract_sub_exprs(%AST.TypeConstructorCall{args: args}), do: args
+  def extract_sub_exprs(%AST.List{elements: elements}), do: elements
+  def extract_sub_exprs(%AST.Pair{fst: fst, snd: snd}), do: [fst, snd]
+  def extract_sub_exprs(_), do: nil
+
+  # Handles error based on context's error_mode.
   defp raise_or_accumulate(%Context{error_mode: :accumulate} = ctx, error) do
-    # Store errors in process dictionary since context isn't threaded back
-    enriched = Context.enrich_error(error, ctx)
+    # In accumulate mode, store errors in process dictionary since context
+    # isn't threaded back through the rule system.
+    enriched = enrich_error(error, ctx)
     errors = Process.get(:deft_accumulated_errors, [])
     Process.put(:deft_accumulated_errors, errors ++ [enriched])
     {nil, Type.bottom(), []}
   end
 
   defp raise_or_accumulate(_ctx, %Error{} = error) do
-    # In fail_fast mode or no context, raise using the new error system
+    # In fail_fast mode or no context, raise using the new error system.
     Error.raise!(error)
   end
+
+  # Enriches an error with context information (file, etc.)
+  defp enrich_error(%Error{location: nil} = error, %Context{env: env}) when not is_nil(env) do
+    %{error | location: Error.extract_location_from_env(env)}
+  end
+
+  # If location has line but no file, add file from env.
+  defp enrich_error(
+         %Error{location: {nil, line, col}} = error,
+         %Context{env: %Macro.Env{file: file}}
+       )
+       when not is_nil(file) do
+    %{error | location: {file, line, col}}
+  end
+
+  defp enrich_error(error, _ctx), do: error
 
   @doc """
   Computes the type of a literal value.
