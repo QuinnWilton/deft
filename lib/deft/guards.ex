@@ -246,7 +246,10 @@ defmodule Deft.Guards do
       Deft.Error.raise!(Deft.Error.type_mismatch(expected: Type.list(), actual: term_t))
     end
 
-    {[term], Type.FixedList.contents(term_t), bindings}
+    # Extract element type if available, otherwise fall back to top.
+    element_type = extract_list_contents(term_t)
+
+    {[term], element_type, bindings}
   end
 
   # tl: list(a) -> list(a) (preserves list type)
@@ -273,13 +276,26 @@ defmodule Deft.Guards do
       Deft.Error.raise!(Deft.Error.type_mismatch(expected: Type.integer(), actual: index_t))
     end
 
-    type =
-      tuple_t
-      |> Type.FixedTuple.unique_types()
-      |> Enum.reduce(Type.bottom(), &Type.union/2)
+    # Extract element types if available, otherwise fall back to top.
+    type = extract_tuple_element_type(tuple_t)
 
     {[tuple, index], type, tuple_bindings ++ index_bindings}
   end
+
+  # Safely extract list contents type, falling back to top for generic lists.
+  defp extract_list_contents(%Type.FixedList{} = list), do: Type.FixedList.contents(list)
+  defp extract_list_contents(%Type.List{}), do: Type.top()
+  defp extract_list_contents(_), do: Type.top()
+
+  # Safely extract tuple element types as a union, falling back to top for generic tuples.
+  defp extract_tuple_element_type(%Type.FixedTuple{} = tuple) do
+    tuple
+    |> Type.FixedTuple.unique_types()
+    |> Enum.reduce(Type.bottom(), &Type.union/2)
+  end
+
+  defp extract_tuple_element_type(%Type.Tuple{}), do: Type.top()
+  defp extract_tuple_element_type(_), do: Type.top()
 
   # Fallback: try to use signature registry
   defp do_handle_guard(name, args, ctx) do
