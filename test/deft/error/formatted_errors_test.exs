@@ -413,8 +413,8 @@ defmodule Deft.Error.FormattedErrorsTest do
       assert formatted =~ "9 │"
       # Should contain the source line content
       assert formatted =~ "x = 1.5"
-      # Should contain pointer characters
-      assert formatted =~ "^"
+      # Should contain underline characters
+      assert formatted =~ "─"
     end
 
     test "falls back to expression context when source not available" do
@@ -464,8 +464,8 @@ defmodule Deft.Error.FormattedErrorsTest do
 
       formatted = Formatter.format(error, colors: false, source_lines: @sample_source)
 
-      # Should produce 8 pointer characters (18 - 10 = 8)
-      assert formatted =~ "^^^^^^^^"
+      # Should produce underline with tee at center (width 8: ───┬────)
+      assert formatted =~ "───┬────"
     end
 
     test "calculates width for LocalCall AST" do
@@ -485,8 +485,8 @@ defmodule Deft.Error.FormattedErrorsTest do
 
       formatted = Formatter.format(error, colors: false, source_lines: @sample_source)
 
-      # Should produce a reasonable width based on Macro.to_string
-      assert formatted =~ "^"
+      # Should produce underline with tee based on expression width
+      assert formatted =~ "─"
     end
   end
 

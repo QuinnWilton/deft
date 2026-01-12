@@ -1,27 +1,28 @@
 defmodule Deft.Error.Formatter do
   @moduledoc """
-  Pretty-prints Deft type errors in a compiler-quality format.
+  Pretty-prints Deft type errors in a Miette-style format.
 
-  This module formats errors similar to Rust's error messages, with:
+  This module formats errors similar to Rust's Miette library, with:
   - Error code and severity
-  - Source location with file, line, and column
-  - Highlighted source context
-  - Pointing arrows to the error location
+  - Source location with unicode box-drawing frame
+  - Highlighted source context with underlines and branching labels
   - Suggestions for fixes
   - Additional notes
 
   ## Example Output
 
       error[E0001]: type mismatch
-        --> lib/my_app.ex:15:10
-         |
-      14 |   add = fn x :: integer, y :: integer ->
-      15 |     x + y + 1.5
-         |             ^^^ expected `integer`, found `float`
-         |
-         = note: in expression `x + y + 1.5`
-         = note: `+` with integer arguments returns integer
-         = help: consider using `trunc(1.5)` or change return type to `number`
+         ╭─[lib/my_app.ex:15:10]
+         │
+      14 │   add = fn x :: integer, y :: integer ->
+      15 │     x + y + 1.5
+         •             ────┬────
+         •                 ╰── expected `integer`, found `float`
+         │
+         ╰─
+            note: in expression `x + y + 1.5`
+            note: `+` with integer arguments returns integer
+            help: consider using `trunc(1.5)` or change return type to `number`
   """
 
   alias Deft.Error
@@ -56,7 +57,8 @@ defmodule Deft.Error.Formatter do
     horizontal: "─",
     top_left: "╭",
     bottom_left: "╰",
-    dot: "•"
+    dot: "•",
+    tee_down: "┬"
   }
 
   @doc """
@@ -274,15 +276,15 @@ defmodule Deft.Error.Formatter do
         "#{line_str} #{@box.vertical} #{source_line}"
       end
 
-    # Format pointer lines for each span
+    # Format pointer lines for each span (each span produces 2 lines: underline + label)
     pointer_lines =
       spans
-      |> Enum.map(fn span -> format_span_pointer(span, source_line, padding, use_colors) end)
+      |> Enum.flat_map(fn span -> format_span_pointer(span, source_line, padding, use_colors) end)
 
     [source | pointer_lines]
   end
 
-  # Format the pointer line for a span (annotation line uses dot border)
+  # Format the pointer lines for a span (returns 2 lines: underline with tee, and branching label)
   defp format_span_pointer(%{location: {_, _, column}, label: label, type: type} = span, source_line, padding, use_colors) do
     # For pattern spans, adjust column to point at pattern start
     col =
@@ -292,9 +294,12 @@ defmodule Deft.Error.Formatter do
         column || 1
       end
 
-    pointer_padding = String.duplicate(" ", max(0, col - 1))
     pointer_width = estimate_span_width(source_line, col, type)
-    pointer = String.duplicate("^", pointer_width)
+
+    # Build the underline with tee at center: ───┬───
+    {underline, tee_position} = build_underline_with_tee(pointer_width)
+
+    pointer_padding = String.duplicate(" ", max(0, col - 1))
 
     # Build the label with type if present
     type_str =
@@ -313,13 +318,35 @@ defmodule Deft.Error.Formatter do
     full_label = "#{label}#{type_str}"
     span_kind = Map.get(span, :kind, :primary)
 
-    # Annotation lines use dot (•) instead of vertical bar
+    # Build the branching label line: spaces to center, then ╰── and label
+    branch_padding = String.duplicate(" ", max(0, col - 1 + tee_position))
+
+    # Line 1: underline with tee
+    # Line 2: branching label
     if use_colors do
       span_color = span_kind_color(span_kind)
-      "#{padding} #{@colors.dim}#{@box.dot}#{@colors.reset} #{pointer_padding}#{span_color}#{pointer}#{@colors.reset} #{full_label}"
+      underline_line = "#{padding} #{@colors.dim}#{@box.dot}#{@colors.reset} #{pointer_padding}#{span_color}#{underline}#{@colors.reset}"
+      label_line = "#{padding} #{@colors.dim}#{@box.dot}#{@colors.reset} #{branch_padding}#{span_color}#{@box.bottom_left}#{@box.horizontal}#{@box.horizontal}#{@colors.reset} #{full_label}"
+      [underline_line, label_line]
     else
-      "#{padding} #{@box.dot} #{pointer_padding}#{pointer} #{full_label}"
+      underline_line = "#{padding} #{@box.dot} #{pointer_padding}#{underline}"
+      label_line = "#{padding} #{@box.dot} #{branch_padding}#{@box.bottom_left}#{@box.horizontal}#{@box.horizontal} #{full_label}"
+      [underline_line, label_line]
     end
+  end
+
+  # Build underline string with tee at center, returns {underline_string, tee_position}
+  defp build_underline_with_tee(width) when width <= 1 do
+    # Single character: just use the tee
+    {@box.tee_down, 0}
+  end
+
+  defp build_underline_with_tee(width) do
+    # Calculate center position (0-indexed)
+    center = div(width - 1, 2)
+    left_dashes = String.duplicate(@box.horizontal, center)
+    right_dashes = String.duplicate(@box.horizontal, width - center - 1)
+    {left_dashes <> @box.tee_down <> right_dashes, center}
   end
 
   # Get all source lines in a range
@@ -438,17 +465,25 @@ defmodule Deft.Error.Formatter do
       col = column || 1
       pointer_padding = String.duplicate(" ", max(0, col - 1))
       pointer_width = get_expression_width(error.expression) || 1
-      pointer = String.duplicate("^", pointer_width)
 
-      pointer_line =
+      # Build underline with tee at center
+      {underline, tee_position} = build_underline_with_tee(pointer_width)
+      branch_padding = String.duplicate(" ", max(0, col - 1 + tee_position))
+      message = format_pointer_message(error, use_colors)
+
+      {underline_line, label_line} =
         if use_colors do
           error_color = severity_color(error.severity)
-          "#{padding} #{@colors.dim}#{@box.dot}#{@colors.reset} #{pointer_padding}#{error_color}#{pointer}#{@colors.reset} #{format_pointer_message(error, use_colors)}"
+          ul = "#{padding} #{@colors.dim}#{@box.dot}#{@colors.reset} #{pointer_padding}#{error_color}#{underline}#{@colors.reset}"
+          ll = "#{padding} #{@colors.dim}#{@box.dot}#{@colors.reset} #{branch_padding}#{error_color}#{@box.bottom_left}#{@box.horizontal}#{@box.horizontal}#{@colors.reset} #{message}"
+          {ul, ll}
         else
-          "#{padding} #{@box.dot} #{pointer_padding}#{pointer} #{format_pointer_message(error, false)}"
+          ul = "#{padding} #{@box.dot} #{pointer_padding}#{underline}"
+          ll = "#{padding} #{@box.dot} #{branch_padding}#{@box.bottom_left}#{@box.horizontal}#{@box.horizontal} #{message}"
+          {ul, ll}
         end
 
-      [separator, source, pointer_line, separator, closing]
+      [separator, source, underline_line, label_line, separator, closing]
       |> Enum.join("\n")
     else
       ([separator] ++ formatted_lines ++ [separator, closing])
@@ -470,18 +505,26 @@ defmodule Deft.Error.Formatter do
     col = column || 1
     pointer_padding = String.duplicate(" ", max(0, col - 1))
     pointer_width = get_expression_width(error.expression) || 1
-    pointer = String.duplicate("^", pointer_width)
 
-    # Annotation line uses dot border
-    pointer_line =
+    # Build underline with tee at center
+    {underline, tee_position} = build_underline_with_tee(pointer_width)
+    branch_padding = String.duplicate(" ", max(0, col - 1 + tee_position))
+    message = format_pointer_message(error, use_colors)
+
+    # Two annotation lines: underline with tee, then branching label
+    {underline_line, label_line} =
       if use_colors do
         error_color = severity_color(error.severity)
-        "#{padding} #{@colors.dim}#{@box.dot}#{@colors.reset} #{pointer_padding}#{error_color}#{pointer}#{@colors.reset} #{format_pointer_message(error, use_colors)}"
+        ul = "#{padding} #{@colors.dim}#{@box.dot}#{@colors.reset} #{pointer_padding}#{error_color}#{underline}#{@colors.reset}"
+        ll = "#{padding} #{@colors.dim}#{@box.dot}#{@colors.reset} #{branch_padding}#{error_color}#{@box.bottom_left}#{@box.horizontal}#{@box.horizontal}#{@colors.reset} #{message}"
+        {ul, ll}
       else
-        "#{padding} #{@box.dot} #{pointer_padding}#{pointer} #{format_pointer_message(error, false)}"
+        ul = "#{padding} #{@box.dot} #{pointer_padding}#{underline}"
+        ll = "#{padding} #{@box.dot} #{branch_padding}#{@box.bottom_left}#{@box.horizontal}#{@box.horizontal} #{message}"
+        {ul, ll}
       end
 
-    [source, pointer_line]
+    [source, underline_line, label_line]
   end
 
   defp format_expression_context(nil, _error, _use_colors), do: nil
