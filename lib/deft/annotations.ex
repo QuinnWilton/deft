@@ -1,6 +1,64 @@
 defmodule Deft.Annotations do
+  @moduledoc """
+  Parses type annotations from Elixir AST into Deft types.
+
+  This module converts type annotation syntax used in Deft code into
+  internal `Deft.Type` structs. It's called by the compiler when processing
+  type annotations on function arguments and ADT variant columns.
+
+  ## Supported Annotation Syntax
+
+  ### Primitive Types
+
+  - `boolean` - Boolean type
+  - `atom` - Atom type
+  - `binary` - Binary/string type
+  - `float` - Float type
+  - `integer` - Integer type
+  - `number` - Number type (supertype of integer and float)
+  - `top` - Top type (any value)
+  - `bottom` - Bottom type (no value)
+
+  ### Composite Types
+
+  - `{a, b}` - Two-element tuple
+  - `{a, b, c, ...}` - N-element tuple (3+)
+  - `a | b` - Union type
+  - `[a]` or `list(a)` - List type
+
+  ### Function Types
+
+  - `(a -> b)` - Single-argument function
+  - `(a, b -> c)` - Multi-argument function
+  - `(-> a)` - Zero-argument function
+
+  ### Type Aliases
+
+  - `MyType` - References a user-defined type alias
+
+  ## Examples
+
+      # In function annotations
+      fn (x :: integer) -> x * 2 end
+
+      # In ADT definitions
+      defdata(
+        shape ::
+          circle(float)
+          | rectangle(float, float)
+      )
+
+  """
+
+  alias Deft.Error
   alias Deft.Type
 
+  @doc """
+  Parses an Elixir AST type annotation into a Deft type.
+
+  Raises `Deft.Error.Exception` if the annotation is malformed or unrecognized.
+  """
+  @spec parse(term()) :: Type.t()
   def parse({:boolean, _, _}) do
     Type.boolean()
   end
@@ -70,5 +128,42 @@ defmodule Deft.Annotations do
 
   def parse({name, _, ctx}) when is_atom(name) and is_atom(ctx) do
     Type.alias(name, ctx)
+  end
+
+  # Catch-all for unrecognized annotation patterns.
+  def parse(ast) do
+    error =
+      Error.malformed_type(
+        expression: ast,
+        suggestions: [
+          "Check the type annotation syntax",
+          "Supported types: boolean, atom, binary, float, integer, number, top, bottom",
+          "Supported composite types: {a, b}, a | b, [a], (a -> b)"
+        ],
+        notes: [malformed_type_note(ast)]
+      )
+
+    Error.raise!(error)
+  end
+
+  defp malformed_type_note(ast) when is_list(ast) and length(ast) == 0 do
+    "Empty list [] is not a valid type annotation. Use [element_type] for list types."
+  end
+
+  defp malformed_type_note(ast) when is_list(ast) and length(ast) > 1 do
+    "List with multiple elements is not a valid type annotation. " <>
+      "Did you mean a tuple {a, b} or a union a | b?"
+  end
+
+  defp malformed_type_note(ast) when is_integer(ast) or is_float(ast) do
+    "Literal numbers are not valid type annotations. Use 'integer', 'float', or 'number'."
+  end
+
+  defp malformed_type_note(ast) when is_binary(ast) do
+    "Literal strings are not valid type annotations. Use 'binary' for string types."
+  end
+
+  defp malformed_type_note(_ast) do
+    "This expression is not a recognized type annotation."
   end
 end
