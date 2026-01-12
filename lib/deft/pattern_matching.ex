@@ -272,6 +272,9 @@ defmodule Deft.PatternMatching do
             end)
 
           {:ok, {erased, variant, bindings}}
+        else
+          # Column types don't match variant's expected types.
+          {:error, variant}
         end
     end
   end
