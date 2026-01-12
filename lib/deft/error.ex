@@ -629,19 +629,6 @@ defmodule Deft.Error do
   # ============================================================================
 
   @doc """
-  Converts an Error struct to an exception that can be raised.
-
-  This allows using `raise Deft.Error.to_exception(error)` or
-  implementing the Exception protocol directly.
-
-  The Exception module is defined in `lib/deft/error/exception.ex`.
-  """
-  @spec to_exception(t()) :: Exception.t()
-  def to_exception(%__MODULE__{} = error) do
-    %Deft.Error.Exception{error: error}
-  end
-
-  @doc """
   Raises an error as a CompileError with a synthetic stacktrace.
 
   This provides a clean user-friendly stacktrace pointing to the error

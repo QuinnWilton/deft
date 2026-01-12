@@ -5,7 +5,7 @@ defmodule Deft.Compiler do
   This module transforms standard Elixir AST (as produced by `quote`) into
   Deft's internal AST representation for type checking.
 
-  Raises `Deft.Error.Exception` if the input contains unsupported syntax.
+  Raises `CompileError` if the input contains unsupported syntax.
   """
 
   alias Deft.AST
@@ -378,30 +378,8 @@ defmodule Deft.Compiler do
     [variant]
   end
 
-  defp parse_adt_columns(columns, variant_name, adt_name) do
-    columns
-    |> Enum.with_index(1)
-    |> Enum.map(fn {column_ast, index} ->
-      try do
-        Annotations.parse(column_ast)
-      rescue
-        e in Deft.Error.Exception ->
-          # Re-raise with additional context about which variant/column failed.
-          original_error = e.error
-
-          enhanced_error = %{
-            original_error
-            | notes:
-                original_error.notes ++
-                  [
-                    "In variant `#{variant_name}` of ADT `#{format_adt_name(adt_name)}`",
-                    "Column #{index} has invalid type annotation"
-                  ]
-          }
-
-          reraise %{e | error: enhanced_error}, __STACKTRACE__
-      end
-    end)
+  defp parse_adt_columns(columns, _variant_name, _adt_name) do
+    Enum.map(columns, &Annotations.parse/1)
   end
 
   defp format_adt_name(%AST.Local{name: name}), do: name

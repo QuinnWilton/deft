@@ -22,7 +22,7 @@ defmodule Deft.PatternMatching do
   @doc """
   Handles pattern matching against a type, returning erased pattern, type, and bindings.
 
-  Raises `Deft.Error.Exception` if the pattern cannot match the given type.
+  Raises `CompileError` if the pattern cannot match the given type.
 
   ## Options
 

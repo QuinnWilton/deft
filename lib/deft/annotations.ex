@@ -56,7 +56,7 @@ defmodule Deft.Annotations do
   @doc """
   Parses an Elixir AST type annotation into a Deft type.
 
-  Raises `Deft.Error.Exception` if the annotation is malformed or unrecognized.
+  Raises `CompileError` if the annotation is malformed or unrecognized.
   """
   @spec parse(term()) :: Type.t()
   def parse({:boolean, _, _}) do
