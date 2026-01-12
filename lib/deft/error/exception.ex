@@ -21,6 +21,6 @@ defmodule Deft.Error.Exception do
 
   @impl true
   def message(%__MODULE__{error: error}) do
-    Deft.Error.Formatter.format(error, colors: false)
+    Deft.Error.Formatter.format(error, colors: true)
   end
 end
