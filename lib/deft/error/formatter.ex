@@ -71,16 +71,35 @@ defmodule Deft.Error.Formatter do
     source_lines = Keyword.get(opts, :source_lines)
     context_lines = Keyword.get(opts, :context_lines, 2)
 
+    # Calculate line number width for consistent padding across all sections
+    line_num_width = calculate_line_num_width(error, source_lines, context_lines)
+
     [
       format_header(error, use_colors),
-      format_location(error, use_colors),
-      format_source_context(error, source_lines, context_lines, use_colors),
-      format_notes(error, use_colors),
-      format_suggestions(error, use_colors)
+      format_location(error, line_num_width, use_colors),
+      format_source_context(error, source_lines, context_lines, line_num_width, use_colors),
+      format_notes(error, line_num_width, use_colors),
+      format_suggestions(error, line_num_width, use_colors)
     ]
     |> Enum.reject(&is_nil/1)
     |> Enum.join("\n")
   end
+
+  # Calculate the width needed for line numbers based on the error's context
+  defp calculate_line_num_width(%Error{location: nil, spans: []}, _source_lines, _context_lines), do: 1
+
+  defp calculate_line_num_width(%Error{spans: spans}, _source_lines, context_lines) when spans != [] do
+    span_lines = Enum.map(spans, fn %{location: {_, line, _}} -> line end)
+    max_line = Enum.max(span_lines) + context_lines
+    String.length(Integer.to_string(max_line))
+  end
+
+  defp calculate_line_num_width(%Error{location: {_, line, _}}, _source_lines, context_lines) do
+    max_line = line + context_lines
+    String.length(Integer.to_string(max_line))
+  end
+
+  defp calculate_line_num_width(_error, _source_lines, _context_lines), do: 1
 
   @doc """
   Formats multiple errors for display.
@@ -131,15 +150,17 @@ defmodule Deft.Error.Formatter do
   # Location Formatting
   # ============================================================================
 
-  defp format_location(%Error{location: nil}, _use_colors), do: nil
+  defp format_location(%Error{location: nil}, _line_num_width, _use_colors), do: nil
 
-  defp format_location(%Error{location: {file, line, column}}, use_colors) do
+  defp format_location(%Error{location: {file, line, column}}, line_num_width, use_colors) do
     location_str = format_location_string(file, line, column)
+    # Padding: line_num_width spaces + 1 space for the separator
+    padding = String.duplicate(" ", line_num_width)
 
     if use_colors do
-      "   #{@colors.dim}#{@box.top_left}#{@box.horizontal}[#{@colors.reset}#{location_str}#{@colors.dim}]#{@colors.reset}"
+      "#{padding} #{@colors.dim}#{@box.top_left}#{@box.horizontal}[#{@colors.reset}#{location_str}#{@colors.dim}]#{@colors.reset}"
     else
-      "   #{@box.top_left}#{@box.horizontal}[#{location_str}]"
+      "#{padding} #{@box.top_left}#{@box.horizontal}[#{location_str}]"
     end
   end
 
@@ -152,35 +173,36 @@ defmodule Deft.Error.Formatter do
   # Source Context Formatting
   # ============================================================================
 
-  defp format_source_context(%Error{location: nil, spans: []}, _source_lines, _context_lines, _use_colors),
+  defp format_source_context(%Error{location: nil, spans: []}, _source_lines, _context_lines, _line_num_width, _use_colors),
     do: nil
 
   # Multi-span display for errors with labeled spans
-  defp format_source_context(%Error{spans: spans} = error, source_lines, context_lines, use_colors)
+  defp format_source_context(%Error{spans: spans} = error, source_lines, context_lines, line_num_width, use_colors)
        when spans != [] do
-    format_multi_span_context(spans, source_lines, context_lines, error, use_colors)
+    format_multi_span_context(spans, source_lines, context_lines, line_num_width, error, use_colors)
   end
 
   defp format_source_context(
          %Error{location: {_file, line, column} = location, expression: expr} = error,
          source_lines,
          context_lines,
+         line_num_width,
          use_colors
        ) do
     # Try to get source line from provided source_lines or read from file.
     source_line = get_source_line_from_location(source_lines, location)
 
     if source_line do
-      format_source_with_pointer(line, column, source_line, location, context_lines, error, use_colors)
+      format_source_with_pointer(line, column, source_line, location, context_lines, line_num_width, error, use_colors)
     else
-      format_expression_context(expr, error, use_colors)
+      format_expression_context(expr, line_num_width, error, use_colors)
     end
   end
 
-  defp format_source_context(_error, _source_lines, _context_lines, _use_colors), do: nil
+  defp format_source_context(_error, _source_lines, _context_lines, _line_num_width, _use_colors), do: nil
 
   # Format multiple labeled spans in miette style
-  defp format_multi_span_context(spans, source_lines, context_lines, error, use_colors) do
+  defp format_multi_span_context(spans, source_lines, context_lines, line_num_width, error, use_colors) do
     # Sort spans by line number
     sorted_spans =
       spans
@@ -195,7 +217,6 @@ defmodule Deft.Error.Formatter do
       min_line = max(1, Enum.min(span_lines) - context_lines)
       max_line = Enum.max(span_lines) + context_lines
 
-      line_num_width = String.length(Integer.to_string(max_line))
       padding = String.duplicate(" ", line_num_width)
 
       # Build a map of span lines to their span info
@@ -240,9 +261,9 @@ defmodule Deft.Error.Formatter do
 
         closing =
           if use_colors do
-            "   #{@colors.dim}#{@box.bottom_left}#{@box.horizontal}#{@colors.reset}"
+            "#{padding} #{@colors.dim}#{@box.bottom_left}#{@box.horizontal}#{@colors.reset}"
           else
-            "   #{@box.bottom_left}#{@box.horizontal}"
+            "#{padding} #{@box.bottom_left}#{@box.horizontal}"
           end
 
         ([separator] ++ formatted_lines ++ [separator, closing])
@@ -408,11 +429,10 @@ defmodule Deft.Error.Formatter do
     min(max(width, 1), 50)
   end
 
-  defp format_source_with_pointer(line, column, source_line, location, context_lines, error, use_colors) do
+  defp format_source_with_pointer(line, column, source_line, location, context_lines, line_num_width, error, use_colors) do
     # Get surrounding lines for context
     min_line = max(1, line - context_lines)
     max_line = line + context_lines
-    line_num_width = String.length(Integer.to_string(max_line))
     padding = String.duplicate(" ", line_num_width)
 
     # Format the separator line
@@ -447,9 +467,9 @@ defmodule Deft.Error.Formatter do
 
     closing =
       if use_colors do
-        "   #{@colors.dim}#{@box.bottom_left}#{@box.horizontal}#{@colors.reset}"
+        "#{padding} #{@colors.dim}#{@box.bottom_left}#{@box.horizontal}#{@colors.reset}"
       else
-        "   #{@box.bottom_left}#{@box.horizontal}"
+        "#{padding} #{@box.bottom_left}#{@box.horizontal}"
       end
 
     if Enum.empty?(formatted_lines) do
@@ -527,9 +547,9 @@ defmodule Deft.Error.Formatter do
     [source, underline_line, label_line]
   end
 
-  defp format_expression_context(nil, _error, _use_colors), do: nil
+  defp format_expression_context(nil, _line_num_width, _error, _use_colors), do: nil
 
-  defp format_expression_context(expr, _error, use_colors) do
+  defp format_expression_context(expr, line_num_width, _error, use_colors) do
     # Convert Deft AST structs to raw Elixir AST first
     raw_ast = to_raw_ast(expr)
 
@@ -550,10 +570,12 @@ defmodule Deft.Error.Formatter do
         expr_str
       end
 
+    padding = String.duplicate(" ", line_num_width)
+
     if use_colors do
-      "     #{@colors.dim}#{@box.vertical}#{@colors.reset}\n     #{@colors.dim}#{@box.vertical}#{@colors.reset} in: #{expr_str}\n     #{@colors.dim}#{@box.vertical}#{@colors.reset}"
+      "#{padding} #{@colors.dim}#{@box.vertical}#{@colors.reset}\n#{padding} #{@colors.dim}#{@box.vertical}#{@colors.reset} in: #{expr_str}\n#{padding} #{@colors.dim}#{@box.vertical}#{@colors.reset}"
     else
-      "     #{@box.vertical}\n     #{@box.vertical} in: #{expr_str}\n     #{@box.vertical}"
+      "#{padding} #{@box.vertical}\n#{padding} #{@box.vertical} in: #{expr_str}\n#{padding} #{@box.vertical}"
     end
   end
 
@@ -610,39 +632,43 @@ defmodule Deft.Error.Formatter do
   # Notes and Suggestions Formatting
   # ============================================================================
 
-  defp format_notes(%Error{notes: []}, _use_colors), do: nil
+  defp format_notes(%Error{notes: []}, _line_num_width, _use_colors), do: nil
 
-  defp format_notes(%Error{notes: notes}, use_colors) do
+  defp format_notes(%Error{notes: notes}, line_num_width, use_colors) do
     notes
-    |> Enum.map(fn note -> format_note(note, use_colors) end)
+    |> Enum.map(fn note -> format_note(note, line_num_width, use_colors) end)
     |> Enum.join("\n")
   end
 
-  defp format_note(note, use_colors) do
+  defp format_note(note, line_num_width, use_colors) do
     formatted_note = bold_backtick_content(note, use_colors)
+    # Padding: line_num_width + 3 spaces (to align with content after "│ ")
+    padding = String.duplicate(" ", line_num_width + 3)
 
     if use_colors do
-      "      #{@colors.note}note#{@colors.reset}: #{formatted_note}"
+      "#{padding}#{@colors.note}note#{@colors.reset}: #{formatted_note}"
     else
-      "      note: #{formatted_note}"
+      "#{padding}note: #{formatted_note}"
     end
   end
 
-  defp format_suggestions(%Error{suggestions: []}, _use_colors), do: nil
+  defp format_suggestions(%Error{suggestions: []}, _line_num_width, _use_colors), do: nil
 
-  defp format_suggestions(%Error{suggestions: suggestions}, use_colors) do
+  defp format_suggestions(%Error{suggestions: suggestions}, line_num_width, use_colors) do
     suggestions
-    |> Enum.map(fn suggestion -> format_suggestion(suggestion, use_colors) end)
+    |> Enum.map(fn suggestion -> format_suggestion(suggestion, line_num_width, use_colors) end)
     |> Enum.join("\n")
   end
 
-  defp format_suggestion(suggestion, use_colors) do
+  defp format_suggestion(suggestion, line_num_width, use_colors) do
     formatted_suggestion = bold_backtick_content(suggestion, use_colors)
+    # Padding: line_num_width + 3 spaces (to align with content after "│ ")
+    padding = String.duplicate(" ", line_num_width + 3)
 
     if use_colors do
-      "      #{@colors.help}help#{@colors.reset}: #{formatted_suggestion}"
+      "#{padding}#{@colors.help}help#{@colors.reset}: #{formatted_suggestion}"
     else
-      "      help: #{formatted_suggestion}"
+      "#{padding}help: #{formatted_suggestion}"
     end
   end
 
