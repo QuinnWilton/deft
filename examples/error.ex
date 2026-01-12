@@ -22,13 +22,13 @@ case error_type do
       """
       use Deft
 
-      deft compute() :: integer do
+      deft compute(x :: integer) :: integer do
         # Declared to return integer, but returns a float
-        1.5
+        x + 1.5
       end
 
       deft main() :: atom do
-        IO.puts(compute())
+        IO.puts(compute(42))
       end
     end
 

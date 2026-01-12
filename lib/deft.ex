@@ -312,7 +312,7 @@ defmodule Deft do
 
     # Type-check all function bodies and generate function definitions
     function_defs =
-      Enum.map(definitions, fn {name, arity, params, param_types, return_type, body, caller_escaped, _meta, return_type_loc} ->
+      Enum.map(definitions, fn {name, arity, params, param_types, return_type, body, caller_escaped, fn_meta, return_type_loc} ->
         caller = Code.eval_quoted(caller_escaped) |> elem(0)
 
         # Resolve alias types in parameter types and return type
@@ -368,7 +368,7 @@ defmodule Deft do
                     _ -> nil
                   end
 
-                body_location = extract_final_expr_location(caller.file, body)
+                body_location = extract_final_expr_location(caller.file, body, fn_meta)
 
                 error =
                   Deft.Error.return_type_mismatch(
@@ -663,14 +663,18 @@ defmodule Deft do
 
   # Extracts the location of the final expression in a body AST.
   # Works for both single expressions and blocks.
-  defp extract_final_expr_location(file, {:__block__, _, exprs}) when is_list(exprs) do
+  # Returns nil for literals without metadata (like `1.5` or `:foo`)
+  # since we cannot reliably determine their source location.
+  defp extract_final_expr_location(file, {:__block__, _, exprs}, _fn_meta) when is_list(exprs) do
     case List.last(exprs) do
       nil -> nil
       final -> extract_expr_location(file, final)
     end
   end
 
-  defp extract_final_expr_location(file, expr), do: extract_expr_location(file, expr)
+  defp extract_final_expr_location(file, expr, _fn_meta) do
+    extract_expr_location(file, expr)
+  end
 
   # Extract location from any expression with metadata.
   # For compound expressions, find the leftmost position.
