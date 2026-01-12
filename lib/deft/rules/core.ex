@@ -87,11 +87,15 @@ defmodule Deft.Rules.Core do
             {acc_exprs, nil, new_bindings, acc_ctx}
 
           _ ->
-            {:ok, erased, expr_type, bindings, acc_ctx} =
-              TypeChecker.check_in_context(expr, acc_bindings, acc_ctx)
+            case TypeChecker.check_in_context(expr, acc_bindings, acc_ctx) do
+              {:ok, erased, expr_type, bindings, acc_ctx} ->
+                new_bindings = acc_bindings ++ bindings
+                {acc_exprs ++ [erased], expr_type, new_bindings, acc_ctx}
 
-            new_bindings = acc_bindings ++ bindings
-            {acc_exprs ++ [erased], expr_type, new_bindings, acc_ctx}
+              {:error, %Deft.Error{} = error} ->
+                # Re-raise the error with full context.
+                Deft.Error.raise!(error)
+            end
         end
       end)
 
