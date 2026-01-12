@@ -788,7 +788,18 @@ defmodule Deft.Rules.DSL.Helpers do
   """
   def check_all!(exprs, expected_types, bindings, ctx) do
     if length(exprs) != length(expected_types) do
-      raise "check_all!: mismatched lengths - #{length(exprs)} exprs vs #{length(expected_types)} types"
+      error =
+        Error.type_mismatch(
+          expected: "#{length(expected_types)} arguments",
+          actual: "#{length(exprs)} arguments",
+          notes: [
+            "Function expects #{length(expected_types)} argument(s)",
+            "Got #{length(exprs)} argument(s)"
+          ],
+          suggestions: ["Check the number of arguments passed to this function"]
+        )
+
+      Error.raise!(error)
     end
 
     {erased_list, bindings_list} =
