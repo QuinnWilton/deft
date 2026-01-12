@@ -222,4 +222,179 @@ defmodule DeftTest do
       assert Type.well_formed?(intersection)
     end
   end
+
+  # ============================================================================
+  # Program Metamorphic Properties
+  # ============================================================================
+  #
+  # These tests verify that semantics-preserving program transformations
+  # also preserve the inferred type. Each test generates a well-typed
+  # expression, applies a transformation, and checks that the type is unchanged.
+
+  alias Deft.AST
+
+  # Transformation: e → (x = e; x)
+  defp bind_and_return(expr, type) do
+    x = AST.Local.new(:__meta_x__, __MODULE__, [])
+    typed_x = AST.Local.new(:__meta_x__, __MODULE__, __deft_type__: type)
+    match = AST.Match.new(x, expr)
+    AST.Block.new([match, typed_x])
+  end
+
+  # Transformation: e → (_ = nil; e)
+  defp prepend_dead_code(expr) do
+    discard =
+      AST.Match.new(
+        AST.Local.new(:_, nil, []),
+        AST.Literal.new(nil)
+      )
+
+    AST.Block.new([discard, expr])
+  end
+
+  # Transformation: e → (nil; e)
+  defp prepend_nil(expr) do
+    AST.Block.new([AST.Literal.new(nil), expr])
+  end
+
+  # Transformation: e → case e do x -> x end
+  defp case_identity(expr, type) do
+    x = AST.Local.new(:__meta_x__, __MODULE__, [])
+    typed_x = AST.Local.new(:__meta_x__, __MODULE__, __deft_type__: type)
+    branch = AST.CaseBranch.new(x, typed_x)
+    AST.Case.new(expr, [branch])
+  end
+
+  # Transformation: e → if true do e else e end
+  defp if_identical_branches(expr) do
+    AST.If.new(AST.Literal.new(true), expr, expr)
+  end
+
+  # Transformation: e → (fn () -> e end).()
+  defp thunk_and_force(expr) do
+    thunk = AST.Fn.new(expr, [])
+    AST.FnApplication.new(thunk, [])
+  end
+
+  # Transformation: e → (fn x :: T -> x end).(e)
+  defp apply_identity(expr, type) do
+    x = AST.Local.new(:__meta_x__, __MODULE__, [])
+    typed_x = AST.Local.new(:__meta_x__, __MODULE__, __deft_type__: type)
+    identity = AST.Fn.new(typed_x, [AST.Annotation.new(x, type)])
+    AST.FnApplication.new(identity, [expr])
+  end
+
+  # Helper to assert type equivalence (mutual subtyping)
+  defp assert_type_equivalent(type_a, type_b, message) do
+    assert Subtyping.subtype_of?(type_a, type_b),
+           "#{message}: #{inspect(type_a)} not <: #{inspect(type_b)}"
+
+    assert Subtyping.subtype_of?(type_b, type_a),
+           "#{message}: #{inspect(type_b)} not <: #{inspect(type_a)}"
+  end
+
+  property "binding and returning preserves type (e → x = e; x)" do
+    env = __ENV__
+
+    check all({expr, _} <- Generators.Code.expression(), max_shrinking_steps: 0) do
+      ctx = Context.new(env)
+
+      {:ok, _, original_type, _, _} = TypeChecker.check(expr, ctx)
+
+      transformed = bind_and_return(expr, original_type)
+      {:ok, _, transformed_type, _, _} = TypeChecker.check(transformed, ctx)
+
+      assert_type_equivalent(original_type, transformed_type, "bind_and_return")
+    end
+  end
+
+  property "dead code does not affect type (e → _ = nil; e)" do
+    env = __ENV__
+
+    check all({expr, _} <- Generators.Code.expression(), max_shrinking_steps: 0) do
+      ctx = Context.new(env)
+
+      {:ok, _, original_type, _, _} = TypeChecker.check(expr, ctx)
+
+      transformed = prepend_dead_code(expr)
+      {:ok, _, transformed_type, _, _} = TypeChecker.check(transformed, ctx)
+
+      assert_type_equivalent(original_type, transformed_type, "prepend_dead_code")
+    end
+  end
+
+  property "sequencing with nil preserves type (e → nil; e)" do
+    env = __ENV__
+
+    check all({expr, _} <- Generators.Code.expression(), max_shrinking_steps: 0) do
+      ctx = Context.new(env)
+
+      {:ok, _, original_type, _, _} = TypeChecker.check(expr, ctx)
+
+      transformed = prepend_nil(expr)
+      {:ok, _, transformed_type, _, _} = TypeChecker.check(transformed, ctx)
+
+      assert_type_equivalent(original_type, transformed_type, "prepend_nil")
+    end
+  end
+
+  property "case with catch-all identity preserves type (e → case e do x -> x end)" do
+    env = __ENV__
+
+    check all({expr, _} <- Generators.Code.expression(), max_shrinking_steps: 0) do
+      ctx = Context.new(env)
+
+      {:ok, _, original_type, _, _} = TypeChecker.check(expr, ctx)
+
+      transformed = case_identity(expr, original_type)
+      {:ok, _, transformed_type, _, _} = TypeChecker.check(transformed, ctx)
+
+      assert_type_equivalent(original_type, transformed_type, "case_identity")
+    end
+  end
+
+  property "if with identical branches preserves type (e → if true do e else e end)" do
+    env = __ENV__
+
+    check all({expr, _} <- Generators.Code.expression(), max_shrinking_steps: 0) do
+      ctx = Context.new(env)
+
+      {:ok, _, original_type, _, _} = TypeChecker.check(expr, ctx)
+
+      transformed = if_identical_branches(expr)
+      {:ok, _, transformed_type, _, _} = TypeChecker.check(transformed, ctx)
+
+      assert_type_equivalent(original_type, transformed_type, "if_identical_branches")
+    end
+  end
+
+  property "thunk and force preserves type (e → (fn -> e end).())" do
+    env = __ENV__
+
+    check all({expr, _} <- Generators.Code.expression(), max_shrinking_steps: 0) do
+      ctx = Context.new(env)
+
+      {:ok, _, original_type, _, _} = TypeChecker.check(expr, ctx)
+
+      transformed = thunk_and_force(expr)
+      {:ok, _, transformed_type, _, _} = TypeChecker.check(transformed, ctx)
+
+      assert_type_equivalent(original_type, transformed_type, "thunk_and_force")
+    end
+  end
+
+  property "identity function application preserves type (e → (fn x :: T -> x end).(e))" do
+    env = __ENV__
+
+    check all({expr, _} <- Generators.Code.expression(), max_shrinking_steps: 0) do
+      ctx = Context.new(env)
+
+      {:ok, _, original_type, _, _} = TypeChecker.check(expr, ctx)
+
+      transformed = apply_identity(expr, original_type)
+      {:ok, _, transformed_type, _, _} = TypeChecker.check(transformed, ctx)
+
+      assert_type_equivalent(original_type, transformed_type, "apply_identity")
+    end
+  end
 end

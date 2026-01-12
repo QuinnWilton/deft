@@ -60,21 +60,37 @@ defmodule Deft.Type.Intersection do
     b_group = type_group(b)
 
     cond do
-      # Same group can have overlap (e.g., different tuples might be compatible)
+      # Functions with different arities are disjoint
+      a_group == :function and b_group == :function ->
+        length(a.inputs) != length(b.inputs)
+
+      # Tuples with different arities are disjoint
+      a_group == :tuple and b_group == :tuple ->
+        tuple_arity(a) != tuple_arity(b)
+
+      # Same group can have overlap (e.g., lists with compatible element types)
       a_group == b_group -> false
+
       # Integer and Float are disjoint (no value is both)
       {a_group, b_group} in [{:integer, :float}, {:float, :integer}] -> true
+
       # Integer/Float are subtypes of Number, so not disjoint from it
       a_group in [:integer, :float] and b_group == :number -> false
       b_group in [:integer, :float] and a_group == :number -> false
+
       # Top is compatible with everything
       a_group == :top or b_group == :top -> false
+
       # Bottom is disjoint from everything except itself
       a_group == :bottom or b_group == :bottom -> a_group != b_group
+
       # Different groups are disjoint
       true -> true
     end
   end
+
+  defp tuple_arity(%Deft.Type.FixedTuple{elements: elements}), do: length(elements)
+  defp tuple_arity(%Deft.Type.Tuple{}), do: :any
 
   # Classify types into groups for disjointness checking.
   defp type_group(%Deft.Type.Integer{}), do: :integer
