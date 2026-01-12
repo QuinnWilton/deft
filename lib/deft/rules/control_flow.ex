@@ -163,11 +163,7 @@ defmodule Deft.Rules.ControlFlow do
 
   def exhaustive_check!(subject_type, pattern_types, nil) do
     unless Enum.any?(pattern_types, &Subtyping.subtype_of?(&1, subject_type)) do
-      Error.raise!(
-        Error.inexhaustive_patterns(
-          missing: subject_type
-        )
-      )
+      Error.raise!(Error.inexhaustive_patterns(missing: subject_type))
     end
   end
 

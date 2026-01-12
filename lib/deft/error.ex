@@ -137,7 +137,8 @@ defmodule Deft.Error do
 
     %__MODULE__{
       code: :type_mismatch,
-      message: "Type mismatch: expected `#{format_type(expected)}`, found `#{format_type(actual)}`",
+      message:
+        "Type mismatch: expected `#{format_type(expected)}`, found `#{format_type(actual)}`",
       expected: expected,
       actual: actual,
       location: Keyword.get(opts, :location),
@@ -359,14 +360,18 @@ defmodule Deft.Error do
 
     %__MODULE__{
       code: :unreachable_branch,
-      message: "Pattern `#{format_type(pattern_type)}` can never match subject of type `#{format_type(subject_type)}`",
+      message:
+        "Pattern `#{format_type(pattern_type)}` can never match subject of type `#{format_type(subject_type)}`",
       # Don't set expected/actual so the pointer line doesn't show "expected X, found Y"
       expected: nil,
       actual: nil,
       expression: Keyword.get(opts, :expression),
       location: Keyword.get(opts, :location),
       spans: Keyword.get(opts, :spans, []),
-      suggestions: ["Remove this unreachable branch", "Change the pattern to match `#{format_type(subject_type)}`"],
+      suggestions: [
+        "Remove this unreachable branch",
+        "Change the pattern to match `#{format_type(subject_type)}`"
+      ],
       notes: [
         "The case subject has type `#{format_type(subject_type)}`",
         "But this pattern only matches `#{format_type(pattern_type)}`"

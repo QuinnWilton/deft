@@ -111,7 +111,8 @@ defmodule Deft.Error.FormatterTest do
         )
 
       # With context_lines: 2, should show lines 1-5 (2 before line 3, 2 after)
-      formatted = Formatter.format(error, colors: false, source_lines: source_lines, context_lines: 2)
+      formatted =
+        Formatter.format(error, colors: false, source_lines: source_lines, context_lines: 2)
 
       # Should contain the surrounding context lines
       assert formatted =~ "defmodule Foo do"
@@ -139,7 +140,8 @@ defmodule Deft.Error.FormatterTest do
           ]
         )
 
-      formatted = Formatter.format(error, colors: false, source_lines: source_lines, context_lines: 0)
+      formatted =
+        Formatter.format(error, colors: false, source_lines: source_lines, context_lines: 0)
 
       # Should contain only line 3
       assert formatted =~ "line 3"

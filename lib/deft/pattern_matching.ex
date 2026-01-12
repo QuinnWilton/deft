@@ -220,9 +220,10 @@ defmodule Deft.PatternMatching do
   defp do_handle_pattern(%AST.List{} = list, %Type.FixedList{} = type, ctx) do
     elem_type = Type.FixedList.contents(type)
 
-    results = Enum.map(list.elements, fn element ->
-      do_handle_pattern(element, elem_type, ctx)
-    end)
+    results =
+      Enum.map(list.elements, fn element ->
+        do_handle_pattern(element, elem_type, ctx)
+      end)
 
     # Check if any element pattern failed.
     case Enum.find(results, &match?({:error, _}, &1)) do

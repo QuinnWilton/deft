@@ -470,10 +470,11 @@ defmodule Deft.Error.FormattedErrorsTest do
 
     test "calculates width for LocalCall AST" do
       # Create a LocalCall AST node
-      local_call = AST.LocalCall.new(:parse, [AST.Literal.new(:h, [line: 5, column: 15])], [
-        line: 5,
-        column: 9
-      ])
+      local_call =
+        AST.LocalCall.new(:parse, [AST.Literal.new(:h, line: 5, column: 15)],
+          line: 5,
+          column: 9
+        )
 
       error =
         Error.type_mismatch(

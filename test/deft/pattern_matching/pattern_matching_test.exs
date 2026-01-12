@@ -293,7 +293,11 @@ defmodule Deft.PatternMatchingTest do
 
       error =
         assert_raise CompileError, fn ->
-          PatternMatching.handle_pattern(pattern, Type.fixed_tuple([Type.integer(), Type.integer()]), ctx)
+          PatternMatching.handle_pattern(
+            pattern,
+            Type.fixed_tuple([Type.integer(), Type.integer()]),
+            ctx
+          )
         end
 
       assert error.description =~ "E0011"

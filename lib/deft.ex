@@ -313,7 +313,8 @@ defmodule Deft do
     # FIRST PASS: Update all signatures with resolved types
     # This must happen before type-checking so that function calls resolve correctly
     definitions_with_resolved_types =
-      Enum.map(definitions, fn {name, arity, params, param_types, return_type, body, caller_escaped, fn_meta, return_type_loc} ->
+      Enum.map(definitions, fn {name, arity, params, param_types, return_type, body,
+                                caller_escaped, fn_meta, return_type_loc} ->
         caller = Code.eval_quoted(caller_escaped) |> elem(0)
 
         # Resolve alias types in parameter types and return type
@@ -325,12 +326,15 @@ defmodule Deft do
         Deft.Signatures.register({caller.module, name, arity}, resolved_signature)
 
         # Return the definition with resolved types for the second pass
-        {name, arity, params, resolved_param_types, resolved_return_type, body, caller, fn_meta, return_type_loc}
+        {name, arity, params, resolved_param_types, resolved_return_type, body, caller, fn_meta,
+         return_type_loc}
       end)
 
     # SECOND PASS: Type-check all function bodies and generate function definitions
     function_defs =
-      Enum.map(definitions_with_resolved_types, fn {name, arity, params, resolved_param_types, resolved_return_type, body, caller, fn_meta, return_type_loc} ->
+      Enum.map(definitions_with_resolved_types, fn {name, arity, params, resolved_param_types,
+                                                    resolved_return_type, body, caller, fn_meta,
+                                                    return_type_loc} ->
         # Compile and type-check the body
         compiled_body = Compiler.compile(body)
 
@@ -412,7 +416,8 @@ defmodule Deft do
 
     # Store module metadata for introspection
     sigs =
-      Enum.map(definitions, fn {name, arity, _params, param_types, return_type, _body, _caller, _meta, _return_type_loc} ->
+      Enum.map(definitions, fn {name, arity, _params, param_types, return_type, _body, _caller,
+                                _meta, _return_type_loc} ->
         {name, arity, param_types, return_type}
       end)
 
@@ -475,7 +480,10 @@ defmodule Deft do
   defp parse_type_to_struct({:boolean, _, _}), do: Deft.Type.boolean()
   defp parse_type_to_struct({:atom, _, _}), do: Deft.Type.atom()
   defp parse_type_to_struct({:binary, _, _}), do: Deft.Type.binary()
-  defp parse_type_to_struct({:list, _, [elem]}), do: Deft.Type.fixed_list(parse_type_to_struct(elem))
+
+  defp parse_type_to_struct({:list, _, [elem]}),
+    do: Deft.Type.fixed_list(parse_type_to_struct(elem))
+
   defp parse_type_to_struct({:list, _, _}), do: Deft.Type.list()
   defp parse_type_to_struct({:tuple, _, _}), do: Deft.Type.tuple()
   defp parse_type_to_struct({:top, _, _}), do: Deft.Type.top()

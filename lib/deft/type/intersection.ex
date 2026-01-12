@@ -69,23 +69,31 @@ defmodule Deft.Type.Intersection do
         tuple_arity(a) != tuple_arity(b)
 
       # Same group can have overlap (e.g., lists with compatible element types)
-      a_group == b_group -> false
+      a_group == b_group ->
+        false
 
       # Integer and Float are disjoint (no value is both)
-      {a_group, b_group} in [{:integer, :float}, {:float, :integer}] -> true
+      {a_group, b_group} in [{:integer, :float}, {:float, :integer}] ->
+        true
 
       # Integer/Float are subtypes of Number, so not disjoint from it
-      a_group in [:integer, :float] and b_group == :number -> false
-      b_group in [:integer, :float] and a_group == :number -> false
+      a_group in [:integer, :float] and b_group == :number ->
+        false
+
+      b_group in [:integer, :float] and a_group == :number ->
+        false
 
       # Top is compatible with everything
-      a_group == :top or b_group == :top -> false
+      a_group == :top or b_group == :top ->
+        false
 
       # Bottom is disjoint from everything except itself
-      a_group == :bottom or b_group == :bottom -> a_group != b_group
+      a_group == :bottom or b_group == :bottom ->
+        a_group != b_group
 
       # Different groups are disjoint
-      true -> true
+      true ->
+        true
     end
   end
 

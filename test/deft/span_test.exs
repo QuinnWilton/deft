@@ -11,19 +11,19 @@ defmodule Deft.SpanTest do
     end
 
     test "extracts from raw meta keyword list" do
-      assert {"test.ex", 10, 5} = Span.extract([line: 10, column: 5, file: "test.ex"])
+      assert {"test.ex", 10, 5} = Span.extract(line: 10, column: 5, file: "test.ex")
     end
 
     test "handles missing file" do
-      assert {nil, 10, 5} = Span.extract([line: 10, column: 5])
+      assert {nil, 10, 5} = Span.extract(line: 10, column: 5)
     end
 
     test "handles missing column" do
-      assert {"test.ex", 10, nil} = Span.extract([line: 10, file: "test.ex"])
+      assert {"test.ex", 10, nil} = Span.extract(line: 10, file: "test.ex")
     end
 
     test "returns nil for missing line" do
-      assert nil == Span.extract([column: 5])
+      assert nil == Span.extract(column: 5)
     end
 
     test "returns nil for empty meta" do
@@ -38,67 +38,67 @@ defmodule Deft.SpanTest do
 
     # AST node types with meta field
     test "extracts from AST.Literal" do
-      node = AST.Literal.new(42, [line: 1, column: 1])
+      node = AST.Literal.new(42, line: 1, column: 1)
       assert {nil, 1, 1} = Span.extract(node)
     end
 
     test "extracts from AST.Local" do
-      node = AST.Local.new(:x, nil, [line: 10, column: 5, file: "test.ex"])
+      node = AST.Local.new(:x, nil, line: 10, column: 5, file: "test.ex")
       assert {"test.ex", 10, 5} = Span.extract(node)
     end
 
     test "extracts from AST.Tuple" do
-      node = AST.Tuple.new([], [line: 5, column: 3])
+      node = AST.Tuple.new([], line: 5, column: 3)
       assert {nil, 5, 3} = Span.extract(node)
     end
 
     test "extracts from AST.List" do
-      node = AST.List.new([], [line: 5, column: 3])
+      node = AST.List.new([], line: 5, column: 3)
       assert {nil, 5, 3} = Span.extract(node)
     end
 
     test "extracts from AST.Pair" do
-      node = AST.Pair.new(nil, nil, [line: 7, column: 2])
+      node = AST.Pair.new(nil, nil, line: 7, column: 2)
       assert {nil, 7, 2} = Span.extract(node)
     end
 
     test "extracts from AST.If" do
-      node = AST.If.new(nil, nil, nil, [line: 3, column: 5])
+      node = AST.If.new(nil, nil, nil, line: 3, column: 5)
       assert {nil, 3, 5} = Span.extract(node)
     end
 
     test "extracts from AST.Match" do
-      node = AST.Match.new(nil, nil, [line: 8, column: 1])
+      node = AST.Match.new(nil, nil, line: 8, column: 1)
       assert {nil, 8, 1} = Span.extract(node)
     end
 
     test "extracts from AST.Block" do
-      node = AST.Block.new([], [line: 1, column: 1])
+      node = AST.Block.new([], line: 1, column: 1)
       assert {nil, 1, 1} = Span.extract(node)
     end
 
     test "extracts from AST.LocalCall" do
-      node = AST.LocalCall.new(:foo, [], [line: 15, column: 10])
+      node = AST.LocalCall.new(:foo, [], line: 15, column: 10)
       assert {nil, 15, 10} = Span.extract(node)
     end
 
     test "extracts from AST.Case" do
-      node = AST.Case.new(nil, [], [line: 20, column: 5])
+      node = AST.Case.new(nil, [], line: 20, column: 5)
       assert {nil, 20, 5} = Span.extract(node)
     end
 
     test "extracts from AST.CaseBranch" do
-      node = AST.CaseBranch.new(nil, nil, [line: 21, column: 7])
+      node = AST.CaseBranch.new(nil, nil, line: 21, column: 7)
       assert {nil, 21, 7} = Span.extract(node)
     end
 
     test "extracts from AST.Cond" do
-      node = AST.Cond.new([], [line: 25, column: 3])
+      node = AST.Cond.new([], line: 25, column: 3)
       assert {nil, 25, 3} = Span.extract(node)
     end
 
     test "extracts from AST.CondBranch" do
-      node = AST.CondBranch.new(nil, nil, [line: 26, column: 5])
+      node = AST.CondBranch.new(nil, nil, line: 26, column: 5)
       assert {nil, 26, 5} = Span.extract(node)
     end
 
@@ -109,24 +109,24 @@ defmodule Deft.SpanTest do
 
     test "extracts from AST.Pin" do
       inner = AST.Local.new(:x, nil, [])
-      node = AST.Pin.new(inner, [line: 40, column: 2])
+      node = AST.Pin.new(inner, line: 40, column: 2)
       assert {nil, 40, 2} = Span.extract(node)
     end
 
     test "extracts from AST.Cons" do
-      node = AST.Cons.new(nil, nil, [line: 45, column: 1])
+      node = AST.Cons.new(nil, nil, line: 45, column: 1)
       assert {nil, 45, 1} = Span.extract(node)
     end
 
     test "extracts from AST.Annotation" do
-      node = AST.Annotation.new(nil, nil, [line: 50, column: 3])
+      node = AST.Annotation.new(nil, nil, line: 50, column: 3)
       assert {nil, 50, 3} = Span.extract(node)
     end
   end
 
   describe "from_meta/1" do
     test "extracts location from keyword list with all fields" do
-      assert {"test.ex", 10, 5} = Span.from_meta([line: 10, column: 5, file: "test.ex"])
+      assert {"test.ex", 10, 5} = Span.from_meta(line: 10, column: 5, file: "test.ex")
     end
 
     test "handles extra metadata fields" do
@@ -135,27 +135,27 @@ defmodule Deft.SpanTest do
     end
 
     test "returns nil when line is missing" do
-      assert nil == Span.from_meta([column: 5, file: "test.ex"])
+      assert nil == Span.from_meta(column: 5, file: "test.ex")
     end
   end
 
   describe "leftmost/2" do
     test "returns first node's location when both have locations" do
-      node1 = AST.Local.new(:x, nil, [line: 10, column: 5])
-      node2 = AST.Local.new(:y, nil, [line: 20, column: 10])
+      node1 = AST.Local.new(:x, nil, line: 10, column: 5)
+      node2 = AST.Local.new(:y, nil, line: 20, column: 10)
 
       assert {nil, 10, 5} = Span.leftmost(node1, node2)
     end
 
     test "returns second node's location when first has none" do
       node1 = AST.Local.new(:x, nil, [])
-      node2 = AST.Local.new(:y, nil, [line: 20, column: 10])
+      node2 = AST.Local.new(:y, nil, line: 20, column: 10)
 
       assert {nil, 20, 10} = Span.leftmost(node1, node2)
     end
 
     test "returns first node's location when second has none" do
-      node1 = AST.Local.new(:x, nil, [line: 10, column: 5])
+      node1 = AST.Local.new(:x, nil, line: 10, column: 5)
       node2 = AST.Local.new(:y, nil, [])
 
       assert {nil, 10, 5} = Span.leftmost(node1, node2)

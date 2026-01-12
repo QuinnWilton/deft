@@ -86,9 +86,11 @@ defmodule Deft.Error.Formatter do
   end
 
   # Calculate the width needed for line numbers based on the error's context
-  defp calculate_line_num_width(%Error{location: nil, spans: []}, _source_lines, _context_lines), do: 1
+  defp calculate_line_num_width(%Error{location: nil, spans: []}, _source_lines, _context_lines),
+    do: 1
 
-  defp calculate_line_num_width(%Error{spans: spans}, _source_lines, context_lines) when spans != [] do
+  defp calculate_line_num_width(%Error{spans: spans}, _source_lines, context_lines)
+       when spans != [] do
     span_lines = Enum.map(spans, fn %{location: {_, line, _}} -> line end)
     max_line = Enum.max(span_lines) + context_lines
     String.length(Integer.to_string(max_line))
@@ -173,13 +175,32 @@ defmodule Deft.Error.Formatter do
   # Source Context Formatting
   # ============================================================================
 
-  defp format_source_context(%Error{location: nil, spans: []}, _source_lines, _context_lines, _line_num_width, _use_colors),
-    do: nil
+  defp format_source_context(
+         %Error{location: nil, spans: []},
+         _source_lines,
+         _context_lines,
+         _line_num_width,
+         _use_colors
+       ),
+       do: nil
 
   # Multi-span display for errors with labeled spans
-  defp format_source_context(%Error{spans: spans} = error, source_lines, context_lines, line_num_width, use_colors)
+  defp format_source_context(
+         %Error{spans: spans} = error,
+         source_lines,
+         context_lines,
+         line_num_width,
+         use_colors
+       )
        when spans != [] do
-    format_multi_span_context(spans, source_lines, context_lines, line_num_width, error, use_colors)
+    format_multi_span_context(
+      spans,
+      source_lines,
+      context_lines,
+      line_num_width,
+      error,
+      use_colors
+    )
   end
 
   defp format_source_context(
@@ -193,16 +214,33 @@ defmodule Deft.Error.Formatter do
     source_line = get_source_line_from_location(source_lines, location)
 
     if source_line do
-      format_source_with_pointer(line, column, source_line, location, context_lines, line_num_width, error, use_colors)
+      format_source_with_pointer(
+        line,
+        column,
+        source_line,
+        location,
+        context_lines,
+        line_num_width,
+        error,
+        use_colors
+      )
     else
       format_expression_context(expr, line_num_width, error, use_colors)
     end
   end
 
-  defp format_source_context(_error, _source_lines, _context_lines, _line_num_width, _use_colors), do: nil
+  defp format_source_context(_error, _source_lines, _context_lines, _line_num_width, _use_colors),
+    do: nil
 
   # Format multiple labeled spans in miette style
-  defp format_multi_span_context(spans, source_lines, context_lines, line_num_width, error, use_colors) do
+  defp format_multi_span_context(
+         spans,
+         source_lines,
+         context_lines,
+         line_num_width,
+         error,
+         use_colors
+       ) do
     # Sort spans by line number
     sorted_spans =
       spans
@@ -242,7 +280,14 @@ defmodule Deft.Error.Formatter do
 
               spans_on_line ->
                 # Line with span(s) - format with pointer
-                format_spans_on_line(spans_on_line, source_line, line_num, line_num_width, error, use_colors)
+                format_spans_on_line(
+                  spans_on_line,
+                  source_line,
+                  line_num,
+                  line_num_width,
+                  error,
+                  use_colors
+                )
             end
           else
             []
@@ -306,7 +351,12 @@ defmodule Deft.Error.Formatter do
   end
 
   # Format the pointer lines for a span (returns 2 lines: underline with tee, and branching label)
-  defp format_span_pointer(%{location: {_, _, column}, label: label, type: type} = span, source_line, padding, use_colors) do
+  defp format_span_pointer(
+         %{location: {_, _, column}, label: label, type: type} = span,
+         source_line,
+         padding,
+         use_colors
+       ) do
     # For pattern spans, adjust column to point at pattern start
     col =
       if String.contains?(label, "pattern") do
@@ -346,12 +396,20 @@ defmodule Deft.Error.Formatter do
     # Line 2: branching label (label colored same as arrow)
     if use_colors do
       span_color = span_kind_color(span_kind)
-      underline_line = "#{padding} #{@colors.dim}#{@box.dot}#{@colors.reset} #{pointer_padding}#{span_color}#{underline}#{@colors.reset}"
-      label_line = "#{padding} #{@colors.dim}#{@box.dot}#{@colors.reset} #{branch_padding}#{span_color}#{@box.bottom_left}#{@box.horizontal}#{@box.horizontal} #{full_label}#{@colors.reset}"
+
+      underline_line =
+        "#{padding} #{@colors.dim}#{@box.dot}#{@colors.reset} #{pointer_padding}#{span_color}#{underline}#{@colors.reset}"
+
+      label_line =
+        "#{padding} #{@colors.dim}#{@box.dot}#{@colors.reset} #{branch_padding}#{span_color}#{@box.bottom_left}#{@box.horizontal}#{@box.horizontal} #{full_label}#{@colors.reset}"
+
       [underline_line, label_line]
     else
       underline_line = "#{padding} #{@box.dot} #{pointer_padding}#{underline}"
-      label_line = "#{padding} #{@box.dot} #{branch_padding}#{@box.bottom_left}#{@box.horizontal}#{@box.horizontal} #{full_label}"
+
+      label_line =
+        "#{padding} #{@box.dot} #{branch_padding}#{@box.bottom_left}#{@box.horizontal}#{@box.horizontal} #{full_label}"
+
       [underline_line, label_line]
     end
   end
@@ -429,7 +487,16 @@ defmodule Deft.Error.Formatter do
     min(max(width, 1), 50)
   end
 
-  defp format_source_with_pointer(line, column, source_line, location, context_lines, line_num_width, error, use_colors) do
+  defp format_source_with_pointer(
+         line,
+         column,
+         source_line,
+         location,
+         context_lines,
+         line_num_width,
+         error,
+         use_colors
+       ) do
     # Get surrounding lines for context
     min_line = max(1, line - context_lines)
     max_line = line + context_lines
@@ -455,7 +522,14 @@ defmodule Deft.Error.Formatter do
         if src_line do
           if line_num == line do
             # Main error line with pointer
-            format_main_line_with_pointer(line_num, src_line, column, line_num_width, error, use_colors)
+            format_main_line_with_pointer(
+              line_num,
+              src_line,
+              column,
+              line_num_width,
+              error,
+              use_colors
+            )
           else
             # Context line
             [format_context_line(line_num, src_line, line_num_width, use_colors)]
@@ -475,6 +549,7 @@ defmodule Deft.Error.Formatter do
     if Enum.empty?(formatted_lines) do
       # Fall back to just showing the single line we have
       line_str = String.pad_leading(Integer.to_string(line), line_num_width)
+
       source =
         if use_colors do
           "#{@colors.dim}#{line_str}#{@colors.reset} #{@colors.dim}#{@box.vertical}#{@colors.reset} #{source_line}"
@@ -494,12 +569,19 @@ defmodule Deft.Error.Formatter do
 
       {underline_line, label_line} =
         if use_colors do
-          ul = "#{padding} #{@colors.dim}#{@box.dot}#{@colors.reset} #{pointer_padding}#{error_color}#{underline}#{@colors.reset}"
-          ll = "#{padding} #{@colors.dim}#{@box.dot}#{@colors.reset} #{branch_padding}#{error_color}#{@box.bottom_left}#{@box.horizontal}#{@box.horizontal} #{message}#{@colors.reset}"
+          ul =
+            "#{padding} #{@colors.dim}#{@box.dot}#{@colors.reset} #{pointer_padding}#{error_color}#{underline}#{@colors.reset}"
+
+          ll =
+            "#{padding} #{@colors.dim}#{@box.dot}#{@colors.reset} #{branch_padding}#{error_color}#{@box.bottom_left}#{@box.horizontal}#{@box.horizontal} #{message}#{@colors.reset}"
+
           {ul, ll}
         else
           ul = "#{padding} #{@box.dot} #{pointer_padding}#{underline}"
-          ll = "#{padding} #{@box.dot} #{branch_padding}#{@box.bottom_left}#{@box.horizontal}#{@box.horizontal} #{message}"
+
+          ll =
+            "#{padding} #{@box.dot} #{branch_padding}#{@box.bottom_left}#{@box.horizontal}#{@box.horizontal} #{message}"
+
           {ul, ll}
         end
 
@@ -535,12 +617,19 @@ defmodule Deft.Error.Formatter do
     # Two annotation lines: underline with tee, then branching label (label colored same as arrow)
     {underline_line, label_line} =
       if use_colors do
-        ul = "#{padding} #{@colors.dim}#{@box.dot}#{@colors.reset} #{pointer_padding}#{error_color}#{underline}#{@colors.reset}"
-        ll = "#{padding} #{@colors.dim}#{@box.dot}#{@colors.reset} #{branch_padding}#{error_color}#{@box.bottom_left}#{@box.horizontal}#{@box.horizontal} #{message}#{@colors.reset}"
+        ul =
+          "#{padding} #{@colors.dim}#{@box.dot}#{@colors.reset} #{pointer_padding}#{error_color}#{underline}#{@colors.reset}"
+
+        ll =
+          "#{padding} #{@colors.dim}#{@box.dot}#{@colors.reset} #{branch_padding}#{error_color}#{@box.bottom_left}#{@box.horizontal}#{@box.horizontal} #{message}#{@colors.reset}"
+
         {ul, ll}
       else
         ul = "#{padding} #{@box.dot} #{pointer_padding}#{underline}"
-        ll = "#{padding} #{@box.dot} #{branch_padding}#{@box.bottom_left}#{@box.horizontal}#{@box.horizontal} #{message}"
+
+        ll =
+          "#{padding} #{@box.dot} #{branch_padding}#{@box.bottom_left}#{@box.horizontal}#{@box.horizontal} #{message}"
+
         {ul, ll}
       end
 
@@ -606,7 +695,8 @@ defmodule Deft.Error.Formatter do
   end
 
   # Fallback: use error message as the pointer label (truncated if needed)
-  defp format_pointer_message(%Error{message: message}, use_colors, span_color) when is_binary(message) do
+  defp format_pointer_message(%Error{message: message}, use_colors, span_color)
+       when is_binary(message) do
     # Use a shortened version of the message as the label
     label = shorten_message_for_label(message)
     bold_backtick_content(label, use_colors, span_color)

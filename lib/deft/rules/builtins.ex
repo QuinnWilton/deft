@@ -189,9 +189,19 @@ defmodule Deft.Rules.Builtins do
       actual = Deft.Type.fixed_tuple(arg_types)
       ctx = var!(ctx, nil)
       # Pass the original args for element-level span tracking.
-      require_subtype!(actual, expected, %AST.TypeConstructorCall{
-        name: name, args: args, type: adt_type, variant: variant, meta: meta
-      }, ctx)
+      require_subtype!(
+        actual,
+        expected,
+        %AST.TypeConstructorCall{
+          name: name,
+          args: args,
+          type: adt_type,
+          variant: variant,
+          meta: meta
+        },
+        ctx
+      )
+
       :ok
     end
 

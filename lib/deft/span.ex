@@ -6,7 +6,8 @@ defmodule Deft.Span do
   information from AST nodes and building labeled spans for error display.
   """
 
-  @type location :: {file :: String.t() | nil, line :: pos_integer(), column :: pos_integer() | nil}
+  @type location ::
+          {file :: String.t() | nil, line :: pos_integer(), column :: pos_integer() | nil}
 
   @type labeled_span :: %{
           required(:location) => location(),

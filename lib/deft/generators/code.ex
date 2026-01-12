@@ -61,11 +61,12 @@ defmodule Deft.Generators.Code do
           # must be able to match any value of the union type.
           []
 
-        primitive when is_struct(primitive, Type.Atom) or
-                         is_struct(primitive, Type.Boolean) or
-                         is_struct(primitive, Type.Integer) or
-                         is_struct(primitive, Type.Float) or
-                         is_struct(primitive, Type.Binary) ->
+        primitive
+        when is_struct(primitive, Type.Atom) or
+               is_struct(primitive, Type.Boolean) or
+               is_struct(primitive, Type.Integer) or
+               is_struct(primitive, Type.Float) or
+               is_struct(primitive, Type.Binary) ->
           [literal_pattern(primitive)]
 
         _ ->

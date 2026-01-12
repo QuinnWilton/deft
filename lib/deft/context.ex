@@ -330,5 +330,4 @@ defmodule Deft.Context do
 
     %{error | location: location, spans: spans}
   end
-
 end

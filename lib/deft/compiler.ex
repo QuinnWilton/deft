@@ -461,12 +461,14 @@ defmodule Deft.Compiler do
         {["The `alias` directive is not supported inside Deft blocks."],
          ["Move aliases outside the deft block."]}
 
-      {op, _, _} when op in [:<<>>, :"::", :".."] ->
+      {op, _, _} when op in [:<<>>, :"::", :..] ->
         {["Binary/bitstring syntax is not supported in Deft."], []}
 
       _ ->
         {["This syntax is not recognized by the Deft compiler."],
-         ["Deft supports: literals, variables, tuples, lists, case, cond, if, fn, and function calls."]}
+         [
+           "Deft supports: literals, variables, tuples, lists, case, cond, if, fn, and function calls."
+         ]}
     end
   end
 
@@ -480,12 +482,14 @@ defmodule Deft.Compiler do
         {["Struct patterns are not supported in Deft."],
          ["Define an ADT with defdata and pattern match on its variants."]}
 
-      {op, _, _} when op in [:<<>>, :"::", :".."] ->
+      {op, _, _} when op in [:<<>>, :"::", :..] ->
         {["Binary/bitstring patterns are not supported in Deft."], []}
 
       _ ->
         {["This pattern is not recognized by the Deft compiler."],
-         ["Deft supports: literals, variables, tuples, lists, cons ([h|t]), pins (^x), and ADT constructors."]}
+         [
+           "Deft supports: literals, variables, tuples, lists, cons ([h|t]), pins (^x), and ADT constructors."
+         ]}
     end
   end
 end
