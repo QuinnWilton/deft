@@ -55,15 +55,37 @@ defmodule Deft do
       # type = %Deft.Type.Integer{}
   """
   defmacro compile(do: block) do
+    source_lines = read_source_lines(__CALLER__.file)
     block = Compiler.compile(block)
-    ctx = Context.new(__CALLER__)
 
-    case Deft.TypeChecker.check(block, ctx) do
-      {:ok, erased, type, _bindings, _ctx} ->
+    ctx =
+      Context.new(__CALLER__,
+        source_lines: source_lines,
+        error_mode: :accumulate
+      )
+
+    # Initialize process dictionary for error accumulation
+    Process.put(:deft_accumulated_errors, [])
+
+    result = Deft.TypeChecker.check(block, ctx)
+    errors = Process.get(:deft_accumulated_errors, [])
+    Process.delete(:deft_accumulated_errors)
+
+    case {result, errors} do
+      {{:ok, erased, type, _bindings, _ctx}, []} ->
         {erased, Macro.escape(type)}
 
-      {:error, reason} ->
-        raise "Type checking failed: #{inspect(reason)}"
+      {_, errors} when errors != [] ->
+        formatted =
+          Deft.Error.Formatter.format_all(errors,
+            colors: true,
+            source_lines: source_lines
+          )
+
+        raise CompileError, description: formatted
+
+      {{:error, reason}, _} ->
+        raise CompileError, description: "Type checking failed: #{inspect(reason)}"
     end
   end
 
@@ -341,4 +363,14 @@ defmodule Deft do
   defp parse_type(other) do
     raise ArgumentError, "Unknown type syntax: #{Macro.to_string(other)}"
   end
+
+  # Reads source file contents for error display
+  defp read_source_lines(file) when is_binary(file) do
+    case File.read(file) do
+      {:ok, content} -> String.split(content, "\n")
+      {:error, _} -> nil
+    end
+  end
+
+  defp read_source_lines(_), do: nil
 end

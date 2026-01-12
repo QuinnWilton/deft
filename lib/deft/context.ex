@@ -295,10 +295,14 @@ defmodule Deft.Context do
   end
 
   # ============================================================================
-  # Private Helpers
+  # Helpers
   # ============================================================================
 
-  defp enrich_error(%Error{location: nil} = error, %__MODULE__{current_file: file, env: env}) do
+  @doc """
+  Enriches an error with context information like file location.
+  """
+  @spec enrich_error(Error.t(), t()) :: Error.t()
+  def enrich_error(%Error{location: nil} = error, %__MODULE__{current_file: file, env: env}) do
     location =
       if env do
         {file || env.file, env.line, nil}
@@ -309,7 +313,7 @@ defmodule Deft.Context do
     %{error | location: location}
   end
 
-  defp enrich_error(%Error{} = error, _ctx), do: error
+  def enrich_error(%Error{} = error, _ctx), do: error
 
   defp error_to_exception(%Error{} = error, _ctx) do
     Error.to_exception(error)

@@ -693,9 +693,10 @@ defmodule Deft.Rules.DSL.Helpers do
 
   # Handles error based on context's error_mode
   defp raise_or_accumulate(%Context{error_mode: :accumulate} = ctx, error) do
-    # In accumulate mode, we add the error but can't easily return the updated context
-    # from the current API, so we still need to raise but with rich error info
-    Context.add_error(ctx, error)
+    # Store errors in process dictionary since context isn't threaded back
+    enriched = Context.enrich_error(error, ctx)
+    errors = Process.get(:deft_accumulated_errors, [])
+    Process.put(:deft_accumulated_errors, errors ++ [enriched])
     {nil, Type.bottom(), []}
   end
 
