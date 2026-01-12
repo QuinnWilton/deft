@@ -582,7 +582,29 @@ defmodule Deft.Error.Formatter do
     end
   end
 
+  # Fallback: use error message as the pointer label (truncated if needed)
+  defp format_pointer_message(%Error{message: message}, use_colors) when is_binary(message) do
+    # Use a shortened version of the message as the label
+    label = shorten_message_for_label(message)
+    bold_backtick_content(label, use_colors)
+  end
+
   defp format_pointer_message(_error, _use_colors), do: ""
+
+  # Shorten an error message for use as a pointer label
+  defp shorten_message_for_label(message) do
+    # Remove common prefixes and truncate
+    message
+    |> String.replace(~r/^Call to /, "")
+    |> String.replace(~r/^Type /, "")
+    |> then(fn msg ->
+      if String.length(msg) > 50 do
+        String.slice(msg, 0, 47) <> "..."
+      else
+        msg
+      end
+    end)
+  end
 
   # ============================================================================
   # Notes and Suggestions Formatting
