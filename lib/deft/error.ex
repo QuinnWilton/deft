@@ -372,6 +372,15 @@ defmodule Deft.Error do
 
   @doc """
   Creates a subtype constraint violation error.
+
+  ## Options
+
+  - `:expected` - The expected supertype (required)
+  - `:actual` - The actual type that should be a subtype (required)
+  - `:location` - Source location
+  - `:expression` - The AST expression
+  - `:spans` - List of labeled spans for multi-span display
+  - `:suggestions` - List of suggested fixes
   """
   @spec subtype_violation(keyword()) :: t()
   def subtype_violation(opts) do
@@ -385,10 +394,11 @@ defmodule Deft.Error do
       actual: actual,
       expression: Keyword.get(opts, :expression),
       location: Keyword.get(opts, :location),
+      spans: Keyword.get(opts, :spans, []),
       suggestions: Keyword.get(opts, :suggestions, []),
       notes: [
-        "Expected subtype of: #{format_type(expected)}",
-        "Found: #{format_type(actual)}"
+        "Expected subtype of `#{format_type(expected)}`",
+        "Found `#{format_type(actual)}`"
       ]
     }
   end

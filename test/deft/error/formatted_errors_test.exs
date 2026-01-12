@@ -379,8 +379,8 @@ defmodule Deft.Error.FormattedErrorsTest do
 
       assert formatted =~ "error[E0009]"
       assert formatted =~ "Subtype constraint violated"
-      assert formatted =~ "= note: Expected subtype of: number"
-      assert formatted =~ "= note: Found: atom"
+      assert formatted =~ "= note: Expected subtype of `number`"
+      assert formatted =~ "= note: Found `atom`"
     end
 
     test "formats subtype violation with complex types" do
