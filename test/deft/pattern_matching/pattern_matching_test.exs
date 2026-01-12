@@ -59,7 +59,7 @@ defmodule Deft.PatternMatchingTest do
     test "literal pattern fails for incompatible type", %{ctx: ctx} do
       pattern = literal(42)
 
-      assert_raise Deft.Error.Exception, fn ->
+      assert_raise CompileError, fn ->
         PatternMatching.handle_pattern(pattern, Type.boolean(), ctx)
       end
     end
@@ -250,7 +250,7 @@ defmodule Deft.PatternMatchingTest do
     test "incompatible literal type raises exception", %{ctx: ctx} do
       pattern = literal(42)
 
-      assert_raise Deft.Error.Exception, fn ->
+      assert_raise CompileError, fn ->
         PatternMatching.handle_pattern(pattern, Type.boolean(), ctx)
       end
     end
@@ -259,14 +259,14 @@ defmodule Deft.PatternMatchingTest do
       pattern = literal(42)
 
       error =
-        assert_raise Deft.Error.Exception, fn ->
+        assert_raise CompileError, fn ->
           PatternMatching.handle_pattern(pattern, Type.boolean(), ctx)
         end
 
-      assert error.error.code == :unreachable_branch
+      assert error.description =~ "E0006"
       # Types are communicated via message and notes, not expected/actual fields
-      assert error.error.message =~ "boolean"
-      assert error.error.message =~ "integer"
+      assert error.description =~ "boolean"
+      assert error.description =~ "integer"
     end
   end
 
@@ -279,38 +279,38 @@ defmodule Deft.PatternMatchingTest do
       pattern = tuple([local(:a), local(:b)])
 
       error =
-        assert_raise Deft.Error.Exception, fn ->
+        assert_raise CompileError, fn ->
           PatternMatching.handle_pattern(pattern, Type.fixed_list(Type.integer()), ctx)
         end
 
-      assert error.error.code == :unsupported_pattern
-      assert Enum.any?(error.error.notes, &String.contains?(&1, "tuple pattern"))
-      assert Enum.any?(error.error.suggestions, &String.contains?(&1, "Tuple patterns can only match tuple types"))
+      assert error.description =~ "E0011"
+      assert error.description =~ "tuple pattern"
+      assert error.description =~ "Tuple patterns can only match tuple types"
     end
 
     test "list pattern against tuple type raises descriptive error", %{ctx: ctx} do
       pattern = list([local(:a), local(:b)])
 
       error =
-        assert_raise Deft.Error.Exception, fn ->
+        assert_raise CompileError, fn ->
           PatternMatching.handle_pattern(pattern, Type.fixed_tuple([Type.integer(), Type.integer()]), ctx)
         end
 
-      assert error.error.code == :unsupported_pattern
-      assert Enum.any?(error.error.notes, &String.contains?(&1, "list pattern"))
-      assert Enum.any?(error.error.suggestions, &String.contains?(&1, "List patterns can only match list types"))
+      assert error.description =~ "E0011"
+      assert error.description =~ "list pattern"
+      assert error.description =~ "List patterns can only match list types"
     end
 
     test "error message includes type description", %{ctx: ctx} do
       pattern = tuple([local(:a)])
 
       error =
-        assert_raise Deft.Error.Exception, fn ->
+        assert_raise CompileError, fn ->
           PatternMatching.handle_pattern(pattern, Type.integer(), ctx)
         end
 
-      assert error.error.code == :unsupported_pattern
-      assert Enum.any?(error.error.notes, &String.contains?(&1, "integer"))
+      assert error.description =~ "E0011"
+      assert error.description =~ "integer"
     end
   end
 end

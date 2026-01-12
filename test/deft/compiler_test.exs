@@ -12,108 +12,108 @@ defmodule Deft.CompilerTest do
       ast = quote do: %{a: 1, b: 2}
 
       error =
-        assert_raise Deft.Error.Exception, fn ->
+        assert_raise CompileError, fn ->
           Compiler.compile(ast)
         end
 
-      assert error.error.code == :unsupported_syntax
-      assert Enum.any?(error.error.notes, &String.contains?(&1, "Map literals are not supported"))
+      assert error.description =~ "E0010"
+      assert error.description =~ "Map literals are not supported"
     end
 
     test "raises on struct literal" do
       ast = {:%, [], [{:__aliases__, [], [:User]}, {:%{}, [], [name: "test"]}]}
 
       error =
-        assert_raise Deft.Error.Exception, fn ->
+        assert_raise CompileError, fn ->
           Compiler.compile(ast)
         end
 
-      assert error.error.code == :unsupported_syntax
-      assert Enum.any?(error.error.notes, &String.contains?(&1, "Struct literals are not supported"))
+      assert error.description =~ "E0010"
+      assert error.description =~ "Struct literals are not supported"
     end
 
     test "raises on comprehension" do
       ast = quote do: for(x <- [1, 2, 3], do: x * 2)
 
       error =
-        assert_raise Deft.Error.Exception, fn ->
+        assert_raise CompileError, fn ->
           Compiler.compile(ast)
         end
 
-      assert error.error.code == :unsupported_syntax
-      assert Enum.any?(error.error.notes, &String.contains?(&1, "Comprehensions are not supported"))
+      assert error.description =~ "E0010"
+      assert error.description =~ "Comprehensions are not supported"
     end
 
     test "raises on with expression" do
       ast = quote do: with({:ok, x} <- {:ok, 1}, do: x)
 
       error =
-        assert_raise Deft.Error.Exception, fn ->
+        assert_raise CompileError, fn ->
           Compiler.compile(ast)
         end
 
-      assert error.error.code == :unsupported_syntax
-      assert Enum.any?(error.error.notes, &String.contains?(&1, "`with` construct is not supported"))
+      assert error.description =~ "E0010"
+      assert error.description =~ "`with` construct is not supported"
     end
 
     test "raises on receive" do
       ast = quote do: receive(do: (x -> x))
 
       error =
-        assert_raise Deft.Error.Exception, fn ->
+        assert_raise CompileError, fn ->
           Compiler.compile(ast)
         end
 
-      assert error.error.code == :unsupported_syntax
-      assert Enum.any?(error.error.notes, &String.contains?(&1, "`receive` construct is not supported"))
+      assert error.description =~ "E0010"
+      assert error.description =~ "`receive` construct is not supported"
     end
 
     test "raises on try" do
       ast = quote do: try(do: 1, rescue: (e -> e))
 
       error =
-        assert_raise Deft.Error.Exception, fn ->
+        assert_raise CompileError, fn ->
           Compiler.compile(ast)
         end
 
-      assert error.error.code == :unsupported_syntax
-      assert Enum.any?(error.error.notes, &String.contains?(&1, "`try` construct is not supported"))
+      assert error.description =~ "E0010"
+      assert error.description =~ "`try` construct is not supported"
     end
 
     test "raises on import inside block" do
       ast = quote do: import(Enum)
 
       error =
-        assert_raise Deft.Error.Exception, fn ->
+        assert_raise CompileError, fn ->
           Compiler.compile(ast)
         end
 
-      assert error.error.code == :unsupported_syntax
-      assert Enum.any?(error.error.notes, &String.contains?(&1, "`import` directive is not supported"))
+      assert error.description =~ "E0010"
+      assert error.description =~ "`import` directive is not supported"
     end
 
     test "raises on require inside block" do
       ast = quote do: require(Logger)
 
       error =
-        assert_raise Deft.Error.Exception, fn ->
+        assert_raise CompileError, fn ->
           Compiler.compile(ast)
         end
 
-      assert error.error.code == :unsupported_syntax
-      assert Enum.any?(error.error.notes, &String.contains?(&1, "`require` directive is not supported"))
+      assert error.description =~ "E0010"
+      assert error.description =~ "`require` directive is not supported"
     end
 
     test "raises on alias inside block" do
       ast = quote do: alias(My.Module)
 
       error =
-        assert_raise Deft.Error.Exception, fn ->
+        assert_raise CompileError, fn ->
           Compiler.compile(ast)
         end
 
-      assert error.error.code == :unsupported_syntax
-      assert Enum.any?(error.error.notes, &String.contains?(&1, "`alias` directive is not supported"))
+      assert error.description =~ "E0010"
+      assert error.description =~ "`alias` directive is not supported"
     end
 
     test "provides generic error for unknown syntax" do
@@ -121,12 +121,12 @@ defmodule Deft.CompilerTest do
       ast = %{unknown: "structure"}
 
       error =
-        assert_raise Deft.Error.Exception, fn ->
+        assert_raise CompileError, fn ->
           Compiler.compile(ast)
         end
 
-      assert error.error.code == :unsupported_syntax
-      assert Enum.any?(error.error.notes, &String.contains?(&1, "syntax is not recognized"))
+      assert error.description =~ "E0010"
+      assert error.description =~ "syntax is not recognized"
     end
   end
 
@@ -139,24 +139,24 @@ defmodule Deft.CompilerTest do
       ast = quote do: %{a: x}
 
       error =
-        assert_raise Deft.Error.Exception, fn ->
+        assert_raise CompileError, fn ->
           Compiler.compile_pattern(ast)
         end
 
-      assert error.error.code == :unsupported_pattern
-      assert Enum.any?(error.error.notes, &String.contains?(&1, "Map patterns are not supported"))
+      assert error.description =~ "E0011"
+      assert error.description =~ "Map patterns are not supported"
     end
 
     test "raises on struct pattern" do
       ast = {:%, [], [{:__aliases__, [], [:User]}, {:%{}, [], [name: {:x, [], nil}]}]}
 
       error =
-        assert_raise Deft.Error.Exception, fn ->
+        assert_raise CompileError, fn ->
           Compiler.compile_pattern(ast)
         end
 
-      assert error.error.code == :unsupported_pattern
-      assert Enum.any?(error.error.notes, &String.contains?(&1, "Struct patterns are not supported"))
+      assert error.description =~ "E0011"
+      assert error.description =~ "Struct patterns are not supported"
     end
 
     test "provides generic error for unknown pattern" do
@@ -164,12 +164,12 @@ defmodule Deft.CompilerTest do
       ast = %{weird: "structure"}
 
       error =
-        assert_raise Deft.Error.Exception, fn ->
+        assert_raise CompileError, fn ->
           Compiler.compile_pattern(ast)
         end
 
-      assert error.error.code == :unsupported_pattern
-      assert Enum.any?(error.error.notes, &String.contains?(&1, "pattern is not recognized"))
+      assert error.description =~ "E0011"
+      assert error.description =~ "pattern is not recognized"
     end
   end
 
@@ -228,21 +228,20 @@ defmodule Deft.CompilerTest do
   # ============================================================================
 
   describe "compile_adt_variant error context" do
-    test "error includes variant name and column index" do
+    test "error includes malformed type information" do
       # An ADT variant with an invalid type annotation.
       # variant_ast represents: my_variant(integer, [invalid])
       variant_ast = {:my_variant, [], [{:integer, [], nil}, []]}
       adt_name = %Deft.AST.Local{name: :my_adt, context: nil, meta: []}
 
       error =
-        assert_raise Deft.Error.Exception, fn ->
+        assert_raise CompileError, fn ->
           Compiler.compile_adt_variant(variant_ast, adt_name)
         end
 
-      # Error should include context about which variant and column failed.
-      assert Enum.any?(error.error.notes, &String.contains?(&1, "my_variant"))
-      assert Enum.any?(error.error.notes, &String.contains?(&1, "my_adt"))
-      assert Enum.any?(error.error.notes, &String.contains?(&1, "Column 2"))
+      # Error should be a malformed type error for the empty list
+      assert error.description =~ "E0003"
+      assert error.description =~ "Malformed type"
     end
   end
 

@@ -191,8 +191,8 @@ defmodule Deft.Context do
   """
   @spec add_error(t(), Error.t()) :: t() | no_return()
   def add_error(%__MODULE__{error_mode: :fail_fast} = ctx, %Error{} = error) do
-    # In fail_fast mode, convert to exception and raise
-    raise error_to_exception(error, ctx)
+    # In fail_fast mode, use Error.raise! for synthetic stacktrace
+    Error.raise!(error, ctx)
   end
 
   def add_error(%__MODULE__{error_mode: :accumulate, errors: errors} = ctx, %Error{} = error) do
@@ -246,7 +246,7 @@ defmodule Deft.Context do
   def with_error_handling(%__MODULE__{error_mode: :fail_fast} = ctx, fun, _recovery) do
     case fun.() do
       {:ok, result} -> {:ok, result, ctx}
-      {:error, %Error{} = error} -> raise error_to_exception(error, ctx)
+      {:error, %Error{} = error} -> Error.raise!(error, ctx)
       {:error, reason} -> {:error, reason, ctx}
     end
   end
@@ -331,7 +331,4 @@ defmodule Deft.Context do
     %{error | location: location, spans: spans}
   end
 
-  defp error_to_exception(%Error{} = error, _ctx) do
-    Error.to_exception(error)
-  end
 end

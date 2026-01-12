@@ -195,7 +195,7 @@ defmodule Deft.ContextTest do
           actual: Type.float()
         )
 
-      assert_raise Deft.Error.Exception, fn ->
+      assert_raise CompileError, fn ->
         Context.add_error(ctx, error)
       end
     end
@@ -398,7 +398,7 @@ defmodule Deft.ContextTest do
           actual: Type.float()
         )
 
-      assert_raise Deft.Error.Exception, fn ->
+      assert_raise CompileError, fn ->
         Context.with_error_handling(ctx, fn -> {:error, error} end, nil)
       end
     end

@@ -332,11 +332,11 @@ defmodule Deft.Rules.CoreRulesTest do
       ast = cons(literal(1), literal(2))
 
       error =
-        assert_raise Deft.Error.Exception, fn ->
+        assert_raise CompileError, fn ->
           TypeChecker.check(ast, ctx)
         end
 
-      assert error.error.code == :type_mismatch
+      assert error.description =~ "E0001"
     end
   end
 end

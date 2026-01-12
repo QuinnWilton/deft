@@ -332,7 +332,7 @@ defmodule Deft.AnnotationsTest do
       # An unrecognized AST form should raise a malformed type error.
       ast = {:unknown_construct, [], [1, 2, 3]}
 
-      assert_raise Deft.Error.Exception, fn ->
+      assert_raise CompileError, fn ->
         Annotations.parse(ast)
       end
     end
@@ -341,7 +341,7 @@ defmodule Deft.AnnotationsTest do
       # Empty list [] is not a valid type annotation.
       ast = []
 
-      assert_raise Deft.Error.Exception, fn ->
+      assert_raise CompileError, fn ->
         Annotations.parse(ast)
       end
     end
@@ -350,7 +350,7 @@ defmodule Deft.AnnotationsTest do
       # A plain integer is not a valid type annotation.
       ast = 42
 
-      assert_raise Deft.Error.Exception, fn ->
+      assert_raise CompileError, fn ->
         Annotations.parse(ast)
       end
     end
@@ -359,7 +359,7 @@ defmodule Deft.AnnotationsTest do
       # [integer, float] is ambiguous - not a valid type syntax.
       ast = [{:integer, [], nil}, {:float, [], nil}]
 
-      assert_raise Deft.Error.Exception, fn ->
+      assert_raise CompileError, fn ->
         Annotations.parse(ast)
       end
     end
@@ -369,12 +369,13 @@ defmodule Deft.AnnotationsTest do
       ast = %{invalid: :type}
 
       error =
-        assert_raise Deft.Error.Exception, fn ->
+        assert_raise CompileError, fn ->
           Annotations.parse(ast)
         end
 
-      assert error.error.code == :malformed_type
-      assert error.error.expression == ast
+      # CompileError has description field with formatted error message
+      assert error.description =~ "E0003"
+      assert error.description =~ "Malformed type"
     end
   end
 end

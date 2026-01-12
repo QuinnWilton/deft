@@ -642,18 +642,54 @@ defmodule Deft.Error do
   end
 
   @doc """
-  Raises an error as an exception.
+  Raises an error as a CompileError with a synthetic stacktrace.
+
+  This provides a clean user-friendly stacktrace pointing to the error
+  location in user code, rather than showing internal Deft stacktraces.
 
   Optionally accepts a Context to enrich the error with file location.
   """
   @spec raise!(t()) :: no_return()
   def raise!(%__MODULE__{} = error) do
-    raise to_exception(error)
+    raise_with_synthetic_stacktrace(error)
   end
 
   @spec raise!(t(), Deft.Context.t()) :: no_return()
   def raise!(%__MODULE__{} = error, %Deft.Context{} = ctx) do
     enriched = Deft.Context.enrich_error(error, ctx)
-    raise to_exception(enriched)
+    raise_with_synthetic_stacktrace(enriched)
   end
+
+  # Raises a CompileError with a synthetic stacktrace pointing to user code.
+  defp raise_with_synthetic_stacktrace(%__MODULE__{} = error) do
+    # Read source lines if we have a file location
+    source_lines = read_source_lines_for_error(error)
+
+    # Format the error message
+    formatted = Deft.Error.Formatter.format(error, colors: true, source_lines: source_lines)
+    exception = %CompileError{description: formatted}
+
+    # Build a synthetic stacktrace pointing to the error location
+    stacktrace = build_synthetic_stacktrace(error)
+
+    :erlang.raise(:error, exception, stacktrace)
+  end
+
+  # Build a synthetic stacktrace from the error's location.
+  defp build_synthetic_stacktrace(%__MODULE__{location: {file, line, _col}})
+       when is_binary(file) and is_integer(line) do
+    [{:elixir_compiler, :__FILE__, 1, [file: String.to_charlist(file), line: line]}]
+  end
+
+  defp build_synthetic_stacktrace(_), do: []
+
+  # Read source lines from the error's file location.
+  defp read_source_lines_for_error(%__MODULE__{location: {file, _, _}}) when is_binary(file) do
+    case File.read(file) do
+      {:ok, content} -> String.split(content, "\n")
+      {:error, _} -> nil
+    end
+  end
+
+  defp read_source_lines_for_error(_), do: nil
 end
