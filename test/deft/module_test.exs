@@ -37,16 +37,16 @@ defmodule Deft.ModuleTest do
       assert function_exported?(UseDeftHook, :__deft__, 1)
     end
 
-    test "stores features in module attributes" do
-      defmodule UseDeftFeatures do
-        use Deft, features: [:strict_subtyping]
+    test "stores type system in module attributes" do
+      defmodule UseDeftTypeSystem do
+        use Deft, type_system: Deft.TypeSystem.Default
 
         deft dummy(x :: integer) :: integer do
           x
         end
       end
 
-      assert [:strict_subtyping] = UseDeftFeatures.__deft__(:features)
+      assert Deft.TypeSystem.Default = UseDeftTypeSystem.__deft__(:type_system)
     end
   end
 

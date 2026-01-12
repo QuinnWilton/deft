@@ -132,13 +132,14 @@ defmodule Deft do
 
   ## Options
 
-  - `:features` - List of optional type system features to enable.
-    Available features: `:strict_subtyping`, `:exhaustiveness_checking`
+  - `:type_system` - Module implementing the type system to use.
+    Defaults to `Deft.TypeSystem.Default`. Custom type systems can be
+    defined using `use Deft.TypeSystem`.
 
   ## Example
 
       defmodule MyMath do
-        use Deft, features: [:strict_subtyping]
+        use Deft
 
         @deft add(integer, integer) :: integer
         def add(a, b), do: a + b
@@ -147,9 +148,29 @@ defmodule Deft do
           x * y
         end
       end
+
+  ## Custom Type System Example
+
+      defmodule MyApp.TypeSystem do
+        use Deft.TypeSystem
+
+        include Deft.Rules.Core
+        include Deft.Rules.Functions
+        include Deft.Rules.ControlFlow
+
+        features [:exhaustiveness_checking, :strict_subtyping]
+      end
+
+      defmodule MyMath do
+        use Deft, type_system: MyApp.TypeSystem
+
+        deft add(a :: integer, b :: integer) :: integer do
+          a + b
+        end
+      end
   """
   defmacro __using__(opts) do
-    features = Keyword.get(opts, :features, [])
+    type_system = Keyword.get(opts, :type_system, Deft.TypeSystem.Default)
 
     quote do
       import Deft, only: [compile: 1, deft: 2, defdata: 1]
@@ -159,8 +180,8 @@ defmodule Deft do
       Module.register_attribute(__MODULE__, :deft_definitions, accumulate: true)
       Module.register_attribute(__MODULE__, :deft_adts, accumulate: true)
       Module.register_attribute(__MODULE__, :deft_adt_names, accumulate: true)
-      Module.register_attribute(__MODULE__, :deft_features, persist: true)
-      Module.put_attribute(__MODULE__, :deft_features, unquote(features))
+      Module.register_attribute(__MODULE__, :deft_type_system, persist: true)
+      Module.put_attribute(__MODULE__, :deft_type_system, unquote(type_system))
 
       @before_compile Deft
     end
@@ -270,7 +291,11 @@ defmodule Deft do
   defmacro __before_compile__(env) do
     definitions = Module.get_attribute(env.module, :deft_definitions) || []
     adts = Module.get_attribute(env.module, :deft_adts) || []
-    features = Module.get_attribute(env.module, :deft_features) || []
+    type_system = Module.get_attribute(env.module, :deft_type_system) || Deft.TypeSystem.Default
+
+    # Get features and registry from the type system
+    features = type_system.features()
+    registry = type_system.registry()
 
     # Process ADT definitions to create bindings
     adt_bindings = process_adts(adts)
@@ -295,7 +320,8 @@ defmodule Deft do
         ctx =
           Context.new(caller,
             source_lines: source_lines,
-            error_mode: :accumulate
+            error_mode: :accumulate,
+            features: features
           )
 
         # Add ADT bindings to context
@@ -318,8 +344,8 @@ defmodule Deft do
         # Initialize error accumulator
         Process.put(:deft_accumulated_errors, [])
 
-        # Type-check the body
-        result = Deft.TypeChecker.check(compiled_body, ctx)
+        # Type-check the body using the type system's registry
+        result = Deft.TypeChecker.check(compiled_body, ctx, registry)
         errors = Process.get(:deft_accumulated_errors, [])
         Process.delete(:deft_accumulated_errors)
 
@@ -354,7 +380,7 @@ defmodule Deft do
 
       @doc false
       def __deft__(:signatures), do: unquote(Macro.escape(sigs))
-      def __deft__(:features), do: unquote(Macro.escape(features))
+      def __deft__(:type_system), do: unquote(type_system)
       def __deft__(:adts), do: unquote(Macro.escape(adt_bindings))
     end
   end
