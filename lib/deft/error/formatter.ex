@@ -58,11 +58,12 @@ defmodule Deft.Error.Formatter do
     opts = Keyword.merge(@default_options, opts)
     use_colors = Keyword.get(opts, :colors, true) and IO.ANSI.enabled?()
     source_lines = Keyword.get(opts, :source_lines)
+    context_lines = Keyword.get(opts, :context_lines, 2)
 
     [
       format_header(error, use_colors),
       format_location(error, use_colors),
-      format_source_context(error, source_lines, use_colors),
+      format_source_context(error, source_lines, context_lines, use_colors),
       format_notes(error, use_colors),
       format_suggestions(error, use_colors)
     ]
@@ -140,34 +141,35 @@ defmodule Deft.Error.Formatter do
   # Source Context Formatting
   # ============================================================================
 
-  defp format_source_context(%Error{location: nil, spans: []}, _source_lines, _use_colors),
+  defp format_source_context(%Error{location: nil, spans: []}, _source_lines, _context_lines, _use_colors),
     do: nil
 
   # Multi-span display for errors with labeled spans
-  defp format_source_context(%Error{spans: spans} = error, source_lines, use_colors)
+  defp format_source_context(%Error{spans: spans} = error, source_lines, context_lines, use_colors)
        when spans != [] do
-    format_multi_span_context(spans, source_lines, error, use_colors)
+    format_multi_span_context(spans, source_lines, context_lines, error, use_colors)
   end
 
   defp format_source_context(
          %Error{location: {_file, line, column} = location, expression: expr} = error,
          source_lines,
+         context_lines,
          use_colors
        ) do
     # Try to get source line from provided source_lines or read from file.
     source_line = get_source_line_from_location(source_lines, location)
 
     if source_line do
-      format_source_with_pointer(line, column, source_line, error, use_colors)
+      format_source_with_pointer(line, column, source_line, location, context_lines, error, use_colors)
     else
       format_expression_context(expr, error, use_colors)
     end
   end
 
-  defp format_source_context(_error, _source_lines, _use_colors), do: nil
+  defp format_source_context(_error, _source_lines, _context_lines, _use_colors), do: nil
 
   # Format multiple labeled spans in miette style
-  defp format_multi_span_context(spans, source_lines, error, use_colors) do
+  defp format_multi_span_context(spans, source_lines, context_lines, error, use_colors) do
     # Sort spans by line number
     sorted_spans =
       spans
@@ -177,25 +179,45 @@ defmodule Deft.Error.Formatter do
     if Enum.empty?(sorted_spans) do
       nil
     else
-      # Calculate the max line number width for consistent formatting
-      max_line =
-        sorted_spans
-        |> Enum.map(fn %{location: {_, line, _}} -> line end)
-        |> Enum.max()
+      # Calculate line range including context
+      span_lines = Enum.map(sorted_spans, fn %{location: {_, line, _}} -> line end)
+      min_line = max(1, Enum.min(span_lines) - context_lines)
+      max_line = Enum.max(span_lines) + context_lines
 
       line_num_width = String.length(Integer.to_string(max_line))
       padding = String.duplicate(" ", line_num_width)
 
-      # Format each span with line numbers for gap detection
-      spans_with_lines =
+      # Build a map of span lines to their span info
+      span_map =
         sorted_spans
-        |> Enum.map(fn %{location: {_, line, _}} = span ->
-          {line, format_labeled_span(span, source_lines, line_num_width, error, use_colors)}
-        end)
-        |> Enum.reject(fn {_, block} -> is_nil(block) end)
+        |> Enum.group_by(fn %{location: {_, line, _}} -> line end)
 
-      # Join all spans with separator lines, adding elision markers for gaps
-      if Enum.empty?(spans_with_lines) do
+      # Get all source lines we need
+      first_location = List.first(sorted_spans).location
+      all_source_lines = get_all_source_lines(source_lines, first_location, min_line, max_line)
+
+      # Format each line in the range
+      formatted_lines =
+        min_line..max_line
+        |> Enum.flat_map(fn line_num ->
+          source_line = Map.get(all_source_lines, line_num)
+
+          if source_line do
+            case Map.get(span_map, line_num) do
+              nil ->
+                # Context line (no span on this line)
+                [format_context_line(line_num, source_line, line_num_width, use_colors)]
+
+              spans_on_line ->
+                # Line with span(s) - format with pointer
+                format_spans_on_line(spans_on_line, source_line, line_num, line_num_width, error, use_colors)
+            end
+          else
+            []
+          end
+        end)
+
+      if Enum.empty?(formatted_lines) do
         nil
       else
         separator =
@@ -205,107 +227,106 @@ defmodule Deft.Error.Formatter do
             "#{padding} |"
           end
 
-        elision =
-          if use_colors do
-            "#{@colors.dim}...#{@colors.reset}"
-          else
-            "..."
-          end
-
-        # Build output with elision markers between non-consecutive lines
-        {result, _} =
-          spans_with_lines
-          |> Enum.reduce({[], nil}, fn {line, block}, {acc, prev_line} ->
-            # Add separator or elision marker between spans
-            between =
-              cond do
-                # First span - just add opening separator
-                prev_line == nil -> [separator]
-                # Gap of more than 1 line - show elision
-                line > prev_line + 1 -> [elision]
-                # Consecutive lines - normal separator
-                true -> [separator]
-              end
-
-            {acc ++ between ++ List.flatten([block]), line}
-          end)
-
-        (result ++ [separator])
+        ([separator] ++ formatted_lines ++ [separator])
         |> Enum.join("\n")
       end
     end
   end
 
-  # Format a single labeled span
-  defp format_labeled_span(
-         %{location: {_file, line, column} = location, label: label, type: type} = span,
-         source_lines,
-         line_num_width,
-         _error,
-         use_colors
-       ) do
-    source_line = get_source_line_from_location(source_lines, location)
+  # Format a context line (no span, just surrounding code)
+  defp format_context_line(line_num, source_line, line_num_width, use_colors) do
+    line_str = String.pad_leading(Integer.to_string(line_num), line_num_width)
 
-    if source_line do
-      padding = String.duplicate(" ", line_num_width)
-
-      # Format the source line with line number
-      source =
-        if use_colors do
-          line_str = String.pad_leading(Integer.to_string(line), line_num_width)
-          "#{@colors.dim}#{line_str}#{@colors.reset} #{@colors.dim}|#{@colors.reset} #{source_line}"
-        else
-          line_str = String.pad_leading(Integer.to_string(line), line_num_width)
-          "#{line_str} | #{source_line}"
-        end
-
-      # For pattern spans, adjust column to point at pattern start (first non-whitespace)
-      # since literal patterns don't have precise column metadata in Elixir AST
-      col =
-        if String.contains?(label, "pattern") do
-          find_first_nonwhitespace_column(source_line)
-        else
-          column || 1
-        end
-
-      pointer_padding = String.duplicate(" ", max(0, col - 1))
-      pointer_width = estimate_span_width(source_line, col, type)
-      pointer = String.duplicate("^", pointer_width)
-
-      # Build the label with type if present (bold type when colors enabled)
-      type_str =
-        if type do
-          formatted = Error.format_type(type)
-
-          if use_colors do
-            " `#{@colors.bold}#{formatted}#{@colors.reset}`"
-          else
-            " `#{formatted}`"
-          end
-        else
-          ""
-        end
-
-      full_label = "#{label}#{type_str}"
-
-      # Use different colors for primary (error) vs secondary (context) spans
-      # Default to primary if not specified
-      span_kind = Map.get(span, :kind, :primary)
-
-      pointer_line =
-        if use_colors do
-          span_color = span_kind_color(span_kind)
-
-          "#{padding} #{@colors.dim}|#{@colors.reset} #{pointer_padding}#{span_color}#{pointer}#{@colors.reset} #{full_label}"
-        else
-          "#{padding} | #{pointer_padding}#{pointer} #{full_label}"
-        end
-
-      [source, pointer_line]
+    if use_colors do
+      "#{@colors.dim}#{line_str} |#{@colors.reset} #{source_line}"
     else
-      nil
+      "#{line_str} | #{source_line}"
     end
   end
+
+  # Format spans that appear on a single line
+  defp format_spans_on_line(spans, source_line, line_num, line_num_width, _error, use_colors) do
+    padding = String.duplicate(" ", line_num_width)
+
+    # Format the source line
+    line_str = String.pad_leading(Integer.to_string(line_num), line_num_width)
+
+    source =
+      if use_colors do
+        "#{@colors.dim}#{line_str}#{@colors.reset} #{@colors.dim}|#{@colors.reset} #{source_line}"
+      else
+        "#{line_str} | #{source_line}"
+      end
+
+    # Format pointer lines for each span
+    pointer_lines =
+      spans
+      |> Enum.map(fn span -> format_span_pointer(span, source_line, padding, use_colors) end)
+
+    [source | pointer_lines]
+  end
+
+  # Format the pointer line for a span
+  defp format_span_pointer(%{location: {_, _, column}, label: label, type: type} = span, source_line, padding, use_colors) do
+    # For pattern spans, adjust column to point at pattern start
+    col =
+      if String.contains?(label, "pattern") do
+        find_first_nonwhitespace_column(source_line)
+      else
+        column || 1
+      end
+
+    pointer_padding = String.duplicate(" ", max(0, col - 1))
+    pointer_width = estimate_span_width(source_line, col, type)
+    pointer = String.duplicate("^", pointer_width)
+
+    # Build the label with type if present
+    type_str =
+      if type do
+        formatted = Error.format_type(type)
+
+        if use_colors do
+          " `#{@colors.bold}#{formatted}#{@colors.reset}`"
+        else
+          " `#{formatted}`"
+        end
+      else
+        ""
+      end
+
+    full_label = "#{label}#{type_str}"
+    span_kind = Map.get(span, :kind, :primary)
+
+    if use_colors do
+      span_color = span_kind_color(span_kind)
+      "#{padding} #{@colors.dim}|#{@colors.reset} #{pointer_padding}#{span_color}#{pointer}#{@colors.reset} #{full_label}"
+    else
+      "#{padding} | #{pointer_padding}#{pointer} #{full_label}"
+    end
+  end
+
+  # Get all source lines in a range
+  defp get_all_source_lines(provided_lines, location, min_line, max_line) do
+    lines = get_source_lines_for_location(provided_lines, location)
+
+    if lines do
+      min_line..max_line
+      |> Enum.map(fn line_num ->
+        {line_num, Enum.at(lines, line_num - 1)}
+      end)
+      |> Enum.reject(fn {_, line} -> is_nil(line) end)
+      |> Map.new()
+    else
+      %{}
+    end
+  end
+
+  # Get source lines list for a location (from provided or file)
+  defp get_source_lines_for_location(provided_lines, {file, _, _}) when is_binary(file) do
+    provided_lines || read_source_file(file)
+  end
+
+  defp get_source_lines_for_location(provided_lines, _), do: provided_lines
 
   # Estimate the width of a span based on context.
   # For expressions, we try to highlight meaningful content.
@@ -343,8 +364,11 @@ defmodule Deft.Error.Formatter do
     min(max(width, 1), 50)
   end
 
-  defp format_source_with_pointer(line, column, source_line, error, use_colors) do
-    line_num_width = String.length(Integer.to_string(line))
+  defp format_source_with_pointer(line, column, source_line, location, context_lines, error, use_colors) do
+    # Get surrounding lines for context
+    min_line = max(1, line - context_lines)
+    max_line = line + context_lines
+    line_num_width = String.length(Integer.to_string(max_line))
     padding = String.duplicate(" ", line_num_width)
 
     # Format the separator line
@@ -355,33 +379,84 @@ defmodule Deft.Error.Formatter do
         "#{padding} |"
       end
 
-    # Format the source line with line number
+    # Get all source lines in range
+    all_source_lines = get_all_source_lines(nil, location, min_line, max_line)
+
+    # Format context and main lines
+    formatted_lines =
+      min_line..max_line
+      |> Enum.flat_map(fn line_num ->
+        src_line = Map.get(all_source_lines, line_num)
+
+        if src_line do
+          if line_num == line do
+            # Main error line with pointer
+            format_main_line_with_pointer(line_num, src_line, column, line_num_width, error, use_colors)
+          else
+            # Context line
+            [format_context_line(line_num, src_line, line_num_width, use_colors)]
+          end
+        else
+          []
+        end
+      end)
+
+    if Enum.empty?(formatted_lines) do
+      # Fall back to just showing the single line we have
+      line_str = String.pad_leading(Integer.to_string(line), line_num_width)
+      source =
+        if use_colors do
+          "#{@colors.dim}#{line_str}#{@colors.reset} #{@colors.dim}|#{@colors.reset} #{source_line}"
+        else
+          "#{line_str} | #{source_line}"
+        end
+
+      col = column || 1
+      pointer_padding = String.duplicate(" ", max(0, col - 1))
+      pointer_width = get_expression_width(error.expression) || 1
+      pointer = String.duplicate("^", pointer_width)
+
+      pointer_line =
+        if use_colors do
+          error_color = severity_color(error.severity)
+          "#{padding} #{@colors.dim}|#{@colors.reset} #{pointer_padding}#{error_color}#{pointer}#{@colors.reset} #{format_pointer_message(error, use_colors)}"
+        else
+          "#{padding} | #{pointer_padding}#{pointer} #{format_pointer_message(error, false)}"
+        end
+
+      [separator, source, pointer_line, separator]
+      |> Enum.join("\n")
+    else
+      ([separator] ++ formatted_lines ++ [separator])
+      |> Enum.join("\n")
+    end
+  end
+
+  defp format_main_line_with_pointer(line, source_line, column, line_num_width, error, use_colors) do
+    padding = String.duplicate(" ", line_num_width)
+    line_str = String.pad_leading(Integer.to_string(line), line_num_width)
+
     source =
       if use_colors do
-        "#{@colors.dim}#{line}#{@colors.reset} #{@colors.dim}|#{@colors.reset} #{source_line}"
+        "#{@colors.dim}#{line_str}#{@colors.reset} #{@colors.dim}|#{@colors.reset} #{source_line}"
       else
-        "#{line} | #{source_line}"
+        "#{line_str} | #{source_line}"
       end
 
-    # Format the pointer line
     col = column || 1
     pointer_padding = String.duplicate(" ", max(0, col - 1))
-
-    # Determine pointer width based on expression
     pointer_width = get_expression_width(error.expression) || 1
     pointer = String.duplicate("^", pointer_width)
 
     pointer_line =
       if use_colors do
         error_color = severity_color(error.severity)
-
         "#{padding} #{@colors.dim}|#{@colors.reset} #{pointer_padding}#{error_color}#{pointer}#{@colors.reset} #{format_pointer_message(error, use_colors)}"
       else
         "#{padding} | #{pointer_padding}#{pointer} #{format_pointer_message(error, false)}"
       end
 
-    [separator, source, pointer_line, separator]
-    |> Enum.join("\n")
+    [source, pointer_line]
   end
 
   defp format_expression_context(nil, _error, _use_colors), do: nil

@@ -88,6 +88,66 @@ defmodule Deft.Error.FormatterTest do
       # Should not contain ANSI codes
       refute formatted =~ "\e["
     end
+
+    test "shows surrounding context lines for multi-span errors" do
+      # Create source with multiple lines
+      source_lines = [
+        "defmodule Foo do",
+        "  def bar(x) do",
+        "    x + 1",
+        "  end",
+        "end"
+      ]
+
+      # Error with spans on different lines
+      error =
+        Error.type_mismatch(
+          expected: Type.integer(),
+          actual: Type.float(),
+          location: {"test.ex", 3, 5},
+          spans: [
+            %{location: {"test.ex", 3, 5}, label: "error here", type: nil, kind: :primary}
+          ]
+        )
+
+      # With context_lines: 2, should show lines 1-5 (2 before line 3, 2 after)
+      formatted = Formatter.format(error, colors: false, source_lines: source_lines, context_lines: 2)
+
+      # Should contain the surrounding context lines
+      assert formatted =~ "defmodule Foo do"
+      assert formatted =~ "def bar(x) do"
+      assert formatted =~ "x + 1"
+      assert formatted =~ "end"
+    end
+
+    test "context_lines: 0 shows only the span line" do
+      source_lines = [
+        "line 1",
+        "line 2",
+        "line 3",
+        "line 4",
+        "line 5"
+      ]
+
+      error =
+        Error.type_mismatch(
+          expected: Type.integer(),
+          actual: Type.float(),
+          location: {"test.ex", 3, 1},
+          spans: [
+            %{location: {"test.ex", 3, 1}, label: "error", type: nil, kind: :primary}
+          ]
+        )
+
+      formatted = Formatter.format(error, colors: false, source_lines: source_lines, context_lines: 0)
+
+      # Should contain only line 3
+      assert formatted =~ "line 3"
+      refute formatted =~ "line 1"
+      refute formatted =~ "line 2"
+      refute formatted =~ "line 4"
+      refute formatted =~ "line 5"
+    end
   end
 
   describe "format_all/2" do

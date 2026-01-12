@@ -10,6 +10,7 @@ defmodule Deft.PatternMatching do
   alias Deft.Context
   alias Deft.Error
   alias Deft.Helpers
+  alias Deft.Span
   alias Deft.Subtyping
   alias Deft.Type
 
@@ -40,21 +41,16 @@ defmodule Deft.PatternMatching do
         subject = Keyword.get(opts, :subject)
         subject_type = Keyword.get(opts, :subject_type, type)
 
-        pattern_location = extract_pattern_location(pattern) || extract_location_from_meta(branch_meta)
-        subject_location = if subject, do: Error.extract_location(subject), else: nil
+        pattern_location = Span.extract(pattern) || Span.extract(branch_meta)
+        subject_location = if subject, do: Span.extract(subject), else: nil
 
         # Build spans for multi-span display
         # Subject is context (secondary), pattern is the error (primary)
         spans =
-          [
-            if subject_location do
-              %{location: subject_location, label: "subject has type", type: subject_type, kind: :secondary}
-            end,
-            if pattern_location do
-              %{location: pattern_location, label: "pattern matches", type: pattern_type, kind: :primary}
-            end
-          ]
-          |> Enum.reject(&is_nil/1)
+          Span.filter([
+            Span.secondary(subject_location, "subject has type", subject_type),
+            Span.primary(pattern_location, "pattern matches", pattern_type)
+          ])
 
         Error.raise!(
           Error.unreachable_branch(
@@ -68,15 +64,6 @@ defmodule Deft.PatternMatching do
         )
     end
   end
-
-  defp extract_location_from_meta(meta) when is_list(meta) do
-    line = Keyword.get(meta, :line)
-    column = Keyword.get(meta, :column)
-    file = Keyword.get(meta, :file)
-    if line, do: {file, line, column}, else: nil
-  end
-
-  defp extract_location_from_meta(_), do: nil
 
   # Union types: try both branches
   defp do_handle_pattern(pattern, %Type.Union{} = type, ctx) do
@@ -333,7 +320,7 @@ defmodule Deft.PatternMatching do
     error =
       Error.unsupported_pattern(
         expression: pattern,
-        location: extract_pattern_location(pattern),
+        location: Span.extract(pattern),
         suggestions: suggestions,
         notes: notes
       )
@@ -344,16 +331,6 @@ defmodule Deft.PatternMatching do
   # ============================================================================
   # Error Helpers
   # ============================================================================
-
-  defp extract_pattern_location(%{meta: meta}) when is_list(meta) do
-    line = Keyword.get(meta, :line)
-    column = Keyword.get(meta, :column)
-    file = Keyword.get(meta, :file)
-
-    if line, do: {file, line, column}, else: nil
-  end
-
-  defp extract_pattern_location(_), do: nil
 
   defp unhandled_pattern_hints(pattern, type) do
     pattern_desc = describe_pattern(pattern)

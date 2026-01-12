@@ -34,6 +34,7 @@ defmodule Deft.Error do
       )
   """
 
+  alias Deft.Span
   alias Deft.Type
 
   @type error_code ::
@@ -541,34 +542,11 @@ defmodule Deft.Error do
   - Raw Elixir AST tuples `{name, meta, args}`
   - Deft AST structs with a `meta` field
   - Raw metadata keyword lists
+
+  This function delegates to `Deft.Span.extract/1`.
   """
   @spec extract_location(term()) :: location() | nil
-  def extract_location({_, meta, _}) when is_list(meta) do
-    extract_location_from_meta(meta)
-  end
-
-  def extract_location(%{meta: meta}) when is_list(meta) do
-    extract_location_from_meta(meta)
-  end
-
-  # Accept a raw metadata list directly.
-  def extract_location(meta) when is_list(meta) do
-    extract_location_from_meta(meta)
-  end
-
-  def extract_location(_), do: nil
-
-  defp extract_location_from_meta(meta) do
-    line = Keyword.get(meta, :line)
-    column = Keyword.get(meta, :column)
-    file = Keyword.get(meta, :file)
-
-    if line do
-      {file, line, column}
-    else
-      nil
-    end
-  end
+  defdelegate extract_location(term), to: Span, as: :extract
 
   @doc """
   Extracts location from a Macro.Env struct.

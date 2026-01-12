@@ -15,6 +15,7 @@ defmodule Deft.Rules.ControlFlow do
   alias Deft.AST.Erased
   alias Deft.Error
   alias Deft.PatternMatching
+  alias Deft.Span
   alias Deft.Subtyping
   alias Deft.Type
 
@@ -182,7 +183,7 @@ defmodule Deft.Rules.ControlFlow do
     ctx = Keyword.fetch!(opts, :ctx)
 
     # Build spans for the case expression and all branches
-    subject_location = Error.extract_location(subject)
+    subject_location = Span.extract(subject)
 
     # Create labels for each covered variant
     covered_labels =
@@ -190,25 +191,22 @@ defmodule Deft.Rules.ControlFlow do
         Error.format_type(variant)
       end)
 
+    # Build branch spans showing what each covers
+    branch_spans =
+      branches
+      |> Enum.zip(Stream.concat(covered_labels, Stream.repeatedly(fn -> nil end)))
+      |> Enum.map(fn {%AST.CaseBranch{pattern: pattern, meta: branch_meta}, covered_label} ->
+        pattern_location = Span.extract(pattern) || Span.extract(branch_meta)
+        label = if covered_label, do: "covers `#{covered_label}`", else: "branch"
+        Span.secondary(pattern_location, label, nil)
+      end)
+
     # All spans are context (secondary) since the error is about missing branches
     spans =
-      [
-        # First span: the case subject with its type
-        if subject_location do
-          %{location: subject_location, label: "subject has type", type: subject_type, kind: :secondary}
-        end
-        # Add spans for each branch showing what it covers
-        | branches
-          |> Enum.zip(Stream.concat(covered_labels, Stream.repeatedly(fn -> nil end)))
-          |> Enum.map(fn {%AST.CaseBranch{pattern: pattern, meta: branch_meta}, covered_label} ->
-            pattern_location = extract_pattern_location(pattern) || Error.extract_location(branch_meta)
-            if pattern_location do
-              label = if covered_label, do: "covers `#{covered_label}`", else: "branch"
-              %{location: pattern_location, label: label, type: nil, kind: :secondary}
-            end
-          end)
-      ]
-      |> Enum.reject(&is_nil/1)
+      Span.filter([
+        Span.secondary(subject_location, "subject has type", subject_type)
+        | branch_spans
+      ])
 
     Error.raise!(
       Error.inexhaustive_patterns(
@@ -220,15 +218,6 @@ defmodule Deft.Rules.ControlFlow do
       ctx
     )
   end
-
-  defp extract_pattern_location(%{meta: meta}) when is_list(meta) do
-    line = Keyword.get(meta, :line)
-    column = Keyword.get(meta, :column)
-    file = Keyword.get(meta, :file)
-    if line, do: {file, line, column}, else: nil
-  end
-
-  defp extract_pattern_location(_), do: nil
 
   # ============================================================================
   # Match (Assignment) Rule

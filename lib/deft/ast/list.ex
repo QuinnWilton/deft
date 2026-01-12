@@ -2,11 +2,12 @@ defmodule Deft.AST.List do
   alias Deft.AST
 
   @enforce_keys [:elements]
-  defstruct @enforce_keys
+  defstruct [:elements, meta: []]
 
-  def new(elements) do
+  def new(elements, meta \\ []) do
     %__MODULE__{
-      elements: elements
+      elements: elements,
+      meta: meta
     }
   end
 

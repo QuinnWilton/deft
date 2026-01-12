@@ -2,12 +2,13 @@ defmodule Deft.AST.Pair do
   alias Deft.AST
 
   @enforce_keys [:fst, :snd]
-  defstruct @enforce_keys
+  defstruct [:fst, :snd, meta: []]
 
-  def new(fst, snd) do
+  def new(fst, snd, meta \\ []) do
     %__MODULE__{
       fst: fst,
-      snd: snd
+      snd: snd,
+      meta: meta
     }
   end
 
