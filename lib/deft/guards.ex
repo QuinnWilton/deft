@@ -282,6 +282,19 @@ defmodule Deft.Guards do
     {[tuple, index], type, tuple_bindings ++ index_bindings}
   end
 
+  # Fallback: try to use signature registry
+  defp do_handle_guard(name, args, ctx) do
+    arity = length(args)
+
+    case lookup_signature(name, arity) do
+      {:ok, %Type.Fn{inputs: input_types, output: output_type}} ->
+        handle_with_signature(name, args, input_types, output_type, ctx)
+
+      :error ->
+        Deft.Error.raise!(Deft.Error.unsupported_call(name: name, arity: arity))
+    end
+  end
+
   # Safely extract list contents type, falling back to top for generic lists.
   defp extract_list_contents(%Type.FixedList{} = list), do: Type.FixedList.contents(list)
   defp extract_list_contents(%Type.List{}), do: Type.top()
@@ -296,19 +309,6 @@ defmodule Deft.Guards do
 
   defp extract_tuple_element_type(%Type.Tuple{}), do: Type.top()
   defp extract_tuple_element_type(_), do: Type.top()
-
-  # Fallback: try to use signature registry
-  defp do_handle_guard(name, args, ctx) do
-    arity = length(args)
-
-    case lookup_signature(name, arity) do
-      {:ok, %Type.Fn{inputs: input_types, output: output_type}} ->
-        handle_with_signature(name, args, input_types, output_type, ctx)
-
-      :error ->
-        Deft.Error.raise!(Deft.Error.unsupported_call(name: name, arity: arity))
-    end
-  end
 
   # Handle a guard using a registered signature
   defp handle_with_signature(_name, args, input_types, output_type, ctx) do
