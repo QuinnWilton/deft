@@ -313,6 +313,16 @@ defmodule Deft.Context do
     %{error | location: location}
   end
 
+  # Enrich location that has nil file but valid line/column.
+  def enrich_error(
+        %Error{location: {nil, line, column}} = error,
+        %__MODULE__{current_file: file, env: env}
+      )
+      when is_integer(line) do
+    file_path = file || (env && env.file)
+    %{error | location: {file_path, line, column}}
+  end
+
   def enrich_error(%Error{} = error, _ctx), do: error
 
   defp error_to_exception(%Error{} = error, _ctx) do

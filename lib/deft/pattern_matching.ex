@@ -36,7 +36,8 @@ defmodule Deft.PatternMatching do
             actual: pattern_type,
             location: extract_pattern_location(pattern),
             expression: pattern
-          )
+          ),
+          ctx
         )
     end
   end
@@ -290,18 +291,18 @@ defmodule Deft.PatternMatching do
   end
 
   # Catch-all for unhandled pattern/type combinations.
-  defp do_handle_pattern(pattern, type, _ctx) do
+  defp do_handle_pattern(pattern, type, ctx) do
     {notes, suggestions} = unhandled_pattern_hints(pattern, type)
 
     error =
-      Deft.Error.unsupported_pattern(
+      Error.unsupported_pattern(
         expression: pattern,
         location: extract_pattern_location(pattern),
         suggestions: suggestions,
         notes: notes
       )
 
-    Deft.Error.raise!(error)
+    Error.raise!(error, ctx)
   end
 
   # ============================================================================

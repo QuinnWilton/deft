@@ -527,6 +527,11 @@ defmodule Deft.Error do
 
   @doc """
   Extracts source location from AST metadata or expression.
+
+  Accepts:
+  - Raw Elixir AST tuples `{name, meta, args}`
+  - Deft AST structs with a `meta` field
+  - Raw metadata keyword lists
   """
   @spec extract_location(term()) :: location() | nil
   def extract_location({_, meta, _}) when is_list(meta) do
@@ -534,6 +539,11 @@ defmodule Deft.Error do
   end
 
   def extract_location(%{meta: meta}) when is_list(meta) do
+    extract_location_from_meta(meta)
+  end
+
+  # Accept a raw metadata list directly.
+  def extract_location(meta) when is_list(meta) do
     extract_location_from_meta(meta)
   end
 
@@ -646,9 +656,17 @@ defmodule Deft.Error do
 
   @doc """
   Raises an error as an exception.
+
+  Optionally accepts a Context to enrich the error with file location.
   """
   @spec raise!(t()) :: no_return()
   def raise!(%__MODULE__{} = error) do
     raise to_exception(error)
+  end
+
+  @spec raise!(t(), Deft.Context.t()) :: no_return()
+  def raise!(%__MODULE__{} = error, %Deft.Context{} = ctx) do
+    enriched = Deft.Context.enrich_error(error, ctx)
+    raise to_exception(enriched)
   end
 end

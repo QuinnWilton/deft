@@ -132,7 +132,8 @@ defmodule Deft.Guards do
           location: Error.extract_location(term_ast),
           expression: term_ast,
           notes: ["Operator `#{name}` requires a `number` operand"]
-        )
+        ),
+        ctx
       )
     end
 
@@ -152,7 +153,8 @@ defmodule Deft.Guards do
           location: Error.extract_location(fst_ast),
           expression: fst_ast,
           notes: ["Left operand of `#{name}` must be a `number`"]
-        )
+        ),
+        ctx
       )
     end
 
@@ -164,7 +166,8 @@ defmodule Deft.Guards do
           location: Error.extract_location(snd_ast),
           expression: snd_ast,
           notes: ["Right operand of `#{name}` must be a `number`"]
-        )
+        ),
+        ctx
       )
     end
 
@@ -192,7 +195,8 @@ defmodule Deft.Guards do
           location: Error.extract_location(fst_ast),
           expression: fst_ast,
           notes: ["Left operand of `#{name}` must be an `integer`"]
-        )
+        ),
+        ctx
       )
     end
 
@@ -204,7 +208,8 @@ defmodule Deft.Guards do
           location: Error.extract_location(snd_ast),
           expression: snd_ast,
           notes: ["Right operand of `#{name}` must be an `integer`"]
-        )
+        ),
+        ctx
       )
     end
 
@@ -224,7 +229,8 @@ defmodule Deft.Guards do
           location: Error.extract_location(fst_ast),
           expression: fst_ast,
           notes: ["Left operand of `/` must be a `number`"]
-        )
+        ),
+        ctx
       )
     end
 
@@ -236,7 +242,8 @@ defmodule Deft.Guards do
           location: Error.extract_location(snd_ast),
           expression: snd_ast,
           notes: ["Right operand of `/` must be a `number`"]
-        )
+        ),
+        ctx
       )
     end
 
@@ -255,7 +262,8 @@ defmodule Deft.Guards do
           location: Error.extract_location(term_ast),
           expression: term_ast,
           notes: ["`tuple_size` requires a `tuple` argument"]
-        )
+        ),
+        ctx
       )
     end
 
@@ -274,7 +282,8 @@ defmodule Deft.Guards do
           location: Error.extract_location(term_ast),
           expression: term_ast,
           notes: ["`length` requires a `list` argument"]
-        )
+        ),
+        ctx
       )
     end
 
@@ -301,7 +310,8 @@ defmodule Deft.Guards do
           location: Error.extract_location(arity_ast),
           expression: arity_ast,
           notes: ["Second argument to `is_function` must be an `integer` arity"]
-        )
+        ),
+        ctx
       )
     end
 
@@ -320,7 +330,8 @@ defmodule Deft.Guards do
           location: Error.extract_location(term_ast),
           expression: term_ast,
           notes: ["`not` requires a `boolean` argument"]
-        )
+        ),
+        ctx
       )
     end
 
@@ -339,7 +350,8 @@ defmodule Deft.Guards do
           location: Error.extract_location(term_ast),
           expression: term_ast,
           notes: ["`hd` requires a `list` argument"]
-        )
+        ),
+        ctx
       )
     end
 
@@ -361,7 +373,8 @@ defmodule Deft.Guards do
           location: Error.extract_location(term_ast),
           expression: term_ast,
           notes: ["`tl` requires a `list` argument"]
-        )
+        ),
+        ctx
       )
     end
 
@@ -381,7 +394,8 @@ defmodule Deft.Guards do
           location: Error.extract_location(tuple_ast),
           expression: tuple_ast,
           notes: ["First argument to `elem` must be a `tuple`"]
-        )
+        ),
+        ctx
       )
     end
 
@@ -393,7 +407,8 @@ defmodule Deft.Guards do
           location: Error.extract_location(index_ast),
           expression: index_ast,
           notes: ["Second argument to `elem` must be an `integer` index"]
-        )
+        ),
+        ctx
       )
     end
 
@@ -412,7 +427,7 @@ defmodule Deft.Guards do
         handle_with_signature(name, args, input_types, output_type, ctx)
 
       :error ->
-        Error.raise!(Error.unsupported_call(name: name, arity: arity))
+        Error.raise!(Error.unsupported_call(name: name, arity: arity), ctx)
     end
   end
 
@@ -448,7 +463,8 @@ defmodule Deft.Guards do
               location: Error.extract_location(arg_ast),
               expression: arg_ast,
               notes: ["Argument #{index} to `#{name}` has wrong type"]
-            )
+            ),
+            ctx
           )
         end
 

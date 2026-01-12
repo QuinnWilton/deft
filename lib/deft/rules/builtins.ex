@@ -11,6 +11,7 @@ defmodule Deft.Rules.Builtins do
 
   alias Deft.AST
   alias Deft.AST.Erased
+  alias Deft.Error
   alias Deft.Guards
   alias Deft.Signatures
   alias Deft.Subtyping
@@ -42,8 +43,14 @@ defmodule Deft.Rules.Builtins do
               {:ok, erased, actual_type, bindings, _} = TypeChecker.check(arg, ctx)
 
               unless Subtyping.subtype_of?(expected_type, actual_type) do
-                Deft.Error.raise!(
-                  Deft.Error.type_mismatch(expected: expected_type, actual: actual_type)
+                Error.raise!(
+                  Error.type_mismatch(
+                    expected: expected_type,
+                    actual: actual_type,
+                    location: Error.extract_location(arg),
+                    expression: arg
+                  ),
+                  ctx
                 )
               end
 
@@ -53,7 +60,16 @@ defmodule Deft.Rules.Builtins do
           {erased_args, output_type, bindings}
 
         true ->
-          Deft.Error.raise!(Deft.Error.unsupported_call(name: name, arity: arity))
+          location = Error.extract_location(meta)
+
+          Error.raise!(
+            Error.unsupported_call(
+              name: name,
+              arity: arity,
+              location: location
+            ),
+            ctx
+          )
       end
     end
 
@@ -82,8 +98,14 @@ defmodule Deft.Rules.Builtins do
               {:ok, erased, actual_type, bindings, _} = TypeChecker.check(arg, ctx)
 
               unless Subtyping.subtype_of?(expected_type, actual_type) do
-                Deft.Error.raise!(
-                  Deft.Error.type_mismatch(expected: expected_type, actual: actual_type)
+                Error.raise!(
+                  Error.type_mismatch(
+                    expected: expected_type,
+                    actual: actual_type,
+                    location: Error.extract_location(arg),
+                    expression: arg
+                  ),
+                  ctx
                 )
               end
 
@@ -93,7 +115,16 @@ defmodule Deft.Rules.Builtins do
           {erased_args, output_type, bindings}
 
         :error ->
-          Deft.Error.raise!(Deft.Error.unsupported_call(name: {module, function}, arity: arity))
+          location = Error.extract_location(meta)
+
+          Error.raise!(
+            Error.unsupported_call(
+              name: {module, function},
+              arity: arity,
+              location: location
+            ),
+            ctx
+          )
       end
     end
 
@@ -116,8 +147,16 @@ defmodule Deft.Rules.Builtins do
         _ ->
           # Not found in signatures - error
           name = if module, do: {module, function}, else: function
+          location = Error.extract_location(meta)
 
-          Deft.Error.raise!(Deft.Error.unsupported_call(name: name, arity: arity))
+          Error.raise!(
+            Error.unsupported_call(
+              name: name,
+              arity: arity,
+              location: location
+            ),
+            ctx
+          )
       end
     end
 

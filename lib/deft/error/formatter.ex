@@ -150,12 +150,12 @@ defmodule Deft.Error.Formatter do
   end
 
   defp format_source_context(
-         %Error{location: {_file, line, column}, expression: expr} = error,
+         %Error{location: {_file, line, column} = location, expression: expr} = error,
          source_lines,
          use_colors
        ) do
-    # Try to get source line from provided source_lines or fall back to expression context.
-    source_line = get_source_line(source_lines, line)
+    # Try to get source line from provided source_lines or read from file.
+    source_line = get_source_line_from_location(source_lines, location)
 
     if source_line do
       format_source_with_pointer(line, column, source_line, error, use_colors)
@@ -238,13 +238,13 @@ defmodule Deft.Error.Formatter do
 
   # Format a single labeled span
   defp format_labeled_span(
-         %{location: {_file, line, column}, label: label, type: type},
+         %{location: {_file, line, column} = location, label: label, type: type},
          source_lines,
          line_num_width,
          error,
          use_colors
        ) do
-    source_line = get_source_line(source_lines, line)
+    source_line = get_source_line_from_location(source_lines, location)
 
     if source_line do
       padding = String.duplicate(" ", line_num_width)
@@ -376,11 +376,16 @@ defmodule Deft.Error.Formatter do
   defp format_expression_context(nil, _error, _use_colors), do: nil
 
   defp format_expression_context(expr, _error, use_colors) do
+    # Convert Deft AST structs to raw Elixir AST first
+    raw_ast = to_raw_ast(expr)
+
     expr_str =
       try do
-        Macro.to_string(expr)
+        Macro.to_string(raw_ast)
       rescue
-        _ -> inspect(expr)
+        _ ->
+          # Last resort: show a simplified representation
+          format_expr_fallback(expr)
       end
 
     # Truncate very long expressions
@@ -397,6 +402,19 @@ defmodule Deft.Error.Formatter do
       "     |\n     | in: #{expr_str}\n     |"
     end
   end
+
+  # Fallback formatting for expressions that can't be converted
+  defp format_expr_fallback(%{__struct__: mod, name: name}) when is_atom(name) do
+    mod_name = mod |> Module.split() |> List.last()
+    "#{mod_name}(#{name})"
+  end
+
+  defp format_expr_fallback(%{__struct__: mod}) do
+    mod_name = mod |> Module.split() |> List.last()
+    "#{mod_name}(...)"
+  end
+
+  defp format_expr_fallback(expr), do: inspect(expr, limit: 3)
 
   defp format_pointer_message(%Error{expected: expected, actual: actual}, use_colors)
        when not is_nil(expected) and not is_nil(actual) do
@@ -489,6 +507,43 @@ defmodule Deft.Error.Formatter do
   end
 
   defp get_source_line(_, _), do: nil
+
+  @doc """
+  Reads source lines from a file.
+
+  Returns a list of lines or nil if the file cannot be read.
+  """
+  @spec read_source_file(String.t()) :: [String.t()] | nil
+  def read_source_file(file_path) when is_binary(file_path) do
+    case File.read(file_path) do
+      {:ok, content} -> String.split(content, "\n")
+      {:error, _} -> nil
+    end
+  end
+
+  def read_source_file(_), do: nil
+
+  # Get source line, reading from file if needed
+  defp get_source_line_from_location(source_lines, {file, line, _column})
+       when is_binary(file) and is_integer(line) and line > 0 do
+    case get_source_line(source_lines, line) do
+      nil ->
+        # Try to read from file
+        case read_source_file(file) do
+          nil -> nil
+          lines -> Enum.at(lines, line - 1)
+        end
+
+      line_content ->
+        line_content
+    end
+  end
+
+  defp get_source_line_from_location(source_lines, {_file, line, _column}) do
+    get_source_line(source_lines, line)
+  end
+
+  defp get_source_line_from_location(_, _), do: nil
 
   defp get_expression_width(nil), do: nil
 
