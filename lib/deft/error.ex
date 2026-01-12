@@ -46,6 +46,8 @@ defmodule Deft.Error do
           | :no_matching_rule
           | :missing_features
           | :subtype_violation
+          | :unsupported_syntax
+          | :unsupported_pattern
 
   @type location :: {String.t() | nil, non_neg_integer() | nil, non_neg_integer() | nil}
 
@@ -86,7 +88,9 @@ defmodule Deft.Error do
     unreachable_branch: "E0006",
     no_matching_rule: "E0007",
     missing_features: "E0008",
-    subtype_violation: "E0009"
+    subtype_violation: "E0009",
+    unsupported_syntax: "E0010",
+    unsupported_pattern: "E0011"
   }
 
   # ============================================================================
@@ -280,6 +284,45 @@ defmodule Deft.Error do
         "Expected subtype of: #{format_type(expected)}",
         "Got: #{format_type(actual)}"
       ]
+    }
+  end
+
+  @doc """
+  Creates an unsupported syntax error.
+
+  Used when the compiler encounters Elixir syntax that Deft doesn't support.
+  """
+  @spec unsupported_syntax(keyword()) :: t()
+  def unsupported_syntax(opts) do
+    expr = Keyword.fetch!(opts, :expression)
+    kind = Keyword.get(opts, :kind, "expression")
+
+    %__MODULE__{
+      code: :unsupported_syntax,
+      message: "Unsupported #{kind} in Deft",
+      expression: expr,
+      location: Keyword.get(opts, :location),
+      suggestions: Keyword.get(opts, :suggestions, []),
+      notes: Keyword.get(opts, :notes, [])
+    }
+  end
+
+  @doc """
+  Creates an unsupported pattern error.
+
+  Used when pattern matching encounters a pattern type that Deft doesn't support.
+  """
+  @spec unsupported_pattern(keyword()) :: t()
+  def unsupported_pattern(opts) do
+    expr = Keyword.fetch!(opts, :expression)
+
+    %__MODULE__{
+      code: :unsupported_pattern,
+      message: "Unsupported pattern in Deft",
+      expression: expr,
+      location: Keyword.get(opts, :location),
+      suggestions: Keyword.get(opts, :suggestions, []),
+      notes: Keyword.get(opts, :notes, [])
     }
   end
 

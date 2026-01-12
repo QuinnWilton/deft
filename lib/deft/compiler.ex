@@ -1,6 +1,16 @@
 defmodule Deft.Compiler do
+  @moduledoc """
+  Compiles Elixir AST to Deft AST nodes.
+
+  This module transforms standard Elixir AST (as produced by `quote`) into
+  Deft's internal AST representation for type checking.
+
+  Raises `Deft.Error.Exception` if the input contains unsupported syntax.
+  """
+
   alias Deft.AST
   alias Deft.Annotations
+  alias Deft.Error
 
   def compile({:__block__, meta, exprs}) do
     exprs = Enum.map(exprs, &compile/1)
@@ -138,6 +148,74 @@ defmodule Deft.Compiler do
     AST.Capture.new(nil, function, arity, meta)
   end
 
+  # ============================================================================
+  # Unsupported Syntax (explicit rejections before generic patterns)
+  # ============================================================================
+
+  # Map literals
+  def compile({:%{}, _, _} = ast) do
+    raise_unsupported_syntax(ast)
+  end
+
+  # Struct literals
+  def compile({:%, _, _} = ast) do
+    raise_unsupported_syntax(ast)
+  end
+
+  # Comprehensions
+  def compile({:for, _, _} = ast) do
+    raise_unsupported_syntax(ast)
+  end
+
+  # With expressions
+  def compile({:with, _, _} = ast) do
+    raise_unsupported_syntax(ast)
+  end
+
+  # Receive
+  def compile({:receive, _, _} = ast) do
+    raise_unsupported_syntax(ast)
+  end
+
+  # Try/rescue/catch
+  def compile({:try, _, _} = ast) do
+    raise_unsupported_syntax(ast)
+  end
+
+  # Raise
+  def compile({:raise, _, _} = ast) do
+    raise_unsupported_syntax(ast)
+  end
+
+  # Throw
+  def compile({:throw, _, _} = ast) do
+    raise_unsupported_syntax(ast)
+  end
+
+  # Import
+  def compile({:import, _, _} = ast) do
+    raise_unsupported_syntax(ast)
+  end
+
+  # Require
+  def compile({:require, _, _} = ast) do
+    raise_unsupported_syntax(ast)
+  end
+
+  # Alias
+  def compile({:alias, _, _} = ast) do
+    raise_unsupported_syntax(ast)
+  end
+
+  # Binary/bitstring syntax
+  def compile({:<<>>, _, _} = ast) do
+    raise_unsupported_syntax(ast)
+  end
+
+  # ============================================================================
+  # Generic patterns (after specific rejections)
+  # ============================================================================
+
   def compile({name, meta, args}) when is_list(args) do
     args = Enum.map(args, &compile/1)
 
@@ -156,6 +234,22 @@ defmodule Deft.Compiler do
       when is_integer(literal)
       when is_number(literal) do
     AST.Literal.new(literal)
+  end
+
+  # Catch-all for unsupported syntax.
+  def compile(ast) do
+    {notes, suggestions} = unsupported_syntax_hints(ast)
+
+    error =
+      Error.unsupported_syntax(
+        expression: ast,
+        kind: "expression",
+        location: Error.extract_location(ast),
+        suggestions: suggestions,
+        notes: notes
+      )
+
+    Error.raise!(error)
   end
 
   def compile_fn_arg({:"::", meta, [pattern, annotation]}) do
@@ -201,6 +295,29 @@ defmodule Deft.Compiler do
     AST.Match.new(pattern, value, meta)
   end
 
+  # ============================================================================
+  # Unsupported Pattern Syntax (explicit rejections before generic patterns)
+  # ============================================================================
+
+  # Map patterns
+  def compile_pattern({:%{}, _, _} = ast) do
+    raise_unsupported_pattern(ast)
+  end
+
+  # Struct patterns
+  def compile_pattern({:%, _, _} = ast) do
+    raise_unsupported_pattern(ast)
+  end
+
+  # Binary/bitstring patterns
+  def compile_pattern({:<<>>, _, _} = ast) do
+    raise_unsupported_pattern(ast)
+  end
+
+  # ============================================================================
+  # Generic pattern clauses (after specific rejections)
+  # ============================================================================
+
   def compile_pattern({name, meta, context}) when is_atom(context) do
     AST.Local.new(name, context, meta)
   end
@@ -226,6 +343,21 @@ defmodule Deft.Compiler do
     AST.Pair.new(fst, snd)
   end
 
+  # Catch-all for unsupported patterns.
+  def compile_pattern(ast) do
+    {notes, suggestions} = unsupported_pattern_hints(ast)
+
+    error =
+      Error.unsupported_pattern(
+        expression: ast,
+        location: Error.extract_location(ast),
+        suggestions: suggestions,
+        notes: notes
+      )
+
+    Error.raise!(error)
+  end
+
   def compile_adt_variant({name, meta, columns}, adt_name) do
     columns = Enum.map(columns, &Annotations.parse/1)
 
@@ -244,5 +376,112 @@ defmodule Deft.Compiler do
     variant = AST.Variant.new(name, adt_name, columns, meta)
 
     [variant]
+  end
+
+  # ============================================================================
+  # Error Helpers
+  # ============================================================================
+
+  defp raise_unsupported_syntax(ast) do
+    {notes, suggestions} = unsupported_syntax_hints(ast)
+
+    error =
+      Error.unsupported_syntax(
+        expression: ast,
+        kind: "expression",
+        location: Error.extract_location(ast),
+        suggestions: suggestions,
+        notes: notes
+      )
+
+    Error.raise!(error)
+  end
+
+  defp raise_unsupported_pattern(ast) do
+    {notes, suggestions} = unsupported_pattern_hints(ast)
+
+    error =
+      Error.unsupported_pattern(
+        expression: ast,
+        location: Error.extract_location(ast),
+        suggestions: suggestions,
+        notes: notes
+      )
+
+    Error.raise!(error)
+  end
+
+  # ============================================================================
+  # Error Hints
+  # ============================================================================
+
+  defp unsupported_syntax_hints(ast) do
+    case ast do
+      {:%{}, _, _} ->
+        {["Map literals are not supported in Deft."],
+         ["Consider using a tuple or defining an ADT instead."]}
+
+      {:%, _, _} ->
+        {["Struct literals are not supported in Deft."],
+         ["Consider defining an ADT with defdata instead."]}
+
+      {:for, _, _} ->
+        {["Comprehensions are not supported in Deft."],
+         ["Use Enum.map/2 or Enum.filter/2 instead."]}
+
+      {:with, _, _} ->
+        {["The `with` construct is not supported in Deft."],
+         ["Use nested case expressions instead."]}
+
+      {:receive, _, _} ->
+        {["The `receive` construct is not supported in Deft."], []}
+
+      {:try, _, _} ->
+        {["The `try` construct is not supported in Deft."], []}
+
+      {:raise, _, _} ->
+        {["The `raise` construct is not supported in Deft."], []}
+
+      {:throw, _, _} ->
+        {["The `throw` construct is not supported in Deft."], []}
+
+      {:import, _, _} ->
+        {["The `import` directive is not supported inside Deft blocks."],
+         ["Move imports outside the deft block."]}
+
+      {:require, _, _} ->
+        {["The `require` directive is not supported inside Deft blocks."],
+         ["Move requires outside the deft block."]}
+
+      {:alias, _, _} ->
+        {["The `alias` directive is not supported inside Deft blocks."],
+         ["Move aliases outside the deft block."]}
+
+      {op, _, _} when op in [:<<>>, :"::", :".."] ->
+        {["Binary/bitstring syntax is not supported in Deft."], []}
+
+      _ ->
+        {["This syntax is not recognized by the Deft compiler."],
+         ["Deft supports: literals, variables, tuples, lists, case, cond, if, fn, and function calls."]}
+    end
+  end
+
+  defp unsupported_pattern_hints(ast) do
+    case ast do
+      {:%{}, _, _} ->
+        {["Map patterns are not supported in Deft."],
+         ["Consider using tuple patterns or ADT matching instead."]}
+
+      {:%, _, _} ->
+        {["Struct patterns are not supported in Deft."],
+         ["Define an ADT with defdata and pattern match on its variants."]}
+
+      {op, _, _} when op in [:<<>>, :"::", :".."] ->
+        {["Binary/bitstring patterns are not supported in Deft."], []}
+
+      _ ->
+        {["This pattern is not recognized by the Deft compiler."],
+         ["Deft supports: literals, variables, tuples, lists, cons ([h|t]), pins (^x), and ADT constructors."]}
+    end
   end
 end
