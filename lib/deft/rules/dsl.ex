@@ -605,6 +605,7 @@ defmodule Deft.Rules.DSL.Helpers do
   Helper functions available within defrule blocks.
   """
 
+  alias Deft.AST
   alias Deft.Context
   alias Deft.Error
   alias Deft.Subtyping
@@ -672,24 +673,40 @@ defmodule Deft.Rules.DSL.Helpers do
 
   @doc """
   Asserts that actual is a subtype of expected with context.
+  Uses detailed subtype checking to provide element-specific error locations.
   """
   def require_subtype!(actual, expected, expr, ctx) do
-    unless Subtyping.subtype_of?(expected, actual) do
-      error =
-        Error.type_mismatch(
-          expected: expected,
-          actual: actual,
-          expression: expr,
-          location: if(expr, do: Error.extract_location(expr), else: nil)
-        )
+    # Extract sub-expressions for element-level span tracking
+    sub_exprs = extract_sub_exprs(expr)
 
-      if ctx do
-        raise_or_accumulate(ctx, error)
-      else
-        Error.raise!(error)
-      end
+    case Subtyping.check_subtype(expected, actual, sub_exprs) do
+      :ok ->
+        :ok
+
+      {:mismatch, %{expected: exp_elem, actual: act_elem, expr: fail_expr}} ->
+        # Use the failing element's expression for location if available
+        location_expr = fail_expr || expr
+
+        error =
+          Error.type_mismatch(
+            expected: exp_elem,
+            actual: act_elem,
+            expression: location_expr,
+            location: if(location_expr, do: Error.extract_location(location_expr), else: nil)
+          )
+
+        if ctx do
+          raise_or_accumulate(ctx, error)
+        else
+          Error.raise!(error)
+        end
     end
   end
+
+  # Extracts child expressions from an AST node for element-level span tracking
+  defp extract_sub_exprs(%AST.Tuple{elements: elements}), do: elements
+  defp extract_sub_exprs(%AST.LocalCall{args: args}), do: args
+  defp extract_sub_exprs(_), do: nil
 
   # Handles error based on context's error_mode
   defp raise_or_accumulate(%Context{error_mode: :accumulate} = ctx, error) do

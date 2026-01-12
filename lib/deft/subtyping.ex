@@ -14,6 +14,55 @@ defmodule Deft.Subtyping do
   alias Deft.Subtyping.Lattice
   alias Deft.Type
 
+  @type mismatch_info :: %{
+          path: [non_neg_integer() | atom()],
+          expected: Type.t(),
+          actual: Type.t(),
+          expr: term() | nil
+        }
+
+  @type check_result :: :ok | {:mismatch, mismatch_info()}
+
+  @doc """
+  Checks subtype relation and returns detailed mismatch info including path.
+
+  The `sub_exprs` parameter provides AST nodes corresponding to elements in `sub` type,
+  enabling precise error location for compound types like tuples.
+
+  Returns `:ok` if `sub` is a subtype of `super`, or `{:mismatch, info}` with details
+  about the first element that fails the check.
+  """
+  @spec check_subtype(Type.t(), Type.t(), term() | [term()] | nil) :: check_result()
+  def check_subtype(super, sub, sub_exprs \\ nil)
+
+  # FixedTuple: element-by-element checking with path tracking
+  def check_subtype(
+        %Type.FixedTuple{elements: super_elems},
+        %Type.FixedTuple{elements: sub_elems},
+        sub_exprs
+      )
+      when is_list(sub_exprs) and length(super_elems) == length(sub_elems) do
+    super_elems
+    |> Enum.zip(sub_elems)
+    |> Enum.zip(sub_exprs)
+    |> Enum.with_index()
+    |> Enum.find_value(:ok, fn {{{super_elem, sub_elem}, elem_expr}, idx} ->
+      case check_subtype(super_elem, sub_elem, elem_expr) do
+        :ok -> nil
+        {:mismatch, info} -> {:mismatch, %{info | path: [idx | info.path]}}
+      end
+    end)
+  end
+
+  # Fallback for all other types or when no sub_exprs available
+  def check_subtype(super, sub, expr) do
+    if subtype_of?(super, sub) do
+      :ok
+    else
+      {:mismatch, %{path: [], expected: super, actual: sub, expr: expr}}
+    end
+  end
+
   @doc """
   Checks if all types in `supers` are supertypes of corresponding types in `subs`.
   """
