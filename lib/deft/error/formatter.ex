@@ -758,8 +758,6 @@ defmodule Deft.Error.Formatter do
     get_source_line(source_lines, line)
   end
 
-  defp get_source_line_from_location(_, _), do: nil
-
   defp get_expression_width(nil), do: nil
 
   defp get_expression_width(expr) do
