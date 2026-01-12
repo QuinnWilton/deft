@@ -223,6 +223,29 @@ defmodule Deft.CompilerTest do
     end
   end
 
+  # ============================================================================
+  # ADT Variant Error Context
+  # ============================================================================
+
+  describe "compile_adt_variant error context" do
+    test "error includes variant name and column index" do
+      # An ADT variant with an invalid type annotation.
+      # variant_ast represents: my_variant(integer, [invalid])
+      variant_ast = {:my_variant, [], [{:integer, [], nil}, []]}
+      adt_name = %Deft.AST.Local{name: :my_adt, context: nil, meta: []}
+
+      error =
+        assert_raise Deft.Error.Exception, fn ->
+          Compiler.compile_adt_variant(variant_ast, adt_name)
+        end
+
+      # Error should include context about which variant and column failed.
+      assert Enum.any?(error.error.notes, &String.contains?(&1, "my_variant"))
+      assert Enum.any?(error.error.notes, &String.contains?(&1, "my_adt"))
+      assert Enum.any?(error.error.notes, &String.contains?(&1, "Column 2"))
+    end
+  end
+
   describe "compile_pattern/1 valid patterns" do
     test "compiles literal patterns" do
       assert %Deft.AST.Literal{value: 42} = Compiler.compile_pattern(42)

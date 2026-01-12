@@ -359,7 +359,7 @@ defmodule Deft.Compiler do
   end
 
   def compile_adt_variant({name, meta, columns}, adt_name) do
-    columns = Enum.map(columns, &Annotations.parse/1)
+    columns = parse_adt_columns(columns, name, adt_name)
 
     AST.Variant.new(name, adt_name, columns, meta)
   end
@@ -372,11 +372,41 @@ defmodule Deft.Compiler do
   end
 
   def compile_adt_variants({name, meta, columns}, adt_name) do
-    columns = Enum.map(columns, &Annotations.parse/1)
+    columns = parse_adt_columns(columns, name, adt_name)
     variant = AST.Variant.new(name, adt_name, columns, meta)
 
     [variant]
   end
+
+  defp parse_adt_columns(columns, variant_name, adt_name) do
+    columns
+    |> Enum.with_index(1)
+    |> Enum.map(fn {column_ast, index} ->
+      try do
+        Annotations.parse(column_ast)
+      rescue
+        e in Deft.Error.Exception ->
+          # Re-raise with additional context about which variant/column failed.
+          original_error = e.error
+
+          enhanced_error = %{
+            original_error
+            | notes:
+                original_error.notes ++
+                  [
+                    "In variant `#{variant_name}` of ADT `#{format_adt_name(adt_name)}`",
+                    "Column #{index} has invalid type annotation"
+                  ]
+          }
+
+          reraise %{e | error: enhanced_error}, __STACKTRACE__
+      end
+    end)
+  end
+
+  defp format_adt_name(%AST.Local{name: name}), do: name
+  defp format_adt_name(name) when is_atom(name), do: name
+  defp format_adt_name(_), do: "unknown"
 
   # ============================================================================
   # Error Helpers
