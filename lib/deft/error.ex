@@ -122,6 +122,7 @@ defmodule Deft.Error do
   - `:expression` - The AST expression that caused the error
   - `:suggestions` - List of possible fixes
   - `:notes` - Additional context notes
+  - `:spans` - List of labeled spans for multi-span display
   """
   @spec type_mismatch(keyword()) :: t()
   def type_mismatch(opts) do
@@ -136,7 +137,8 @@ defmodule Deft.Error do
       location: Keyword.get(opts, :location),
       expression: Keyword.get(opts, :expression),
       suggestions: Keyword.get(opts, :suggestions, []),
-      notes: Keyword.get(opts, :notes, [])
+      notes: Keyword.get(opts, :notes, []),
+      spans: Keyword.get(opts, :spans, [])
     }
   end
 

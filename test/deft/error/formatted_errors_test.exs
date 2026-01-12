@@ -95,6 +95,37 @@ defmodule Deft.Error.FormattedErrorsTest do
       assert formatted =~ "{integer, atom}"
       assert formatted =~ "{float, boolean}"
     end
+
+    test "formats type mismatch with multi-span showing declaration and usage" do
+      # Error with spans showing both the declared type and the found type
+      error =
+        Error.type_mismatch(
+          expected: Type.integer(),
+          actual: Type.float(),
+          location: {"lib/example.ex", 9, 9},
+          spans: [
+            %{
+              location: {"lib/example.ex", 4, 26},
+              label: "parameter declared as",
+              type: Type.integer()
+            },
+            %{
+              location: {"lib/example.ex", 9, 9},
+              label: "argument has type",
+              type: Type.float()
+            }
+          ]
+        )
+
+      formatted = Formatter.format(error, colors: false, source_lines: @sample_source)
+
+      # Should show multi-span output with both locations
+      assert formatted =~ "parameter declared as"
+      assert formatted =~ "argument has type"
+      # Both lines should be shown
+      assert formatted =~ "4 |"
+      assert formatted =~ "9 |"
+    end
   end
 
   describe "E0002 - Missing annotation" do
