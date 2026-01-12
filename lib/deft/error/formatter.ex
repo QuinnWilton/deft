@@ -343,11 +343,11 @@ defmodule Deft.Error.Formatter do
     branch_padding = String.duplicate(" ", max(0, col - 1 + tee_position))
 
     # Line 1: underline with tee
-    # Line 2: branching label
+    # Line 2: branching label (label colored same as arrow)
     if use_colors do
       span_color = span_kind_color(span_kind)
       underline_line = "#{padding} #{@colors.dim}#{@box.dot}#{@colors.reset} #{pointer_padding}#{span_color}#{underline}#{@colors.reset}"
-      label_line = "#{padding} #{@colors.dim}#{@box.dot}#{@colors.reset} #{branch_padding}#{span_color}#{@box.bottom_left}#{@box.horizontal}#{@box.horizontal}#{@colors.reset} #{full_label}"
+      label_line = "#{padding} #{@colors.dim}#{@box.dot}#{@colors.reset} #{branch_padding}#{span_color}#{@box.bottom_left}#{@box.horizontal}#{@box.horizontal} #{full_label}#{@colors.reset}"
       [underline_line, label_line]
     else
       underline_line = "#{padding} #{@box.dot} #{pointer_padding}#{underline}"
@@ -489,13 +489,13 @@ defmodule Deft.Error.Formatter do
       # Build underline with tee at center
       {underline, tee_position} = build_underline_with_tee(pointer_width)
       branch_padding = String.duplicate(" ", max(0, col - 1 + tee_position))
-      message = format_pointer_message(error, use_colors)
+      error_color = if use_colors, do: severity_color(error.severity), else: ""
+      message = format_pointer_message(error, use_colors, error_color)
 
       {underline_line, label_line} =
         if use_colors do
-          error_color = severity_color(error.severity)
           ul = "#{padding} #{@colors.dim}#{@box.dot}#{@colors.reset} #{pointer_padding}#{error_color}#{underline}#{@colors.reset}"
-          ll = "#{padding} #{@colors.dim}#{@box.dot}#{@colors.reset} #{branch_padding}#{error_color}#{@box.bottom_left}#{@box.horizontal}#{@box.horizontal}#{@colors.reset} #{message}"
+          ll = "#{padding} #{@colors.dim}#{@box.dot}#{@colors.reset} #{branch_padding}#{error_color}#{@box.bottom_left}#{@box.horizontal}#{@box.horizontal} #{message}#{@colors.reset}"
           {ul, ll}
         else
           ul = "#{padding} #{@box.dot} #{pointer_padding}#{underline}"
@@ -529,14 +529,14 @@ defmodule Deft.Error.Formatter do
     # Build underline with tee at center
     {underline, tee_position} = build_underline_with_tee(pointer_width)
     branch_padding = String.duplicate(" ", max(0, col - 1 + tee_position))
-    message = format_pointer_message(error, use_colors)
+    error_color = if use_colors, do: severity_color(error.severity), else: ""
+    message = format_pointer_message(error, use_colors, error_color)
 
-    # Two annotation lines: underline with tee, then branching label
+    # Two annotation lines: underline with tee, then branching label (label colored same as arrow)
     {underline_line, label_line} =
       if use_colors do
-        error_color = severity_color(error.severity)
         ul = "#{padding} #{@colors.dim}#{@box.dot}#{@colors.reset} #{pointer_padding}#{error_color}#{underline}#{@colors.reset}"
-        ll = "#{padding} #{@colors.dim}#{@box.dot}#{@colors.reset} #{branch_padding}#{error_color}#{@box.bottom_left}#{@box.horizontal}#{@box.horizontal}#{@colors.reset} #{message}"
+        ll = "#{padding} #{@colors.dim}#{@box.dot}#{@colors.reset} #{branch_padding}#{error_color}#{@box.bottom_left}#{@box.horizontal}#{@box.horizontal} #{message}#{@colors.reset}"
         {ul, ll}
       else
         ul = "#{padding} #{@box.dot} #{pointer_padding}#{underline}"
@@ -592,26 +592,27 @@ defmodule Deft.Error.Formatter do
 
   defp format_expr_fallback(expr), do: inspect(expr, limit: 3)
 
-  defp format_pointer_message(%Error{expected: expected, actual: actual}, use_colors)
+  defp format_pointer_message(%Error{expected: expected, actual: actual}, use_colors, span_color)
        when not is_nil(expected) and not is_nil(actual) do
     expected_str = Error.format_type(expected)
     actual_str = Error.format_type(actual)
 
     if use_colors do
-      "expected `#{@colors.bold}#{expected_str}#{@colors.reset}`, found `#{@colors.bold}#{actual_str}#{@colors.reset}`"
+      # After bold reset, restore span_color so the rest of the label stays colored
+      "expected `#{@colors.bold}#{expected_str}#{@colors.reset}#{span_color}`, found `#{@colors.bold}#{actual_str}#{@colors.reset}#{span_color}`"
     else
       "expected `#{expected_str}`, found `#{actual_str}`"
     end
   end
 
   # Fallback: use error message as the pointer label (truncated if needed)
-  defp format_pointer_message(%Error{message: message}, use_colors) when is_binary(message) do
+  defp format_pointer_message(%Error{message: message}, use_colors, span_color) when is_binary(message) do
     # Use a shortened version of the message as the label
     label = shorten_message_for_label(message)
-    bold_backtick_content(label, use_colors)
+    bold_backtick_content(label, use_colors, span_color)
   end
 
-  defp format_pointer_message(_error, _use_colors), do: ""
+  defp format_pointer_message(_error, _use_colors, _span_color), do: ""
 
   # Shorten an error message for use as a pointer label
   defp shorten_message_for_label(message) do
@@ -677,6 +678,14 @@ defmodule Deft.Error.Formatter do
 
   defp bold_backtick_content(text, true) do
     Regex.replace(~r/`([^`]+)`/, text, "`#{@colors.bold}\\1#{@colors.reset}`")
+  end
+
+  # 3-arity version that restores span_color after bold reset
+  defp bold_backtick_content(text, false, _span_color), do: text
+
+  defp bold_backtick_content(text, true, span_color) do
+    # After bold reset, restore span_color so the rest of the text stays colored
+    Regex.replace(~r/`([^`]+)`/, text, "`#{@colors.bold}\\1#{@colors.reset}#{span_color}`")
   end
 
   # ============================================================================

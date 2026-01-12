@@ -382,10 +382,6 @@ defmodule Deft.Compiler do
     Enum.map(columns, &Annotations.parse/1)
   end
 
-  defp format_adt_name(%AST.Local{name: name}), do: name
-  defp format_adt_name(name) when is_atom(name), do: name
-  defp format_adt_name(_), do: "unknown"
-
   # ============================================================================
   # Error Helpers
   # ============================================================================
