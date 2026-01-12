@@ -244,6 +244,9 @@ defmodule Deft do
     {params, param_types} = parse_typed_params(args)
     return_type_parsed = parse_type(return_type)
 
+    # Extract location of the return type annotation for error reporting
+    return_type_location = extract_return_type_location(return_type)
+
     # Create function signature for registration
     arity = length(params)
     module = __CALLER__.module
@@ -264,7 +267,7 @@ defmodule Deft do
     Deft.Signatures.register({module, name, arity}, signature)
 
     # Store definition for deferred type-checking in __before_compile__
-    # We store: {name, arity, params, evaluated_param_types, evaluated_return_type, body, caller, meta}
+    # We store: {name, arity, params, evaluated_param_types, evaluated_return_type, body, caller, meta, return_type_location}
     definition = {
       name,
       arity,
@@ -273,7 +276,8 @@ defmodule Deft do
       evaluated_return_type,
       body,
       Macro.escape(__CALLER__),
-      meta
+      meta,
+      return_type_location
     }
 
     quote do
@@ -308,7 +312,7 @@ defmodule Deft do
 
     # Type-check all function bodies and generate function definitions
     function_defs =
-      Enum.map(definitions, fn {name, arity, params, param_types, return_type, body, caller_escaped, meta} ->
+      Enum.map(definitions, fn {name, arity, params, param_types, return_type, body, caller_escaped, _meta, return_type_loc} ->
         caller = Code.eval_quoted(caller_escaped) |> elem(0)
 
         # Resolve alias types in parameter types and return type
@@ -331,8 +335,8 @@ defmodule Deft do
         # Build parameter bindings with resolved types
         param_bindings =
           Enum.zip(params, resolved_param_types)
-          |> Enum.map(fn {{param_name, meta, param_context}, type} ->
-            local = Deft.AST.Local.new(param_name, param_context, meta)
+          |> Enum.map(fn {{param_name, param_meta, param_context}, type} ->
+            local = Deft.AST.Local.new(param_name, param_context, param_meta)
             {local, type}
           end)
 
@@ -357,16 +361,23 @@ defmodule Deft do
               if Deft.Subtyping.subtype_of?(resolved_return_type, body_type) do
                 erased
               else
-                location = {caller.file, Keyword.get(meta, :line), Keyword.get(meta, :column)}
+                # Use return type location for pointing at the annotation
+                declaration_location =
+                  case return_type_loc do
+                    {line, col} -> {caller.file, line, col}
+                    _ -> nil
+                  end
+
+                body_location = extract_final_expr_location(caller.file, body)
 
                 error =
-                  Deft.Error.type_mismatch(
-                    expected: resolved_return_type,
-                    actual: body_type,
-                    location: location,
-                    expression: nil,
-                    notes: ["Function `#{name}/#{arity}` body type is not compatible with declared return type."],
-                    suggestions: ["Change the return type annotation or fix the function body."]
+                  Deft.Error.return_type_mismatch(
+                    name: name,
+                    arity: arity,
+                    declared_type: resolved_return_type,
+                    actual_type: body_type,
+                    declaration_location: declaration_location,
+                    body_location: body_location
                   )
 
                 raise_type_errors([error], source_lines)
@@ -389,7 +400,7 @@ defmodule Deft do
 
     # Store module metadata for introspection
     sigs =
-      Enum.map(definitions, fn {name, arity, _params, param_types, return_type, _body, _caller, _meta} ->
+      Enum.map(definitions, fn {name, arity, _params, param_types, return_type, _body, _caller, _meta, _return_type_loc} ->
         {name, arity, param_types, return_type}
       end)
 
@@ -649,4 +660,52 @@ defmodule Deft do
   end
 
   defp read_source_lines(_), do: nil
+
+  # Extracts the location of the final expression in a body AST.
+  # Works for both single expressions and blocks.
+  defp extract_final_expr_location(file, {:__block__, _, exprs}) when is_list(exprs) do
+    case List.last(exprs) do
+      nil -> nil
+      final -> extract_expr_location(file, final)
+    end
+  end
+
+  defp extract_final_expr_location(file, expr), do: extract_expr_location(file, expr)
+
+  # Extract location from any expression with metadata.
+  # For compound expressions, find the leftmost position.
+  defp extract_expr_location(file, expr) do
+    case find_leftmost_position(expr) do
+      {line, column} when is_integer(line) -> {file, line, column}
+      _ -> nil
+    end
+  end
+
+  # Recursively find the leftmost (earliest line, then earliest column) position in an AST.
+  defp find_leftmost_position({_, meta, args}) when is_list(meta) do
+    current = {Keyword.get(meta, :line), Keyword.get(meta, :column)}
+
+    # Check all arguments for earlier positions
+    arg_positions =
+      args
+      |> List.wrap()
+      |> Enum.map(&find_leftmost_position/1)
+      |> Enum.reject(&is_nil/1)
+
+    [current | arg_positions]
+    |> Enum.reject(fn {line, _} -> is_nil(line) end)
+    |> Enum.min_by(fn {line, col} -> {line, col || 0} end, fn -> nil end)
+  end
+
+  defp find_leftmost_position(_), do: nil
+
+  # Extract location from the return type AST for error reporting.
+  # Works with simple types like `integer` and compound types like `list(integer)`.
+  defp extract_return_type_location({_, meta, _}) when is_list(meta) do
+    line = Keyword.get(meta, :line)
+    column = Keyword.get(meta, :column)
+    if line, do: {line, column}, else: nil
+  end
+
+  defp extract_return_type_location(_), do: nil
 end

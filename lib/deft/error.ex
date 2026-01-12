@@ -51,6 +51,18 @@ defmodule Deft.Error do
 
   @type location :: {String.t() | nil, non_neg_integer() | nil, non_neg_integer() | nil}
 
+  @typedoc """
+  A labeled span for multi-span error display.
+
+  Contains a location tuple, a label describing what this span represents,
+  and optionally a type to display.
+  """
+  @type labeled_span :: %{
+          location: location(),
+          label: String.t(),
+          type: Type.t() | nil
+        }
+
   @type t :: %__MODULE__{
           code: error_code(),
           message: String.t(),
@@ -62,7 +74,8 @@ defmodule Deft.Error do
           context_after: String.t() | nil,
           suggestions: [String.t()],
           notes: [String.t()],
-          severity: :error | :warning
+          severity: :error | :warning,
+          spans: [labeled_span()]
         }
 
   defstruct [
@@ -76,7 +89,8 @@ defmodule Deft.Error do
     :context_after,
     suggestions: [],
     notes: [],
-    severity: :error
+    severity: :error,
+    spans: []
   ]
 
   @error_codes %{
@@ -123,6 +137,65 @@ defmodule Deft.Error do
       expression: Keyword.get(opts, :expression),
       suggestions: Keyword.get(opts, :suggestions, []),
       notes: Keyword.get(opts, :notes, [])
+    }
+  end
+
+  @doc """
+  Creates a return type mismatch error with multi-span display.
+
+  This error type shows both the declared return type location and the
+  body expression that produces the incompatible type, making it clear
+  where the mismatch occurs.
+
+  ## Options
+
+  - `:name` - Function name (required)
+  - `:arity` - Function arity (required)
+  - `:declared_type` - The declared return type (required)
+  - `:actual_type` - The actual type of the body (required)
+  - `:declaration_location` - Location of the return type annotation `{file, line, column}`
+  - `:body_location` - Location of the body's final expression `{file, line, column}`
+  """
+  @spec return_type_mismatch(keyword()) :: t()
+  def return_type_mismatch(opts) do
+    name = Keyword.fetch!(opts, :name)
+    arity = Keyword.fetch!(opts, :arity)
+    declared_type = Keyword.fetch!(opts, :declared_type)
+    actual_type = Keyword.fetch!(opts, :actual_type)
+    declaration_location = Keyword.get(opts, :declaration_location)
+    body_location = Keyword.get(opts, :body_location)
+
+    spans =
+      [
+        if declaration_location do
+          %{
+            location: declaration_location,
+            label: "declared return type",
+            type: declared_type
+          }
+        end,
+        if body_location do
+          %{
+            location: body_location,
+            label: "body has type",
+            type: actual_type
+          }
+        end
+      ]
+      |> Enum.reject(&is_nil/1)
+
+    %__MODULE__{
+      code: :type_mismatch,
+      message: "Return type mismatch in `#{name}/#{arity}`",
+      expected: declared_type,
+      actual: actual_type,
+      location: declaration_location,
+      spans: spans,
+      suggestions: [
+        "Change the return type annotation to `#{format_type(actual_type)}`",
+        "Or modify the function body to return `#{format_type(declared_type)}`"
+      ],
+      notes: []
     }
   end
 

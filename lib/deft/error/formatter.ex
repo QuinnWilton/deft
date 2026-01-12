@@ -105,12 +105,13 @@ defmodule Deft.Error.Formatter do
   defp format_header(%Error{code: code, message: message, severity: severity}, use_colors) do
     code_str = Error.error_code_string(code)
     severity_str = Atom.to_string(severity)
+    formatted_message = bold_backtick_content(message, use_colors)
 
     if use_colors do
       color = severity_color(severity)
-      "#{color}#{@colors.bold}#{severity_str}[#{code_str}]#{@colors.reset}: #{message}"
+      "#{color}#{@colors.bold}#{severity_str}[#{code_str}]#{@colors.reset}: #{formatted_message}"
     else
-      "#{severity_str}[#{code_str}]: #{message}"
+      "#{severity_str}[#{code_str}]: #{formatted_message}"
     end
   end
 
@@ -139,7 +140,14 @@ defmodule Deft.Error.Formatter do
   # Source Context Formatting
   # ============================================================================
 
-  defp format_source_context(%Error{location: nil}, _source_lines, _use_colors), do: nil
+  defp format_source_context(%Error{location: nil, spans: []}, _source_lines, _use_colors),
+    do: nil
+
+  # Multi-span display for errors with labeled spans
+  defp format_source_context(%Error{spans: spans} = error, source_lines, use_colors)
+       when spans != [] do
+    format_multi_span_context(spans, source_lines, error, use_colors)
+  end
 
   defp format_source_context(
          %Error{location: {_file, line, column}, expression: expr} = error,
@@ -157,6 +165,172 @@ defmodule Deft.Error.Formatter do
   end
 
   defp format_source_context(_error, _source_lines, _use_colors), do: nil
+
+  # Format multiple labeled spans in miette style
+  defp format_multi_span_context(spans, source_lines, error, use_colors) do
+    # Sort spans by line number
+    sorted_spans =
+      spans
+      |> Enum.filter(fn %{location: {_, line, _}} -> is_integer(line) end)
+      |> Enum.sort_by(fn %{location: {_, line, _}} -> line end)
+
+    if Enum.empty?(sorted_spans) do
+      nil
+    else
+      # Calculate the max line number width for consistent formatting
+      max_line =
+        sorted_spans
+        |> Enum.map(fn %{location: {_, line, _}} -> line end)
+        |> Enum.max()
+
+      line_num_width = String.length(Integer.to_string(max_line))
+      padding = String.duplicate(" ", line_num_width)
+
+      # Format each span with line numbers for gap detection
+      spans_with_lines =
+        sorted_spans
+        |> Enum.map(fn %{location: {_, line, _}} = span ->
+          {line, format_labeled_span(span, source_lines, line_num_width, error, use_colors)}
+        end)
+        |> Enum.reject(fn {_, block} -> is_nil(block) end)
+
+      # Join all spans with separator lines, adding elision markers for gaps
+      if Enum.empty?(spans_with_lines) do
+        nil
+      else
+        separator =
+          if use_colors do
+            "#{padding} #{@colors.dim}|#{@colors.reset}"
+          else
+            "#{padding} |"
+          end
+
+        elision =
+          if use_colors do
+            "#{@colors.dim}...#{@colors.reset}"
+          else
+            "..."
+          end
+
+        # Build output with elision markers between non-consecutive lines
+        {result, _} =
+          spans_with_lines
+          |> Enum.reduce({[], nil}, fn {line, block}, {acc, prev_line} ->
+            # Add separator or elision marker between spans
+            between =
+              cond do
+                # First span - just add opening separator
+                prev_line == nil -> [separator]
+                # Gap of more than 1 line - show elision
+                line > prev_line + 1 -> [elision]
+                # Consecutive lines - normal separator
+                true -> [separator]
+              end
+
+            {acc ++ between ++ List.flatten([block]), line}
+          end)
+
+        (result ++ [separator])
+        |> Enum.join("\n")
+      end
+    end
+  end
+
+  # Format a single labeled span
+  defp format_labeled_span(
+         %{location: {_file, line, column}, label: label, type: type},
+         source_lines,
+         line_num_width,
+         error,
+         use_colors
+       ) do
+    source_line = get_source_line(source_lines, line)
+
+    if source_line do
+      padding = String.duplicate(" ", line_num_width)
+
+      # Format the source line with line number
+      source =
+        if use_colors do
+          line_str = String.pad_leading(Integer.to_string(line), line_num_width)
+          "#{@colors.dim}#{line_str}#{@colors.reset} #{@colors.dim}|#{@colors.reset} #{source_line}"
+        else
+          line_str = String.pad_leading(Integer.to_string(line), line_num_width)
+          "#{line_str} | #{source_line}"
+        end
+
+      # Format the pointer line with label
+      col = column || 1
+      pointer_padding = String.duplicate(" ", max(0, col - 1))
+      pointer_width = estimate_span_width(source_line, col, type)
+      pointer = String.duplicate("^", pointer_width)
+
+      # Build the label with type if present (bold type when colors enabled)
+      type_str =
+        if type do
+          formatted = Error.format_type(type)
+
+          if use_colors do
+            " `#{@colors.bold}#{formatted}#{@colors.reset}`"
+          else
+            " `#{formatted}`"
+          end
+        else
+          ""
+        end
+
+      full_label = "#{label}#{type_str}"
+
+      pointer_line =
+        if use_colors do
+          error_color = severity_color(error.severity)
+
+          "#{padding} #{@colors.dim}|#{@colors.reset} #{pointer_padding}#{error_color}#{pointer}#{@colors.reset} #{full_label}"
+        else
+          "#{padding} | #{pointer_padding}#{pointer} #{full_label}"
+        end
+
+      [source, pointer_line]
+    else
+      nil
+    end
+  end
+
+  # Estimate the width of a span based on context.
+  # For expressions, we try to highlight meaningful content.
+  defp estimate_span_width(source_line, column, _type) do
+    # Get the content from the column position to end of line
+    remaining = String.slice(source_line, max(0, column - 1)..-1//1)
+
+    # For body expressions, try to highlight up to a common statement terminator
+    # or the entire remaining non-whitespace content
+    trimmed = String.trim_trailing(remaining)
+
+    # If this looks like an expression (not a definition), highlight the whole thing
+    width =
+      cond do
+        # If line ends with "do" or contains "->", it's likely a declaration
+        String.ends_with?(trimmed, " do") or String.contains?(trimmed, "->") ->
+          # Just highlight the first token
+          case Regex.run(~r/^(\S+)/, remaining) do
+            [_, match] -> String.length(match)
+            _ -> 1
+          end
+
+        # For regular expressions, highlight the trimmed content
+        String.length(trimmed) > 0 ->
+          String.length(trimmed)
+
+        # Fallback to single token
+        true ->
+          case Regex.run(~r/^(\S+)/, remaining) do
+            [_, match] -> String.length(match)
+            _ -> 1
+          end
+      end
+
+    min(max(width, 1), 50)
+  end
 
   defp format_source_with_pointer(line, column, source_line, error, use_colors) do
     line_num_width = String.length(Integer.to_string(line))
@@ -251,10 +425,12 @@ defmodule Deft.Error.Formatter do
   end
 
   defp format_note(note, use_colors) do
+    formatted_note = bold_backtick_content(note, use_colors)
+
     if use_colors do
-      "     #{@colors.note}= note#{@colors.reset}: #{note}"
+      "     #{@colors.note}= note#{@colors.reset}: #{formatted_note}"
     else
-      "     = note: #{note}"
+      "     = note: #{formatted_note}"
     end
   end
 
@@ -267,11 +443,20 @@ defmodule Deft.Error.Formatter do
   end
 
   defp format_suggestion(suggestion, use_colors) do
+    formatted_suggestion = bold_backtick_content(suggestion, use_colors)
+
     if use_colors do
-      "     #{@colors.help}= help#{@colors.reset}: #{suggestion}"
+      "     #{@colors.help}= help#{@colors.reset}: #{formatted_suggestion}"
     else
-      "     = help: #{suggestion}"
+      "     = help: #{formatted_suggestion}"
     end
+  end
+
+  # Bold content within backticks when colors are enabled
+  defp bold_backtick_content(text, false), do: text
+
+  defp bold_backtick_content(text, true) do
+    Regex.replace(~r/`([^`]+)`/, text, "`#{@colors.bold}\\1#{@colors.reset}`")
   end
 
   # ============================================================================
