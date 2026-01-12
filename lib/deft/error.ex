@@ -130,7 +130,7 @@ defmodule Deft.Error do
 
     %__MODULE__{
       code: :type_mismatch,
-      message: "Type mismatch: expected `#{format_type(expected)}`, got `#{format_type(actual)}`",
+      message: "Type mismatch: expected `#{format_type(expected)}`, found `#{format_type(actual)}`",
       expected: expected,
       actual: actual,
       location: Keyword.get(opts, :location),
@@ -355,7 +355,7 @@ defmodule Deft.Error do
       suggestions: Keyword.get(opts, :suggestions, []),
       notes: [
         "Expected subtype of: #{format_type(expected)}",
-        "Got: #{format_type(actual)}"
+        "Found: #{format_type(actual)}"
       ]
     }
   end

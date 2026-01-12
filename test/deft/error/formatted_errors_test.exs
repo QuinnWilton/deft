@@ -48,7 +48,7 @@ defmodule Deft.Error.FormattedErrorsTest do
       assert formatted =~ "error[E0001]"
       assert formatted =~ "Type mismatch"
       assert formatted =~ "expected `integer`"
-      assert formatted =~ "got `float`"
+      assert formatted =~ "found `float`"
       assert formatted =~ "--> lib/example.ex:9:9"
     end
 
@@ -331,7 +331,7 @@ defmodule Deft.Error.FormattedErrorsTest do
       assert formatted =~ "error[E0009]"
       assert formatted =~ "Subtype constraint violated"
       assert formatted =~ "= note: Expected subtype of: number"
-      assert formatted =~ "= note: Got: atom"
+      assert formatted =~ "= note: Found: atom"
     end
 
     test "formats subtype violation with complex types" do
