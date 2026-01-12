@@ -13,6 +13,7 @@ defmodule Deft.Rules.ControlFlow do
 
   alias Deft.AST
   alias Deft.AST.Erased
+  alias Deft.Error
   alias Deft.PatternMatching
   alias Deft.Subtyping
   alias Deft.Type
@@ -88,7 +89,8 @@ defmodule Deft.Rules.ControlFlow do
 
     # Check exhaustiveness if feature enabled
     if_feature :exhaustiveness_checking do
-      Deft.Rules.ControlFlow.exhaustive_check!(subject_type, pattern_types)
+      case_location = Error.extract_location(subject)
+      Deft.Rules.ControlFlow.exhaustive_check!(subject_type, pattern_types, case_location)
     end
 
     conclude(
@@ -98,24 +100,41 @@ defmodule Deft.Rules.ControlFlow do
   end
 
   @doc false
-  def exhaustive_check!(%Type.Union{} = subject_type, pattern_types) do
-    exhaustive_check!(subject_type.fst, pattern_types)
-    exhaustive_check!(subject_type.snd, pattern_types)
+  def exhaustive_check!(subject_type, pattern_types, location \\ nil)
+
+  def exhaustive_check!(%Type.Union{} = subject_type, pattern_types, location) do
+    exhaustive_check!(subject_type.fst, pattern_types, location)
+    exhaustive_check!(subject_type.snd, pattern_types, location)
   end
 
-  def exhaustive_check!(%Type.ADT{} = subject_type, pattern_types) do
-    for variant <- subject_type.variants do
-      unless Enum.any?(pattern_types, fn pattern ->
-               Subtyping.subtype_of?(pattern, variant)
-             end) do
-        Deft.Error.raise!(Deft.Error.inexhaustive_patterns(missing: variant))
-      end
+  def exhaustive_check!(%Type.ADT{} = subject_type, pattern_types, location) do
+    # Find which variants are covered
+    {covered, missing} =
+      Enum.split_with(subject_type.variants, fn variant ->
+        Enum.any?(pattern_types, fn pattern ->
+          Subtyping.subtype_of?(pattern, variant)
+        end)
+      end)
+
+    unless Enum.empty?(missing) do
+      Error.raise!(
+        Error.inexhaustive_patterns(
+          missing: missing,
+          covered: covered,
+          location: location
+        )
+      )
     end
   end
 
-  def exhaustive_check!(subject_type, pattern_types) do
+  def exhaustive_check!(subject_type, pattern_types, location) do
     unless Enum.any?(pattern_types, &Subtyping.subtype_of?(&1, subject_type)) do
-      Deft.Error.raise!(Deft.Error.inexhaustive_patterns(missing: subject_type))
+      Error.raise!(
+        Error.inexhaustive_patterns(
+          missing: subject_type,
+          location: location
+        )
+      )
     end
   end
 

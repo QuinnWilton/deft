@@ -215,7 +215,7 @@ defmodule Deft.Error.FormattedErrorsTest do
 
       assert formatted =~ "error[E0005]"
       assert formatted =~ "Non-exhaustive pattern"
-      assert formatted =~ "= help: Add a case branch for: none"
+      assert formatted =~ "= help: Add a case branch for `none`"
       assert formatted =~ "= note: Pattern matching must cover all possible values"
     end
 
@@ -233,8 +233,8 @@ defmodule Deft.Error.FormattedErrorsTest do
 
       formatted = Formatter.format(error, colors: false, source_lines: @sample_source)
 
-      assert formatted =~ "= help: Add a case branch for: some(integer)"
-      assert formatted =~ "= help: Add a case branch for: none"
+      assert formatted =~ "= help: Add a case branch for `some(integer)`"
+      assert formatted =~ "= help: Add a case branch for `none`"
     end
 
     test "formats inexhaustive patterns with complex variants" do
@@ -249,6 +249,24 @@ defmodule Deft.Error.FormattedErrorsTest do
       formatted = Formatter.format(error, colors: false, source_lines: @sample_source)
 
       assert formatted =~ "rectangle(number, number)"
+    end
+
+    test "formats inexhaustive patterns with covered variants" do
+      missing = Type.variant(:none, nil, [])
+      covered = [Type.variant(:some, nil, [Type.integer()])]
+
+      error =
+        Error.inexhaustive_patterns(
+          missing: missing,
+          covered: covered,
+          location: {"lib/example.ex", 8, 5}
+        )
+
+      formatted = Formatter.format(error, colors: false, source_lines: @sample_source)
+
+      assert formatted =~ "error[E0005]"
+      assert formatted =~ "= note: Covered patterns: `some(integer)`"
+      assert formatted =~ "= help: Add a case branch for `none`"
     end
   end
 

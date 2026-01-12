@@ -259,22 +259,44 @@ defmodule Deft.Error do
 
   @doc """
   Creates an inexhaustive patterns error.
+
+  ## Options
+
+  - `:missing` - The missing type(s) that need to be handled (required)
+  - `:location` - Source location of the case expression
+  - `:expression` - The case expression AST
+  - `:covered` - List of types that are covered (for display)
+  - `:spans` - List of labeled spans for multi-span display
   """
   @spec inexhaustive_patterns(keyword()) :: t()
   def inexhaustive_patterns(opts) do
     missing = Keyword.fetch!(opts, :missing)
     missing_list = List.wrap(missing)
+    covered = Keyword.get(opts, :covered, [])
+
+    notes =
+      if Enum.empty?(covered) do
+        ["Pattern matching must cover all possible values"]
+      else
+        covered_str =
+          covered
+          |> Enum.map(&format_type/1)
+          |> Enum.join(", ")
+
+        ["Covered patterns: `#{covered_str}`"]
+      end
 
     %__MODULE__{
       code: :inexhaustive_patterns,
       message: "Non-exhaustive pattern matching",
       expression: Keyword.get(opts, :expression),
       location: Keyword.get(opts, :location),
+      spans: Keyword.get(opts, :spans, []),
       suggestions:
         Enum.map(missing_list, fn m ->
-          "Add a case branch for: #{format_type(m)}"
+          "Add a case branch for `#{format_type(m)}`"
         end),
-      notes: ["Pattern matching must cover all possible values"]
+      notes: notes
     }
   end
 
