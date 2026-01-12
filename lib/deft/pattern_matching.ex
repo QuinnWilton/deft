@@ -130,13 +130,16 @@ defmodule Deft.PatternMatching do
 
       {:ok, {value, value_type, value_bindings}} ->
         if Subtyping.subtype_of?(type, value_type) do
-          {:ok, {pattern, pattern_type, pattern_bindings}} =
-            do_handle_pattern(match.pattern, type, ctx)
+          case do_handle_pattern(match.pattern, type, ctx) do
+            {:error, _} = error ->
+              error
 
-          erased = {:=, match.meta, [pattern, value]}
-          bindings = value_bindings ++ pattern_bindings
+            {:ok, {pattern, pattern_type, pattern_bindings}} ->
+              erased = {:=, match.meta, [pattern, value]}
+              bindings = value_bindings ++ pattern_bindings
 
-          {:ok, {erased, pattern_type, bindings}}
+              {:ok, {erased, pattern_type, bindings}}
+          end
         else
           {:error, value_type}
         end
@@ -145,97 +148,131 @@ defmodule Deft.PatternMatching do
 
   # Tuple patterns
   defp do_handle_pattern(%AST.Tuple{} = tuple, %Type.FixedTuple{} = type, ctx) do
-    {elements, types, inner_bindings} =
+    results =
       tuple.elements
       |> Enum.zip(Type.FixedTuple.elements(type))
-      |> Enum.reduce({[], [], []}, fn {element, elem_type}, {elements, types, inner_bindings} ->
-        {:ok, {element, element_type, element_bindings}} =
-          do_handle_pattern(element, elem_type, ctx)
-
-        {elements ++ [element], types ++ [element_type], inner_bindings ++ element_bindings}
+      |> Enum.map(fn {element, elem_type} ->
+        do_handle_pattern(element, elem_type, ctx)
       end)
 
-    erased = {:{}, tuple.meta, elements}
-    tuple_type = Type.fixed_tuple(types)
+    # Check if any element pattern failed.
+    case Enum.find(results, &match?({:error, _}, &1)) do
+      {:error, _} = error ->
+        error
 
-    # Merge duplicate bindings with intersection types
-    bindings =
-      inner_bindings
-      |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
-      |> Enum.map(fn {local, types} ->
-        merged_type = Enum.reduce(types, Type.bottom(), &Type.intersection/2)
-        {local, merged_type}
-      end)
+      nil ->
+        {elements, types, inner_bindings} =
+          Enum.reduce(results, {[], [], []}, fn {:ok, {element, element_type, element_bindings}},
+                                                {elements, types, inner_bindings} ->
+            {elements ++ [element], types ++ [element_type], inner_bindings ++ element_bindings}
+          end)
 
-    {:ok, {erased, tuple_type, bindings}}
+        erased = {:{}, tuple.meta, elements}
+        tuple_type = Type.fixed_tuple(types)
+
+        # Merge duplicate bindings with intersection types.
+        bindings =
+          inner_bindings
+          |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
+          |> Enum.map(fn {local, types} ->
+            merged_type = Enum.reduce(types, Type.bottom(), &Type.intersection/2)
+            {local, merged_type}
+          end)
+
+        {:ok, {erased, tuple_type, bindings}}
+    end
   end
 
   # List patterns
   defp do_handle_pattern(%AST.List{} = list, %Type.FixedList{} = type, ctx) do
     elem_type = Type.FixedList.contents(type)
 
-    {elements, element_types, inner_bindings} =
-      Enum.reduce(list.elements, {[], [], []}, fn element,
-                                                  {elements, element_types, inner_bindings} ->
-        {:ok, {element, element_t, element_bindings}} =
-          do_handle_pattern(element, elem_type, ctx)
+    results = Enum.map(list.elements, fn element ->
+      do_handle_pattern(element, elem_type, ctx)
+    end)
 
-        {
-          elements ++ [element],
-          element_types ++ [element_t],
-          inner_bindings ++ element_bindings
-        }
-      end)
+    # Check if any element pattern failed.
+    case Enum.find(results, &match?({:error, _}, &1)) do
+      {:error, _} = error ->
+        error
 
-    elements_type =
-      element_types
-      |> Enum.reduce(Type.bottom(), &Type.union/2)
-      |> Type.fixed_list()
+      nil ->
+        {elements, element_types, inner_bindings} =
+          Enum.reduce(results, {[], [], []}, fn {:ok, {element, element_t, element_bindings}},
+                                                {elements, element_types, inner_bindings} ->
+            {
+              elements ++ [element],
+              element_types ++ [element_t],
+              inner_bindings ++ element_bindings
+            }
+          end)
 
-    {:ok, {elements, elements_type, inner_bindings}}
+        elements_type =
+          element_types
+          |> Enum.reduce(Type.bottom(), &Type.union/2)
+          |> Type.fixed_list()
+
+        {:ok, {elements, elements_type, inner_bindings}}
+    end
   end
 
   # Cons patterns ([head | rest])
   defp do_handle_pattern(%AST.Cons{} = cons, type, ctx) do
-    {:ok, {head, _, head_bindings}} = do_handle_pattern(cons.head, type, ctx)
+    case do_handle_pattern(cons.head, type, ctx) do
+      {:error, _} = error ->
+        error
 
-    {:ok, {rest, _, rest_bindings}} =
-      do_handle_pattern(cons.rest, Type.fixed_list(type), ctx)
+      {:ok, {head, _, head_bindings}} ->
+        case do_handle_pattern(cons.rest, Type.fixed_list(type), ctx) do
+          {:error, _} = error ->
+            error
 
-    erased = {:|, cons.meta, [head, rest]}
-
-    {:ok, {erased, type, head_bindings ++ rest_bindings}}
+          {:ok, {rest, _, rest_bindings}} ->
+            erased = {:|, cons.meta, [head, rest]}
+            {:ok, {erased, type, head_bindings ++ rest_bindings}}
+        end
+    end
   end
 
   # Type constructor patterns (ADT matching)
   defp do_handle_pattern(%AST.TypeConstructorCall{} = constructor, %Type.ADT{}, ctx) do
     variant = constructor.variant
 
-    {columns, types, inner_bindings} =
+    results =
       constructor.args
       |> Enum.zip(variant.columns)
-      |> Enum.reduce({[], [], []}, fn {column, column_type}, {columns, types, inner_bindings} ->
-        {:ok, {column, col_type, column_bindings}} =
-          do_handle_pattern(column, column_type, ctx)
-
-        {columns ++ [column], types ++ [col_type], inner_bindings ++ column_bindings}
+      |> Enum.map(fn {column, column_type} ->
+        do_handle_pattern(column, column_type, ctx)
       end)
 
-    if length(types) == length(variant.columns) and
-         Subtyping.subtypes_of?(variant.columns, types) do
-      columns = [constructor.name | columns]
-      erased = {:{}, constructor.meta, columns}
+    # Check if any column pattern failed.
+    case Enum.find(results, &match?({:error, _}, &1)) do
+      {:error, _} = error ->
+        error
 
-      # Merge duplicate bindings with intersection types
-      bindings =
-        inner_bindings
-        |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
-        |> Enum.map(fn {local, types} ->
-          merged_type = Enum.reduce(types, Type.bottom(), &Type.intersection/2)
-          {local, merged_type}
-        end)
+      nil ->
+        {columns, types, inner_bindings} =
+          Enum.reduce(results, {[], [], []}, fn {:ok, {column, col_type, column_bindings}},
+                                                {columns, types, inner_bindings} ->
+            {columns ++ [column], types ++ [col_type], inner_bindings ++ column_bindings}
+          end)
 
-      {:ok, {erased, variant, bindings}}
+        if length(types) == length(variant.columns) and
+             Subtyping.subtypes_of?(variant.columns, types) do
+          columns = [constructor.name | columns]
+          erased = {:{}, constructor.meta, columns}
+
+          # Merge duplicate bindings with intersection types.
+          bindings =
+            inner_bindings
+            |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
+            |> Enum.map(fn {local, types} ->
+              merged_type = Enum.reduce(types, Type.bottom(), &Type.intersection/2)
+              {local, merged_type}
+            end)
+
+          {:ok, {erased, variant, bindings}}
+        end
     end
   end
 
