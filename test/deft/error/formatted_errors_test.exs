@@ -284,8 +284,8 @@ defmodule Deft.Error.FormattedErrorsTest do
       assert formatted =~ "error[E0006]"
       assert formatted =~ "Branch is unreachable"
       assert formatted =~ "= help: Remove this branch"
-      assert formatted =~ "= note: Value has type: integer"
-      assert formatted =~ "= note: Pattern expects type: atom"
+      assert formatted =~ "= note: Value has type `integer`"
+      assert formatted =~ "= note: Pattern expects type `atom`"
     end
 
     test "formats unreachable branch with complex types" do

@@ -8,6 +8,7 @@ defmodule Deft.PatternMatching do
 
   alias Deft.AST
   alias Deft.Context
+  alias Deft.Error
   alias Deft.Helpers
   alias Deft.Subtyping
   alias Deft.Type
@@ -29,7 +30,14 @@ defmodule Deft.PatternMatching do
         result
 
       {:error, pattern_type} ->
-        Deft.Error.raise!(Deft.Error.unreachable_branch(expected: type, actual: pattern_type))
+        Error.raise!(
+          Error.unreachable_branch(
+            expected: type,
+            actual: pattern_type,
+            location: extract_pattern_location(pattern),
+            expression: pattern
+          )
+        )
     end
   end
 

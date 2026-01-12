@@ -302,6 +302,14 @@ defmodule Deft.Error do
 
   @doc """
   Creates an unreachable branch error.
+
+  ## Options
+
+  - `:expected` - The type of the value being matched (required)
+  - `:actual` - The type the pattern expects (required)
+  - `:location` - Source location of the pattern
+  - `:expression` - The pattern AST
+  - `:spans` - List of labeled spans for multi-span display
   """
   @spec unreachable_branch(keyword()) :: t()
   def unreachable_branch(opts) do
@@ -315,10 +323,11 @@ defmodule Deft.Error do
       actual: actual,
       expression: Keyword.get(opts, :expression),
       location: Keyword.get(opts, :location),
+      spans: Keyword.get(opts, :spans, []),
       suggestions: ["Remove this branch or fix the pattern"],
       notes: [
-        "Value has type: #{format_type(expected)}",
-        "Pattern expects type: #{format_type(actual)}"
+        "Value has type `#{format_type(expected)}`",
+        "Pattern expects type `#{format_type(actual)}`"
       ]
     }
   end
