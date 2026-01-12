@@ -347,7 +347,7 @@ defmodule Deft.Error.FormattedErrorsTest do
 
       assert formatted =~ "error[E0008]"
       assert formatted =~ "Required type system features are not enabled"
-      assert formatted =~ "= help: Enable feature: :polymorphism"
+      assert formatted =~ "= help: Enable feature `:polymorphism"
       assert formatted =~ "= note: Use `use Deft, features:"
     end
 
@@ -360,9 +360,9 @@ defmodule Deft.Error.FormattedErrorsTest do
 
       formatted = Formatter.format(error, colors: false, source_lines: @sample_source)
 
-      assert formatted =~ "= help: Enable feature: :polymorphism"
-      assert formatted =~ "= help: Enable feature: :effects"
-      assert formatted =~ "= help: Enable feature: :refinement_types"
+      assert formatted =~ "= help: Enable feature `:polymorphism"
+      assert formatted =~ "= help: Enable feature `:effects"
+      assert formatted =~ "= help: Enable feature `:refinement_types"
     end
   end
 

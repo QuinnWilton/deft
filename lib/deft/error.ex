@@ -203,6 +203,13 @@ defmodule Deft.Error do
 
   @doc """
   Creates a missing annotation error.
+
+  ## Options
+
+  - `:expression` - The expression requiring annotation (required)
+  - `:location` - Source location
+  - `:notes` - Additional context notes
+  - `:spans` - List of labeled spans for multi-span display
   """
   @spec missing_annotation(keyword()) :: t()
   def missing_annotation(opts) do
@@ -213,6 +220,7 @@ defmodule Deft.Error do
       message: "Missing type annotation on expression",
       expression: expr,
       location: Keyword.get(opts, :location),
+      spans: Keyword.get(opts, :spans, []),
       suggestions: ["Add a type annotation using the `::` operator"],
       notes: Keyword.get(opts, :notes, [])
     }
@@ -220,6 +228,14 @@ defmodule Deft.Error do
 
   @doc """
   Creates a malformed type error.
+
+  ## Options
+
+  - `:expression` - The malformed type expression (required)
+  - `:location` - Source location
+  - `:suggestions` - List of suggested fixes
+  - `:notes` - Additional context notes
+  - `:spans` - List of labeled spans for multi-span display
   """
   @spec malformed_type(keyword()) :: t()
   def malformed_type(opts) do
@@ -230,6 +246,7 @@ defmodule Deft.Error do
       message: "Malformed type expression",
       expression: expr,
       location: Keyword.get(opts, :location),
+      spans: Keyword.get(opts, :spans, []),
       suggestions: Keyword.get(opts, :suggestions, []),
       notes: Keyword.get(opts, :notes, [])
     }
@@ -237,6 +254,16 @@ defmodule Deft.Error do
 
   @doc """
   Creates an unsupported local call error.
+
+  ## Options
+
+  - `:name` - The function name (required)
+  - `:arity` - The function arity (required)
+  - `:expression` - The call expression AST
+  - `:location` - Source location
+  - `:suggestions` - List of suggested fixes
+  - `:notes` - Additional context notes
+  - `:spans` - List of labeled spans for multi-span display
   """
   @spec unsupported_call(keyword()) :: t()
   def unsupported_call(opts) do
@@ -245,9 +272,10 @@ defmodule Deft.Error do
 
     %__MODULE__{
       code: :unsupported_call,
-      message: "Call to unsupported function: #{name}/#{arity}",
+      message: "Call to unsupported function `#{format_call_name(name)}/#{arity}`",
       expression: Keyword.get(opts, :expression),
       location: Keyword.get(opts, :location),
+      spans: Keyword.get(opts, :spans, []),
       suggestions:
         Keyword.get(opts, :suggestions, [
           "Register a type signature for this function",
@@ -256,6 +284,10 @@ defmodule Deft.Error do
       notes: Keyword.get(opts, :notes, [])
     }
   end
+
+  # Format a function name for display, handling module tuples
+  defp format_call_name({module, function}), do: "#{inspect(module)}.#{function}"
+  defp format_call_name(name), do: "#{name}"
 
   @doc """
   Creates an inexhaustive patterns error.
@@ -334,6 +366,13 @@ defmodule Deft.Error do
 
   @doc """
   Creates a no matching rule error.
+
+  ## Options
+
+  - `:ast` - The AST expression with no matching rule (required)
+  - `:location` - Source location
+  - `:notes` - Additional context notes
+  - `:spans` - List of labeled spans for multi-span display
   """
   @spec no_matching_rule(keyword()) :: t()
   def no_matching_rule(opts) do
@@ -344,6 +383,7 @@ defmodule Deft.Error do
       message: "No typing rule matches this expression",
       expression: ast,
       location: Keyword.get(opts, :location),
+      spans: Keyword.get(opts, :spans, []),
       suggestions: ["This construct may not be supported"],
       notes: Keyword.get(opts, :notes, [])
     }
@@ -351,6 +391,13 @@ defmodule Deft.Error do
 
   @doc """
   Creates a missing features error.
+
+  ## Options
+
+  - `:features` - The required feature(s) (required)
+  - `:expression` - The expression requiring the feature
+  - `:location` - Source location
+  - `:spans` - List of labeled spans for multi-span display
   """
   @spec missing_features(keyword()) :: t()
   def missing_features(opts) do
@@ -362,9 +409,10 @@ defmodule Deft.Error do
       message: "Required type system features are not enabled",
       expression: Keyword.get(opts, :expression),
       location: Keyword.get(opts, :location),
+      spans: Keyword.get(opts, :spans, []),
       suggestions:
         Enum.map(features_list, fn f ->
-          "Enable feature: #{inspect(f)}"
+          "Enable feature `#{inspect(f)}`"
         end),
       notes: ["Use `use Deft, features: #{inspect(features_list)}` to enable"]
     }
@@ -407,6 +455,15 @@ defmodule Deft.Error do
   Creates an unsupported syntax error.
 
   Used when the compiler encounters Elixir syntax that Deft doesn't support.
+
+  ## Options
+
+  - `:expression` - The unsupported expression (required)
+  - `:kind` - The kind of unsupported syntax (default: "expression")
+  - `:location` - Source location
+  - `:suggestions` - List of suggested alternatives
+  - `:notes` - Additional context notes
+  - `:spans` - List of labeled spans for multi-span display
   """
   @spec unsupported_syntax(keyword()) :: t()
   def unsupported_syntax(opts) do
@@ -418,6 +475,7 @@ defmodule Deft.Error do
       message: "Unsupported #{kind} in Deft",
       expression: expr,
       location: Keyword.get(opts, :location),
+      spans: Keyword.get(opts, :spans, []),
       suggestions: Keyword.get(opts, :suggestions, []),
       notes: Keyword.get(opts, :notes, [])
     }
@@ -427,6 +485,14 @@ defmodule Deft.Error do
   Creates an unsupported pattern error.
 
   Used when pattern matching encounters a pattern type that Deft doesn't support.
+
+  ## Options
+
+  - `:expression` - The unsupported pattern (required)
+  - `:location` - Source location
+  - `:suggestions` - List of suggested alternatives
+  - `:notes` - Additional context notes
+  - `:spans` - List of labeled spans for multi-span display
   """
   @spec unsupported_pattern(keyword()) :: t()
   def unsupported_pattern(opts) do
@@ -437,6 +503,7 @@ defmodule Deft.Error do
       message: "Unsupported pattern in Deft",
       expression: expr,
       location: Keyword.get(opts, :location),
+      spans: Keyword.get(opts, :spans, []),
       suggestions: Keyword.get(opts, :suggestions, []),
       notes: Keyword.get(opts, :notes, [])
     }
