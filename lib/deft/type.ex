@@ -125,11 +125,13 @@ defmodule Deft.Type do
       fst == snd ->
         fst
 
+      # subtype_of?(super, sub) - if snd <: fst, return snd (the subtype)
       Subtyping.subtype_of?(fst, snd) ->
-        fst
-
-      Subtyping.subtype_of?(snd, fst) ->
         snd
+
+      # subtype_of?(super, sub) - if fst <: snd, return fst (the subtype)
+      Subtyping.subtype_of?(snd, fst) ->
+        fst
 
       true ->
         Type.Intersection.new(fst, snd)

@@ -143,4 +143,35 @@ defmodule Deft.Rules.Core do
 
     conclude(erased_elements ~> Type.fixed_list(elem_type))
   end
+
+  # ============================================================================
+  # Cons Rule (list construction [head | tail])
+  # ============================================================================
+
+  defrule :cons, %AST.Cons{head: head, rest: rest, meta: meta} do
+    head ~> {erased_head, head_type}
+    rest ~> {erased_rest, rest_type}
+
+    compute result_type do
+      # The rest must be a list type.
+      case rest_type do
+        %Type.FixedList{} ->
+          elem_type = Type.FixedList.contents(rest_type)
+          Type.fixed_list(Type.union(head_type, elem_type))
+
+        %Type.List{} ->
+          Type.list()
+
+        _ ->
+          Deft.Error.raise!(
+            Deft.Error.type_mismatch(
+              expected: Type.list(),
+              actual: rest_type
+            )
+          )
+      end
+    end
+
+    conclude(Erased.cons(meta, erased_head, erased_rest) ~> result_type)
+  end
 end

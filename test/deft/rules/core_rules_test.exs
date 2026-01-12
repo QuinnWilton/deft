@@ -281,4 +281,62 @@ defmodule Deft.Rules.CoreRulesTest do
       assert [1, 2] = erased
     end
   end
+
+  describe "cons rule" do
+    test "matches AST.Cons nodes" do
+      ast = cons(literal(1), list([]))
+      assert Core.Rule_cons.matches?(ast)
+    end
+
+    test "synthesizes list type from cons expression", %{ctx: ctx} do
+      ast = cons(literal(1), list([]))
+
+      {:ok, _erased, type, _bindings, _ctx} = TypeChecker.check(ast, ctx)
+
+      assert %Type.FixedList{} = type
+      assert %Type.Integer{} = Type.FixedList.contents(type)
+    end
+
+    test "unions head type with tail element type", %{ctx: ctx} do
+      # [1 | [true, false]] should produce [integer | boolean]
+      ast = cons(literal(1), list([literal(true), literal(false)]))
+
+      {:ok, _erased, type, _bindings, _ctx} = TypeChecker.check(ast, ctx)
+
+      assert %Type.FixedList{} = type
+      elem_type = Type.FixedList.contents(type)
+      assert %Type.Union{} = elem_type
+    end
+
+    test "cons with empty tail", %{ctx: ctx} do
+      ast = cons(literal(:ok), list([]))
+
+      {:ok, _erased, type, _bindings, _ctx} = TypeChecker.check(ast, ctx)
+
+      assert %Type.FixedList{} = type
+      # Empty list has bottom type, union with atom is atom.
+      elem_type = Type.FixedList.contents(type)
+      assert %Type.Atom{} = elem_type
+    end
+
+    test "erases to cons expression", %{ctx: ctx} do
+      ast = cons(literal(1), list([literal(2)]))
+
+      {:ok, erased, _type, _bindings, _ctx} = TypeChecker.check(ast, ctx)
+
+      assert {:|, _, [1, [2]]} = erased
+    end
+
+    test "raises error when tail is not a list", %{ctx: ctx} do
+      # [1 | 2] - tail is integer, not a list
+      ast = cons(literal(1), literal(2))
+
+      error =
+        assert_raise Deft.Error.Exception, fn ->
+          TypeChecker.check(ast, ctx)
+        end
+
+      assert error.error.code == :type_mismatch
+    end
+  end
 end

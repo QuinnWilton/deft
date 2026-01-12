@@ -51,15 +51,16 @@ defmodule Deft.Subtyping do
     subtype_of?(fst, sub) or subtype_of?(snd, sub)
   end
 
-  # Intersection as sub: Intersection(a, b) <: super if a <: super OR b <: super
-  # (Must be checked before Intersection as super when both args are Intersections)
-  def subtype_of?(super, %Type.Intersection{fst: fst, snd: snd}) do
-    subtype_of?(super, fst) or subtype_of?(super, snd)
-  end
-
   # Intersection as super: sub <: Intersection(a, b) if sub <: a AND sub <: b
+  # (Must be checked before Intersection as sub when both args are Intersections,
+  # so that A & B & C <: D & E decomposes to checking against D and E separately)
   def subtype_of?(%Type.Intersection{fst: fst, snd: snd}, sub) do
     subtype_of?(fst, sub) and subtype_of?(snd, sub)
+  end
+
+  # Intersection as sub: Intersection(a, b) <: super if a <: super OR b <: super
+  def subtype_of?(super, %Type.Intersection{fst: fst, snd: snd}) do
+    subtype_of?(super, fst) or subtype_of?(super, snd)
   end
 
   # ADT/Variant relationship: Variant <: ADT if variant belongs to ADT

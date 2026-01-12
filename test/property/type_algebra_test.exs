@@ -57,13 +57,12 @@ defmodule Deft.Property.TypeAlgebraTest do
       end
     end
 
-    property "T & Bottom simplifies based on subtyping" do
+    property "T & Bottom = Bottom (intersection with empty type)" do
       check all(type <- Types.primitive_type(), max_shrinking_steps: 0) do
-        # Since Bottom <: T for all T, intersection(T, Bottom) = T
-        # (because the subtype is the lower bound in intersection)
+        # Bottom is the empty type (no values). Intersection with empty = empty.
+        # This is dual to union: T | Bottom = T, but T & Bottom = Bottom.
         intersection = Type.intersection(type, Type.bottom())
-        # The result should be the type itself (since Bottom <: T)
-        assert intersection == type
+        assert intersection == Type.bottom()
       end
     end
   end

@@ -199,4 +199,19 @@ defmodule Deft.AST.Erased do
   def match(meta, pattern, value) do
     {:=, meta, [pattern, value]}
   end
+
+  # ============================================================================
+  # List Construction
+  # ============================================================================
+
+  @doc """
+  Builds a cons (list construction) expression AST.
+
+      iex> Erased.cons([], :head, :tail)
+      {:|, [], [:head, :tail]}
+  """
+  @spec cons(keyword(), term(), term()) :: Macro.t()
+  def cons(meta, head, tail) do
+    {:|, meta, [head, tail]}
+  end
 end

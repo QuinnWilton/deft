@@ -209,6 +209,17 @@ defmodule Deft.TestHelpers.ASTBuilders do
     AST.List.new(elements)
   end
 
+  @doc """
+  Creates a cons (list construction) AST node.
+
+  ## Examples
+
+      cons(literal(1), list([literal(2), literal(3)]))
+  """
+  def cons(head, rest) do
+    AST.Cons.new(head, rest)
+  end
+
   # Blocks
 
   @doc """

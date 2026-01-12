@@ -124,7 +124,9 @@ defmodule Deft.WalkableTest do
     end
 
     test "Intersection has fst and snd as children" do
-      intersection_type = Type.Intersection.new(Type.integer(), Type.boolean())
+      # Create intersection struct directly to test Walkable protocol,
+      # bypassing normalization that would simplify disjoint types to Bottom.
+      intersection_type = %Type.Intersection{fst: Type.integer(), snd: Type.boolean()}
 
       [fst, snd] = Walkable.children(intersection_type)
 

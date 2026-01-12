@@ -171,11 +171,12 @@ defmodule Deft.PatternMatching do
         tuple_type = Type.fixed_tuple(types)
 
         # Merge duplicate bindings with intersection types.
+        # Use top() as initial value since intersection(top, x) = x.
         bindings =
           inner_bindings
           |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
           |> Enum.map(fn {local, types} ->
-            merged_type = Enum.reduce(types, Type.bottom(), &Type.intersection/2)
+            merged_type = Enum.reduce(types, Type.top(), &Type.intersection/2)
             {local, merged_type}
           end)
 
@@ -263,11 +264,12 @@ defmodule Deft.PatternMatching do
           erased = {:{}, constructor.meta, columns}
 
           # Merge duplicate bindings with intersection types.
+          # Use top() as initial value since intersection(top, x) = x.
           bindings =
             inner_bindings
             |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
             |> Enum.map(fn {local, types} ->
-              merged_type = Enum.reduce(types, Type.bottom(), &Type.intersection/2)
+              merged_type = Enum.reduce(types, Type.top(), &Type.intersection/2)
               {local, merged_type}
             end)
 
