@@ -10,6 +10,7 @@ defmodule Deft.Guards do
   """
 
   alias Deft.Context
+  alias Deft.Error
   alias Deft.Signatures
   alias Deft.Subtyping
   alias Deft.Type
@@ -120,27 +121,51 @@ defmodule Deft.Guards do
   end
 
   # Unary math: number -> same type
-  defp do_handle_guard(name, [term], ctx) when name in @unary_math do
-    {:ok, term, term_t, bindings, _} = TypeChecker.check(term, ctx)
+  defp do_handle_guard(name, [term_ast], ctx) when name in @unary_math do
+    {:ok, term, term_t, bindings, _} = TypeChecker.check(term_ast, ctx)
 
     unless Subtyping.subtype_of?(Type.number(), term_t) do
-      Deft.Error.raise!(Deft.Error.type_mismatch(expected: Type.number(), actual: term_t))
+      Error.raise!(
+        Error.type_mismatch(
+          expected: Type.number(),
+          actual: term_t,
+          location: Error.extract_location(term_ast),
+          expression: term_ast,
+          notes: ["Operator `#{name}` requires a `number` operand"]
+        )
+      )
     end
 
     {[term], term_t, bindings}
   end
 
   # Binary math: number, number -> number (preserves most specific type)
-  defp do_handle_guard(name, [fst, snd], ctx) when name in @binary_math do
-    {:ok, fst, fst_t, fst_bindings, _} = TypeChecker.check(fst, ctx)
-    {:ok, snd, snd_t, snd_bindings, _} = TypeChecker.check(snd, ctx)
+  defp do_handle_guard(name, [fst_ast, snd_ast], ctx) when name in @binary_math do
+    {:ok, fst, fst_t, fst_bindings, _} = TypeChecker.check(fst_ast, ctx)
+    {:ok, snd, snd_t, snd_bindings, _} = TypeChecker.check(snd_ast, ctx)
 
     unless Subtyping.subtype_of?(Type.number(), fst_t) do
-      Deft.Error.raise!(Deft.Error.type_mismatch(expected: Type.number(), actual: fst_t))
+      Error.raise!(
+        Error.type_mismatch(
+          expected: Type.number(),
+          actual: fst_t,
+          location: Error.extract_location(fst_ast),
+          expression: fst_ast,
+          notes: ["Left operand of `#{name}` must be a `number`"]
+        )
+      )
     end
 
     unless Subtyping.subtype_of?(Type.number(), snd_t) do
-      Deft.Error.raise!(Deft.Error.type_mismatch(expected: Type.number(), actual: snd_t))
+      Error.raise!(
+        Error.type_mismatch(
+          expected: Type.number(),
+          actual: snd_t,
+          location: Error.extract_location(snd_ast),
+          expression: snd_ast,
+          notes: ["Right operand of `#{name}` must be a `number`"]
+        )
+      )
     end
 
     # Compute result type: most specific common type
@@ -155,54 +180,102 @@ defmodule Deft.Guards do
   end
 
   # Integer division: integer, integer -> integer
-  defp do_handle_guard(name, [fst, snd], ctx) when name in @integer_division do
-    {:ok, fst, fst_t, fst_bindings, _} = TypeChecker.check(fst, ctx)
-    {:ok, snd, snd_t, snd_bindings, _} = TypeChecker.check(snd, ctx)
+  defp do_handle_guard(name, [fst_ast, snd_ast], ctx) when name in @integer_division do
+    {:ok, fst, fst_t, fst_bindings, _} = TypeChecker.check(fst_ast, ctx)
+    {:ok, snd, snd_t, snd_bindings, _} = TypeChecker.check(snd_ast, ctx)
 
     unless Subtyping.subtype_of?(Type.integer(), fst_t) do
-      Deft.Error.raise!(Deft.Error.type_mismatch(expected: Type.integer(), actual: fst_t))
+      Error.raise!(
+        Error.type_mismatch(
+          expected: Type.integer(),
+          actual: fst_t,
+          location: Error.extract_location(fst_ast),
+          expression: fst_ast,
+          notes: ["Left operand of `#{name}` must be an `integer`"]
+        )
+      )
     end
 
     unless Subtyping.subtype_of?(Type.integer(), snd_t) do
-      Deft.Error.raise!(Deft.Error.type_mismatch(expected: Type.integer(), actual: snd_t))
+      Error.raise!(
+        Error.type_mismatch(
+          expected: Type.integer(),
+          actual: snd_t,
+          location: Error.extract_location(snd_ast),
+          expression: snd_ast,
+          notes: ["Right operand of `#{name}` must be an `integer`"]
+        )
+      )
     end
 
     {[fst, snd], Type.integer(), fst_bindings ++ snd_bindings}
   end
 
   # Division: number, number -> float
-  defp do_handle_guard(:/, [fst, snd], ctx) do
-    {:ok, fst, fst_t, fst_bindings, _} = TypeChecker.check(fst, ctx)
-    {:ok, snd, snd_t, snd_bindings, _} = TypeChecker.check(snd, ctx)
+  defp do_handle_guard(:/, [fst_ast, snd_ast], ctx) do
+    {:ok, fst, fst_t, fst_bindings, _} = TypeChecker.check(fst_ast, ctx)
+    {:ok, snd, snd_t, snd_bindings, _} = TypeChecker.check(snd_ast, ctx)
 
     unless Subtyping.subtype_of?(Type.number(), fst_t) do
-      Deft.Error.raise!(Deft.Error.type_mismatch(expected: Type.number(), actual: fst_t))
+      Error.raise!(
+        Error.type_mismatch(
+          expected: Type.number(),
+          actual: fst_t,
+          location: Error.extract_location(fst_ast),
+          expression: fst_ast,
+          notes: ["Left operand of `/` must be a `number`"]
+        )
+      )
     end
 
     unless Subtyping.subtype_of?(Type.number(), snd_t) do
-      Deft.Error.raise!(Deft.Error.type_mismatch(expected: Type.number(), actual: snd_t))
+      Error.raise!(
+        Error.type_mismatch(
+          expected: Type.number(),
+          actual: snd_t,
+          location: Error.extract_location(snd_ast),
+          expression: snd_ast,
+          notes: ["Right operand of `/` must be a `number`"]
+        )
+      )
     end
 
     {[fst, snd], Type.float(), fst_bindings ++ snd_bindings}
   end
 
   # tuple_size: tuple -> integer
-  defp do_handle_guard(:tuple_size, [term], ctx) do
-    {:ok, term, term_t, bindings, _} = TypeChecker.check(term, ctx)
+  defp do_handle_guard(:tuple_size, [term_ast], ctx) do
+    {:ok, term, term_t, bindings, _} = TypeChecker.check(term_ast, ctx)
 
     unless Subtyping.subtype_of?(Type.tuple(), term_t) do
-      Deft.Error.raise!(Deft.Error.type_mismatch(expected: Type.tuple(), actual: term_t))
+      Error.raise!(
+        Error.type_mismatch(
+          expected: Type.tuple(),
+          actual: term_t,
+          location: Error.extract_location(term_ast),
+          expression: term_ast,
+          notes: ["`tuple_size` requires a `tuple` argument"]
+        )
+      )
     end
 
     {[term], Type.integer(), bindings}
   end
 
   # length: list -> integer
-  defp do_handle_guard(:length, [term], ctx) do
-    {:ok, term, term_t, bindings, _} = TypeChecker.check(term, ctx)
+  defp do_handle_guard(:length, [term_ast], ctx) do
+    {:ok, term, term_t, bindings, _} = TypeChecker.check(term_ast, ctx)
 
     unless Subtyping.subtype_of?(Type.list(), term_t) do
-      Deft.Error.raise!(Deft.Error.type_mismatch(expected: Type.list(), actual: term_t))
+      Error.raise!(
+        Error.type_mismatch(
+          expected: Type.list(),
+          actual: term_t,
+          location: Error.extract_location(term_ast),
+          expression: term_ast,
+          notes: ["`length` requires a `list` argument"]
+        )
+      )
     end
 
     {[term], Type.integer(), bindings}
@@ -216,34 +289,58 @@ defmodule Deft.Guards do
   end
 
   # is_function/2: any, integer -> boolean
-  defp do_handle_guard(:is_function, [fun, arity], ctx) do
-    {:ok, fun, _, fun_bindings, _} = TypeChecker.check(fun, ctx)
-    {:ok, arity, arity_t, arity_bindings, _} = TypeChecker.check(arity, ctx)
+  defp do_handle_guard(:is_function, [fun_ast, arity_ast], ctx) do
+    {:ok, fun, _, fun_bindings, _} = TypeChecker.check(fun_ast, ctx)
+    {:ok, arity, arity_t, arity_bindings, _} = TypeChecker.check(arity_ast, ctx)
 
     unless Subtyping.subtype_of?(Type.integer(), arity_t) do
-      Deft.Error.raise!(Deft.Error.type_mismatch(expected: Type.integer(), actual: arity_t))
+      Error.raise!(
+        Error.type_mismatch(
+          expected: Type.integer(),
+          actual: arity_t,
+          location: Error.extract_location(arity_ast),
+          expression: arity_ast,
+          notes: ["Second argument to `is_function` must be an `integer` arity"]
+        )
+      )
     end
 
     {[fun, arity], Type.boolean(), fun_bindings ++ arity_bindings}
   end
 
   # not: boolean -> boolean
-  defp do_handle_guard(:not, [term], ctx) do
-    {:ok, term, term_t, bindings, _} = TypeChecker.check(term, ctx)
+  defp do_handle_guard(:not, [term_ast], ctx) do
+    {:ok, term, term_t, bindings, _} = TypeChecker.check(term_ast, ctx)
 
     unless Subtyping.subtype_of?(Type.boolean(), term_t) do
-      Deft.Error.raise!(Deft.Error.type_mismatch(expected: Type.boolean(), actual: term_t))
+      Error.raise!(
+        Error.type_mismatch(
+          expected: Type.boolean(),
+          actual: term_t,
+          location: Error.extract_location(term_ast),
+          expression: term_ast,
+          notes: ["`not` requires a `boolean` argument"]
+        )
+      )
     end
 
     {[term], term_t, bindings}
   end
 
   # hd: list(a) -> a (preserves element type)
-  defp do_handle_guard(:hd, [term], ctx) do
-    {:ok, term, term_t, bindings, _} = TypeChecker.check(term, ctx)
+  defp do_handle_guard(:hd, [term_ast], ctx) do
+    {:ok, term, term_t, bindings, _} = TypeChecker.check(term_ast, ctx)
 
     unless Subtyping.subtype_of?(Type.list(), term_t) do
-      Deft.Error.raise!(Deft.Error.type_mismatch(expected: Type.list(), actual: term_t))
+      Error.raise!(
+        Error.type_mismatch(
+          expected: Type.list(),
+          actual: term_t,
+          location: Error.extract_location(term_ast),
+          expression: term_ast,
+          notes: ["`hd` requires a `list` argument"]
+        )
+      )
     end
 
     # Extract element type if available, otherwise fall back to top.
@@ -253,27 +350,51 @@ defmodule Deft.Guards do
   end
 
   # tl: list(a) -> list(a) (preserves list type)
-  defp do_handle_guard(:tl, [term], ctx) do
-    {:ok, term, term_t, bindings, _} = TypeChecker.check(term, ctx)
+  defp do_handle_guard(:tl, [term_ast], ctx) do
+    {:ok, term, term_t, bindings, _} = TypeChecker.check(term_ast, ctx)
 
     unless Subtyping.subtype_of?(Type.list(), term_t) do
-      Deft.Error.raise!(Deft.Error.type_mismatch(expected: Type.list(), actual: term_t))
+      Error.raise!(
+        Error.type_mismatch(
+          expected: Type.list(),
+          actual: term_t,
+          location: Error.extract_location(term_ast),
+          expression: term_ast,
+          notes: ["`tl` requires a `list` argument"]
+        )
+      )
     end
 
     {[term], term_t, bindings}
   end
 
   # elem: tuple, integer -> union of element types
-  defp do_handle_guard(:elem, [tuple, index], ctx) do
-    {:ok, tuple, tuple_t, tuple_bindings, _} = TypeChecker.check(tuple, ctx)
-    {:ok, index, index_t, index_bindings, _} = TypeChecker.check(index, ctx)
+  defp do_handle_guard(:elem, [tuple_ast, index_ast], ctx) do
+    {:ok, tuple, tuple_t, tuple_bindings, _} = TypeChecker.check(tuple_ast, ctx)
+    {:ok, index, index_t, index_bindings, _} = TypeChecker.check(index_ast, ctx)
 
     unless Subtyping.subtype_of?(Type.tuple(), tuple_t) do
-      Deft.Error.raise!(Deft.Error.type_mismatch(expected: Type.tuple(), actual: tuple_t))
+      Error.raise!(
+        Error.type_mismatch(
+          expected: Type.tuple(),
+          actual: tuple_t,
+          location: Error.extract_location(tuple_ast),
+          expression: tuple_ast,
+          notes: ["First argument to `elem` must be a `tuple`"]
+        )
+      )
     end
 
     unless Subtyping.subtype_of?(Type.integer(), index_t) do
-      Deft.Error.raise!(Deft.Error.type_mismatch(expected: Type.integer(), actual: index_t))
+      Error.raise!(
+        Error.type_mismatch(
+          expected: Type.integer(),
+          actual: index_t,
+          location: Error.extract_location(index_ast),
+          expression: index_ast,
+          notes: ["Second argument to `elem` must be an `integer` index"]
+        )
+      )
     end
 
     # Extract element types if available, otherwise fall back to top.
@@ -291,7 +412,7 @@ defmodule Deft.Guards do
         handle_with_signature(name, args, input_types, output_type, ctx)
 
       :error ->
-        Deft.Error.raise!(Deft.Error.unsupported_call(name: name, arity: arity))
+        Error.raise!(Error.unsupported_call(name: name, arity: arity))
     end
   end
 
@@ -311,16 +432,23 @@ defmodule Deft.Guards do
   defp extract_tuple_element_type(_), do: Type.top()
 
   # Handle a guard using a registered signature
-  defp handle_with_signature(_name, args, input_types, output_type, ctx) do
+  defp handle_with_signature(name, args, input_types, output_type, ctx) do
     {erased_args, bindings} =
       args
       |> Enum.zip(input_types)
-      |> Enum.reduce({[], []}, fn {arg, expected_type}, {erased_acc, bindings_acc} ->
-        {:ok, erased, actual_type, bindings, _} = TypeChecker.check(arg, ctx)
+      |> Enum.with_index(1)
+      |> Enum.reduce({[], []}, fn {{arg_ast, expected_type}, index}, {erased_acc, bindings_acc} ->
+        {:ok, erased, actual_type, bindings, _} = TypeChecker.check(arg_ast, ctx)
 
         unless Subtyping.subtype_of?(expected_type, actual_type) do
-          Deft.Error.raise!(
-            Deft.Error.type_mismatch(expected: expected_type, actual: actual_type)
+          Error.raise!(
+            Error.type_mismatch(
+              expected: expected_type,
+              actual: actual_type,
+              location: Error.extract_location(arg_ast),
+              expression: arg_ast,
+              notes: ["Argument #{index} to `#{name}` has wrong type"]
+            )
           )
         end
 
