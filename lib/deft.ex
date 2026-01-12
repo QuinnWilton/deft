@@ -310,8 +310,9 @@ defmodule Deft do
     # Build a map from alias names to ADT types for resolution
     alias_map = build_alias_map(adt_bindings)
 
-    # Type-check all function bodies and generate function definitions
-    function_defs =
+    # FIRST PASS: Update all signatures with resolved types
+    # This must happen before type-checking so that function calls resolve correctly
+    definitions_with_resolved_types =
       Enum.map(definitions, fn {name, arity, params, param_types, return_type, body, caller_escaped, fn_meta, return_type_loc} ->
         caller = Code.eval_quoted(caller_escaped) |> elem(0)
 
@@ -319,6 +320,17 @@ defmodule Deft do
         resolved_param_types = Enum.map(param_types, &resolve_aliases(&1, alias_map))
         resolved_return_type = resolve_aliases(return_type, alias_map)
 
+        # Update the signature in the registry with resolved types
+        resolved_signature = Deft.Type.fun(resolved_param_types, resolved_return_type)
+        Deft.Signatures.register({caller.module, name, arity}, resolved_signature)
+
+        # Return the definition with resolved types for the second pass
+        {name, arity, params, resolved_param_types, resolved_return_type, body, caller, fn_meta, return_type_loc}
+      end)
+
+    # SECOND PASS: Type-check all function bodies and generate function definitions
+    function_defs =
+      Enum.map(definitions_with_resolved_types, fn {name, arity, params, resolved_param_types, resolved_return_type, body, caller, fn_meta, return_type_loc} ->
         # Compile and type-check the body
         compiled_body = Compiler.compile(body)
 

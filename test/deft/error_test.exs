@@ -113,7 +113,19 @@ defmodule Deft.ErrorTest do
   end
 
   describe "unreachable_branch/1" do
-    test "creates error with expected and actual types" do
+    test "creates error with subject and pattern types" do
+      error =
+        Error.unreachable_branch(
+          subject_type: Type.integer(),
+          pattern_type: Type.float()
+        )
+
+      assert error.code == :unreachable_branch
+      assert error.message =~ "Pattern `float` can never match subject of type `integer`"
+      assert "Remove this unreachable branch" in error.suggestions
+    end
+
+    test "falls back to expected/actual for backwards compatibility" do
       error =
         Error.unreachable_branch(
           expected: Type.integer(),
@@ -121,8 +133,7 @@ defmodule Deft.ErrorTest do
         )
 
       assert error.code == :unreachable_branch
-      assert error.message == "Branch is unreachable"
-      assert "Remove this branch or fix the pattern" in error.suggestions
+      assert error.message =~ "Pattern `float` can never match subject of type `integer`"
     end
   end
 

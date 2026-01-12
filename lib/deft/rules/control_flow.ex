@@ -72,7 +72,11 @@ defmodule Deft.Rules.ControlFlow do
       Enum.map(branches, fn %AST.CaseBranch{pattern: pattern, body: body, meta: branch_meta} ->
         # Handle pattern against subject type
         {erased_pattern, pattern_type, pattern_bindings} =
-          PatternMatching.handle_pattern(pattern, subject_type, ctx)
+          PatternMatching.handle_pattern(pattern, subject_type, ctx,
+            branch_meta: branch_meta,
+            subject: subject,
+            subject_type: subject_type
+          )
 
         # Synthesize body with pattern bindings
         all_bindings = bindings ++ pattern_bindings
@@ -89,8 +93,13 @@ defmodule Deft.Rules.ControlFlow do
 
     # Check exhaustiveness if feature enabled
     if_feature :exhaustiveness_checking do
-      case_location = Error.extract_location(subject)
-      Deft.Rules.ControlFlow.exhaustive_check!(subject_type, pattern_types, case_location)
+      Deft.Rules.ControlFlow.exhaustive_check!(
+        subject_type,
+        pattern_types,
+        subject: subject,
+        branches: branches,
+        ctx: ctx
+      )
     end
 
     conclude(
@@ -100,14 +109,25 @@ defmodule Deft.Rules.ControlFlow do
   end
 
   @doc false
-  def exhaustive_check!(subject_type, pattern_types, location \\ nil)
-
-  def exhaustive_check!(%Type.Union{} = subject_type, pattern_types, location) do
-    exhaustive_check!(subject_type.fst, pattern_types, location)
-    exhaustive_check!(subject_type.snd, pattern_types, location)
+  # Backwards-compatible 2-argument version for testing
+  def exhaustive_check!(subject_type, pattern_types) do
+    exhaustive_check!(subject_type, pattern_types, nil)
   end
 
-  def exhaustive_check!(%Type.ADT{} = subject_type, pattern_types, location) do
+  def exhaustive_check!(subject_type, pattern_types, opts)
+
+  # Simple location-only call (for tests and simple cases)
+  def exhaustive_check!(%Type.Union{} = subject_type, pattern_types, nil) do
+    exhaustive_check!(subject_type.fst, pattern_types, nil)
+    exhaustive_check!(subject_type.snd, pattern_types, nil)
+  end
+
+  def exhaustive_check!(%Type.Union{} = subject_type, pattern_types, opts) when is_list(opts) do
+    exhaustive_check!(subject_type.fst, pattern_types, opts)
+    exhaustive_check!(subject_type.snd, pattern_types, opts)
+  end
+
+  def exhaustive_check!(%Type.ADT{} = subject_type, pattern_types, nil) do
     # Find which variants are covered
     {covered, missing} =
       Enum.split_with(subject_type.variants, fn variant ->
@@ -120,23 +140,95 @@ defmodule Deft.Rules.ControlFlow do
       Error.raise!(
         Error.inexhaustive_patterns(
           missing: missing,
-          covered: covered,
-          location: location
+          covered: covered
         )
       )
     end
   end
 
-  def exhaustive_check!(subject_type, pattern_types, location) do
+  def exhaustive_check!(%Type.ADT{} = subject_type, pattern_types, opts) when is_list(opts) do
+    # Find which variants are covered
+    {covered, missing} =
+      Enum.split_with(subject_type.variants, fn variant ->
+        Enum.any?(pattern_types, fn pattern ->
+          Subtyping.subtype_of?(pattern, variant)
+        end)
+      end)
+
+    unless Enum.empty?(missing) do
+      raise_inexhaustive_error(subject_type, missing, covered, opts)
+    end
+  end
+
+  def exhaustive_check!(subject_type, pattern_types, nil) do
     unless Enum.any?(pattern_types, &Subtyping.subtype_of?(&1, subject_type)) do
       Error.raise!(
         Error.inexhaustive_patterns(
-          missing: subject_type,
-          location: location
+          missing: subject_type
         )
       )
     end
   end
+
+  def exhaustive_check!(subject_type, pattern_types, opts) when is_list(opts) do
+    unless Enum.any?(pattern_types, &Subtyping.subtype_of?(&1, subject_type)) do
+      raise_inexhaustive_error(subject_type, subject_type, [], opts)
+    end
+  end
+
+  defp raise_inexhaustive_error(subject_type, missing, covered, opts) do
+    subject = Keyword.fetch!(opts, :subject)
+    branches = Keyword.fetch!(opts, :branches)
+    ctx = Keyword.fetch!(opts, :ctx)
+
+    # Build spans for the case expression and all branches
+    subject_location = Error.extract_location(subject)
+
+    # Create labels for each covered variant
+    covered_labels =
+      Enum.map(covered, fn variant ->
+        Error.format_type(variant)
+      end)
+
+    # All spans are context (secondary) since the error is about missing branches
+    spans =
+      [
+        # First span: the case subject with its type
+        if subject_location do
+          %{location: subject_location, label: "subject has type", type: subject_type, kind: :secondary}
+        end
+        # Add spans for each branch showing what it covers
+        | branches
+          |> Enum.zip(Stream.concat(covered_labels, Stream.repeatedly(fn -> nil end)))
+          |> Enum.map(fn {%AST.CaseBranch{pattern: pattern, meta: branch_meta}, covered_label} ->
+            pattern_location = extract_pattern_location(pattern) || Error.extract_location(branch_meta)
+            if pattern_location do
+              label = if covered_label, do: "covers `#{covered_label}`", else: "branch"
+              %{location: pattern_location, label: label, type: nil, kind: :secondary}
+            end
+          end)
+      ]
+      |> Enum.reject(&is_nil/1)
+
+    Error.raise!(
+      Error.inexhaustive_patterns(
+        missing: missing,
+        covered: covered,
+        location: subject_location,
+        spans: spans
+      ),
+      ctx
+    )
+  end
+
+  defp extract_pattern_location(%{meta: meta}) when is_list(meta) do
+    line = Keyword.get(meta, :line)
+    column = Keyword.get(meta, :column)
+    file = Keyword.get(meta, :file)
+    if line, do: {file, line, column}, else: nil
+  end
+
+  defp extract_pattern_location(_), do: nil
 
   # ============================================================================
   # Match (Assignment) Rule

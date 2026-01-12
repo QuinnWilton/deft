@@ -302,28 +302,34 @@ defmodule Deft.Context do
   Enriches an error with context information like file location.
   """
   @spec enrich_error(Error.t(), t()) :: Error.t()
-  def enrich_error(%Error{location: nil} = error, %__MODULE__{current_file: file, env: env}) do
+  def enrich_error(%Error{} = error, %__MODULE__{} = ctx) do
+    file_path = ctx.current_file || (ctx.env && ctx.env.file)
+
+    # Enrich main location
     location =
-      if env do
-        {file || env.file, env.line, nil}
-      else
-        nil
+      case error.location do
+        nil ->
+          if ctx.env, do: {file_path, ctx.env.line, nil}, else: nil
+
+        {nil, line, column} when is_integer(line) ->
+          {file_path, line, column}
+
+        other ->
+          other
       end
 
-    %{error | location: location}
-  end
+    # Enrich spans with file path
+    spans =
+      Enum.map(error.spans, fn
+        %{location: {nil, line, column}} = span when is_integer(line) ->
+          %{span | location: {file_path, line, column}}
 
-  # Enrich location that has nil file but valid line/column.
-  def enrich_error(
-        %Error{location: {nil, line, column}} = error,
-        %__MODULE__{current_file: file, env: env}
-      )
-      when is_integer(line) do
-    file_path = file || (env && env.file)
-    %{error | location: {file_path, line, column}}
-  end
+        span ->
+          span
+      end)
 
-  def enrich_error(%Error{} = error, _ctx), do: error
+    %{error | location: location, spans: spans}
+  end
 
   defp error_to_exception(%Error{} = error, _ctx) do
     Error.to_exception(error)

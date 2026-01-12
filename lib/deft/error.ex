@@ -55,12 +55,17 @@ defmodule Deft.Error do
   A labeled span for multi-span error display.
 
   Contains a location tuple, a label describing what this span represents,
-  and optionally a type to display.
+  optionally a type to display, and a kind indicating primary (error) or
+  secondary (context) highlighting.
+
+  - `:primary` spans are highlighted in red (the actual error)
+  - `:secondary` spans are highlighted in yellow (additional context)
   """
   @type labeled_span :: %{
-          location: location(),
-          label: String.t(),
-          type: Type.t() | nil
+          required(:location) => location(),
+          required(:label) => String.t(),
+          optional(:type) => Type.t() | nil,
+          optional(:kind) => :primary | :secondary
         }
 
   @type t :: %__MODULE__{
@@ -173,14 +178,16 @@ defmodule Deft.Error do
           %{
             location: declaration_location,
             label: "declared return type",
-            type: declared_type
+            type: declared_type,
+            kind: :secondary
           }
         end,
         if body_location do
           %{
             location: body_location,
             label: "body has type",
-            type: actual_type
+            type: actual_type,
+            kind: :primary
           }
         end
       ]
@@ -337,29 +344,31 @@ defmodule Deft.Error do
 
   ## Options
 
-  - `:expected` - The type of the value being matched (required)
-  - `:actual` - The type the pattern expects (required)
+  - `:subject_type` - The type of the case subject (required)
+  - `:pattern_type` - The type the pattern matches (required)
   - `:location` - Source location of the pattern
   - `:expression` - The pattern AST
   - `:spans` - List of labeled spans for multi-span display
   """
   @spec unreachable_branch(keyword()) :: t()
   def unreachable_branch(opts) do
-    expected = Keyword.fetch!(opts, :expected)
-    actual = Keyword.fetch!(opts, :actual)
+    # Support both old (:expected/:actual) and new (:subject_type/:pattern_type) keys
+    subject_type = Keyword.get(opts, :subject_type) || Keyword.fetch!(opts, :expected)
+    pattern_type = Keyword.get(opts, :pattern_type) || Keyword.fetch!(opts, :actual)
 
     %__MODULE__{
       code: :unreachable_branch,
-      message: "Branch is unreachable",
-      expected: expected,
-      actual: actual,
+      message: "Pattern `#{format_type(pattern_type)}` can never match subject of type `#{format_type(subject_type)}`",
+      # Don't set expected/actual so the pointer line doesn't show "expected X, found Y"
+      expected: nil,
+      actual: nil,
       expression: Keyword.get(opts, :expression),
       location: Keyword.get(opts, :location),
       spans: Keyword.get(opts, :spans, []),
-      suggestions: ["Remove this branch or fix the pattern"],
+      suggestions: ["Remove this unreachable branch", "Change the pattern to match `#{format_type(subject_type)}`"],
       notes: [
-        "Value has type `#{format_type(expected)}`",
-        "Pattern expects type `#{format_type(actual)}`"
+        "The case subject has type `#{format_type(subject_type)}`",
+        "But this pattern only matches `#{format_type(pattern_type)}`"
       ]
     }
   end

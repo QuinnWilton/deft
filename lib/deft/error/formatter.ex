@@ -238,10 +238,10 @@ defmodule Deft.Error.Formatter do
 
   # Format a single labeled span
   defp format_labeled_span(
-         %{location: {_file, line, column} = location, label: label, type: type},
+         %{location: {_file, line, column} = location, label: label, type: type} = span,
          source_lines,
          line_num_width,
-         error,
+         _error,
          use_colors
        ) do
     source_line = get_source_line_from_location(source_lines, location)
@@ -259,8 +259,15 @@ defmodule Deft.Error.Formatter do
           "#{line_str} | #{source_line}"
         end
 
-      # Format the pointer line with label
-      col = column || 1
+      # For pattern spans, adjust column to point at pattern start (first non-whitespace)
+      # since literal patterns don't have precise column metadata in Elixir AST
+      col =
+        if String.contains?(label, "pattern") do
+          find_first_nonwhitespace_column(source_line)
+        else
+          column || 1
+        end
+
       pointer_padding = String.duplicate(" ", max(0, col - 1))
       pointer_width = estimate_span_width(source_line, col, type)
       pointer = String.duplicate("^", pointer_width)
@@ -281,11 +288,15 @@ defmodule Deft.Error.Formatter do
 
       full_label = "#{label}#{type_str}"
 
+      # Use different colors for primary (error) vs secondary (context) spans
+      # Default to primary if not specified
+      span_kind = Map.get(span, :kind, :primary)
+
       pointer_line =
         if use_colors do
-          error_color = severity_color(error.severity)
+          span_color = span_kind_color(span_kind)
 
-          "#{padding} #{@colors.dim}|#{@colors.reset} #{pointer_padding}#{error_color}#{pointer}#{@colors.reset} #{full_label}"
+          "#{padding} #{@colors.dim}|#{@colors.reset} #{pointer_padding}#{span_color}#{pointer}#{@colors.reset} #{full_label}"
         else
           "#{padding} | #{pointer_padding}#{pointer} #{full_label}"
         end
@@ -499,6 +510,10 @@ defmodule Deft.Error.Formatter do
   defp severity_color(:error), do: @colors.error
   defp severity_color(:warning), do: @colors.warning
 
+  # Colors for span kinds: primary (error) vs secondary (context)
+  defp span_kind_color(:primary), do: @colors.error
+  defp span_kind_color(:secondary), do: @colors.warning
+
   # Gets a source line from the provided source_lines list.
   # Lines are 1-indexed in error locations.
   defp get_source_line(source_lines, line)
@@ -609,6 +624,14 @@ defmodule Deft.Error.Formatter do
       end_col - start_col
     else
       nil
+    end
+  end
+
+  # Find the 1-indexed column of the first non-whitespace character in a line.
+  defp find_first_nonwhitespace_column(line) do
+    case Regex.run(~r/^\s*/, line) do
+      [leading_whitespace] -> String.length(leading_whitespace) + 1
+      _ -> 1
     end
   end
 end

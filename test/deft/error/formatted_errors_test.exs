@@ -274,25 +274,25 @@ defmodule Deft.Error.FormattedErrorsTest do
     test "formats unreachable branch error" do
       error =
         Error.unreachable_branch(
-          expected: Type.integer(),
-          actual: Type.atom(),
+          subject_type: Type.integer(),
+          pattern_type: Type.atom(),
           location: {"lib/example.ex", 10, 5}
         )
 
       formatted = Formatter.format(error, colors: false, source_lines: @sample_source)
 
       assert formatted =~ "error[E0006]"
-      assert formatted =~ "Branch is unreachable"
-      assert formatted =~ "= help: Remove this branch"
-      assert formatted =~ "= note: Value has type `integer`"
-      assert formatted =~ "= note: Pattern expects type `atom`"
+      assert formatted =~ "Pattern `atom` can never match subject of type `integer`"
+      assert formatted =~ "= help: Remove this unreachable branch"
+      assert formatted =~ "= note: The case subject has type `integer`"
+      assert formatted =~ "= note: But this pattern only matches `atom`"
     end
 
     test "formats unreachable branch with complex types" do
       error =
         Error.unreachable_branch(
-          expected: Type.union(Type.integer(), Type.float()),
-          actual: Type.atom(),
+          subject_type: Type.union(Type.integer(), Type.float()),
+          pattern_type: Type.atom(),
           location: {"lib/example.ex", 10, 5}
         )
 

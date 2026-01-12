@@ -22,25 +22,61 @@ defmodule Deft.PatternMatching do
   Handles pattern matching against a type, returning erased pattern, type, and bindings.
 
   Raises `Deft.Error.Exception` if the pattern cannot match the given type.
+
+  ## Options
+
+  - `:branch_meta` - Metadata from the case branch, used as fallback location for literals
+  - `:subject` - The case subject AST, for extracting location in error messages
+  - `:subject_type` - The type of the case subject, for better error messages
   """
-  @spec handle_pattern(term(), Type.t(), Context.t()) :: result()
-  def handle_pattern(pattern, type, %Context{} = ctx) do
+  @spec handle_pattern(term(), Type.t(), Context.t(), keyword()) :: result()
+  def handle_pattern(pattern, type, %Context{} = ctx, opts \\ []) do
     case do_handle_pattern(pattern, type, ctx) do
       {:ok, result} ->
         result
 
       {:error, pattern_type} ->
+        branch_meta = Keyword.get(opts, :branch_meta)
+        subject = Keyword.get(opts, :subject)
+        subject_type = Keyword.get(opts, :subject_type, type)
+
+        pattern_location = extract_pattern_location(pattern) || extract_location_from_meta(branch_meta)
+        subject_location = if subject, do: Error.extract_location(subject), else: nil
+
+        # Build spans for multi-span display
+        # Subject is context (secondary), pattern is the error (primary)
+        spans =
+          [
+            if subject_location do
+              %{location: subject_location, label: "subject has type", type: subject_type, kind: :secondary}
+            end,
+            if pattern_location do
+              %{location: pattern_location, label: "pattern matches", type: pattern_type, kind: :primary}
+            end
+          ]
+          |> Enum.reject(&is_nil/1)
+
         Error.raise!(
           Error.unreachable_branch(
-            expected: type,
-            actual: pattern_type,
-            location: extract_pattern_location(pattern),
-            expression: pattern
+            subject_type: subject_type,
+            pattern_type: pattern_type,
+            location: pattern_location,
+            expression: pattern,
+            spans: spans
           ),
           ctx
         )
     end
   end
+
+  defp extract_location_from_meta(meta) when is_list(meta) do
+    line = Keyword.get(meta, :line)
+    column = Keyword.get(meta, :column)
+    file = Keyword.get(meta, :file)
+    if line, do: {file, line, column}, else: nil
+  end
+
+  defp extract_location_from_meta(_), do: nil
 
   # Union types: try both branches
   defp do_handle_pattern(pattern, %Type.Union{} = type, ctx) do

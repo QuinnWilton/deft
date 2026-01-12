@@ -61,12 +61,14 @@ defmodule Deft.Rules.Builtins do
 
         true ->
           location = Error.extract_location(meta)
+          call_ast = %AST.LocalCall{name: name, args: args, meta: meta}
 
           Error.raise!(
             Error.unsupported_call(
               name: name,
               arity: arity,
-              location: location
+              location: location,
+              expression: call_ast
             ),
             ctx
           )
@@ -116,12 +118,14 @@ defmodule Deft.Rules.Builtins do
 
         :error ->
           location = Error.extract_location(meta)
+          call_ast = %AST.RemoteCall{module: module, function: function, args: args, meta: meta}
 
           Error.raise!(
             Error.unsupported_call(
               name: {module, function},
               arity: arity,
-              location: location
+              location: location,
+              expression: call_ast
             ),
             ctx
           )
@@ -148,12 +152,14 @@ defmodule Deft.Rules.Builtins do
           # Not found in signatures - error
           name = if module, do: {module, function}, else: function
           location = Error.extract_location(meta)
+          capture_ast = %AST.Capture{module: module, function: function, arity: arity, meta: meta}
 
           Error.raise!(
             Error.unsupported_call(
               name: name,
               arity: arity,
-              location: location
+              location: location,
+              expression: capture_ast
             ),
             ctx
           )

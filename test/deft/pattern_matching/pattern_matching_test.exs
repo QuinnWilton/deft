@@ -255,7 +255,7 @@ defmodule Deft.PatternMatchingTest do
       end
     end
 
-    test "error includes expected and actual types", %{ctx: ctx} do
+    test "error includes subject and pattern types in message", %{ctx: ctx} do
       pattern = literal(42)
 
       error =
@@ -264,8 +264,9 @@ defmodule Deft.PatternMatchingTest do
         end
 
       assert error.error.code == :unreachable_branch
-      assert %Type.Boolean{} = error.error.expected
-      assert %Type.Integer{} = error.error.actual
+      # Types are communicated via message and notes, not expected/actual fields
+      assert error.error.message =~ "boolean"
+      assert error.error.message =~ "integer"
     end
   end
 
