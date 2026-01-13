@@ -1,19 +1,13 @@
 defmodule Deft.Type.Fn do
   use Deft.Subtyping.DSL
 
-  parameter(:inputs, variance: :contravariant)
-  parameter(:output, variance: :covariant)
+  # Contravariant inputs with arity check: fn(Number) -> T <: fn(Integer) -> T
+  # because a function accepting Number can be used where one accepting Integer is expected
+  parameter(:inputs, variance: :contravariant, arity: :must_match)
 
-  structural_rule(fn sub, super ->
-    # Contravariant inputs: super's inputs must be subtypes of sub's inputs
-    # Covariant output: sub's output must be subtype of super's output
-    length(sub.inputs) == length(super.inputs) and
-      Enum.zip(sub.inputs, super.inputs)
-      |> Enum.all?(fn {sub_in, super_in} ->
-        Deft.Subtyping.subtype_of?(sub_in, super_in)
-      end) and
-      Deft.Subtyping.subtype_of?(super.output, sub.output)
-  end)
+  # Covariant output: fn(T) -> Integer <: fn(T) -> Number
+  # because a function returning Integer can be used where one returning Number is expected
+  parameter(:output, variance: :covariant)
 
   alias Deft.AST
 

@@ -36,11 +36,8 @@ defmodule Deft.Subtyping.Lattice do
     end
   end
 
-  @doc """
-  Returns the immediate declared supertypes of a type module.
-  """
-  @spec immediate_supertypes(module()) :: [module()]
-  def immediate_supertypes(type_module) do
+  # Returns the immediate declared supertypes of a type module.
+  defp immediate_supertypes(type_module) do
     if has_metadata?(type_module) do
       type_module.__subtyping_metadata__().supertypes
     else
@@ -48,11 +45,8 @@ defmodule Deft.Subtyping.Lattice do
     end
   end
 
-  @doc """
-  Returns the immediate declared subtypes of a type module.
-  """
-  @spec immediate_subtypes(module()) :: [module()]
-  def immediate_subtypes(type_module) do
+  # Returns the immediate declared subtypes of a type module.
+  defp immediate_subtypes(type_module) do
     for mod <- type_modules(),
         type_module in mod.__subtyping_metadata__().supertypes do
       mod
@@ -124,28 +118,15 @@ defmodule Deft.Subtyping.Lattice do
   end
 
   @doc """
-  Returns a map representation of the full lattice for introspection.
+  Returns true if the type module has a check_subtype function for detailed error reporting.
   """
-  @spec to_map() :: map()
-  def to_map do
-    modules = type_modules()
-
-    %{
-      type_modules: modules,
-      edges: edges(),
-      supertypes:
-        Map.new(modules, fn mod ->
-          {mod, supertypes_of(mod)}
-        end),
-      subtypes:
-        Map.new(modules, fn mod ->
-          {mod, subtypes_of(mod)}
-        end),
-      variance:
-        Map.new(modules, fn mod ->
-          {mod, variance_of(mod)}
-        end)
-    }
+  @spec has_check_subtype?(module()) :: boolean()
+  def has_check_subtype?(type_module) do
+    if has_metadata?(type_module) do
+      Map.get(type_module.__subtyping_metadata__(), :has_check_subtype?, false)
+    else
+      false
+    end
   end
 
   defp has_metadata?(mod) do

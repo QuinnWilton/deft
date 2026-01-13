@@ -126,53 +126,17 @@ defmodule Deft.Subtyping do
   @spec check_subtype(Type.t(), Type.t(), term() | [term()] | nil) :: check_result()
   def check_subtype(super, sub, sub_expr \\ nil)
 
-  # FixedTuple: check element-by-element
-  def check_subtype(
-        %Type.FixedTuple{elements: super_elems},
-        %Type.FixedTuple{elements: sub_elems},
-        sub_exprs
-      )
-      when is_list(sub_exprs) do
-    if length(super_elems) != length(sub_elems) do
-      {:mismatch,
-       %{
-         path: [],
-         expected: Type.fixed_tuple(super_elems),
-         actual: Type.fixed_tuple(sub_elems),
-         expr: nil
-       }}
+  # Same type constructor with auto-generated check_subtype - delegate to it
+  def check_subtype(%{__struct__: mod} = super, %{__struct__: mod} = sub, sub_expr) do
+    if Lattice.has_check_subtype?(mod) do
+      mod.check_subtype(sub, super, sub_expr)
     else
-      check_tuple_elements(super_elems, sub_elems, sub_exprs, 0)
-    end
-  end
-
-  # FixedList: check element type
-  def check_subtype(
-        %Type.FixedList{contents: super_contents},
-        %Type.FixedList{contents: sub_contents},
-        sub_expr
-      ) do
-    case check_subtype(super_contents, sub_contents, nil) do
-      :ok -> :ok
-      {:mismatch, info} -> {:mismatch, %{info | expr: sub_expr}}
-    end
-  end
-
-  # Fn: check inputs and output
-  def check_subtype(
-        %Type.Fn{inputs: super_inputs, output: super_output},
-        %Type.Fn{inputs: sub_inputs, output: sub_output},
-        sub_expr
-      ) do
-    # Function subtyping: contravariant in inputs, covariant in output.
-    # sub <: super means sub can be used where super is expected.
-    # For inputs: super_inputs <: sub_inputs (contravariant).
-    # For output: sub_output <: super_output (covariant).
-    with :ok <- check_fn_inputs(super_inputs, sub_inputs, 0),
-         :ok <- check_subtype(super_output, sub_output, nil) do
-      :ok
-    else
-      {:mismatch, info} -> {:mismatch, %{info | expr: info.expr || sub_expr}}
+      # Fallback to basic check
+      if subtype_of?(super, sub) do
+        :ok
+      else
+        {:mismatch, %{path: [], expected: super, actual: sub, expr: sub_expr}}
+      end
     end
   end
 
@@ -183,58 +147,5 @@ defmodule Deft.Subtyping do
     else
       {:mismatch, %{path: [], expected: super, actual: sub, expr: expr}}
     end
-  end
-
-  # Helper: check tuple elements one by one
-  defp check_tuple_elements([], [], [], _idx), do: :ok
-
-  defp check_tuple_elements(
-         [super_elem | super_rest],
-         [sub_elem | sub_rest],
-         [elem_expr | expr_rest],
-         idx
-       ) do
-    case check_subtype(super_elem, sub_elem, elem_expr) do
-      :ok ->
-        check_tuple_elements(super_rest, sub_rest, expr_rest, idx + 1)
-
-      {:mismatch, info} ->
-        {:mismatch, %{info | path: [idx | info.path]}}
-    end
-  end
-
-  # Handle case where sub_exprs is shorter than elements (or nil)
-  defp check_tuple_elements(
-         [super_elem | super_rest],
-         [sub_elem | sub_rest],
-         [],
-         idx
-       ) do
-    case check_subtype(super_elem, sub_elem, nil) do
-      :ok ->
-        check_tuple_elements(super_rest, sub_rest, [], idx + 1)
-
-      {:mismatch, info} ->
-        {:mismatch, %{info | path: [idx | info.path]}}
-    end
-  end
-
-  # Helper: check function inputs (contravariant)
-  defp check_fn_inputs([], [], _idx), do: :ok
-
-  defp check_fn_inputs([super_input | super_rest], [sub_input | sub_rest], idx) do
-    # Contravariant: super_input <: sub_input
-    case check_subtype(sub_input, super_input, nil) do
-      :ok ->
-        check_fn_inputs(super_rest, sub_rest, idx + 1)
-
-      {:mismatch, info} ->
-        {:mismatch, %{info | path: [:input, idx | info.path]}}
-    end
-  end
-
-  defp check_fn_inputs(_, _, _idx) do
-    # Arity mismatch - let the caller handle with full type comparison
-    :ok
   end
 end

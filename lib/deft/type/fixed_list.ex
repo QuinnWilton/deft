@@ -3,11 +3,8 @@ defmodule Deft.Type.FixedList do
 
   subtype_of(Deft.Type.List)
 
+  # Covariant: [Integer] <: [Number] because Integer <: Number
   parameter(:contents, variance: :covariant)
-
-  structural_rule(fn sub, super ->
-    Deft.Subtyping.subtype_of?(super.contents, sub.contents)
-  end)
 
   alias Deft.AST
 
