@@ -5,6 +5,6 @@ defmodule Deft.Signatures.String do
 
   use Deft.Signatures.DSL, for: String
 
-  sig(to_integer(binary) :: integer)
-  sig(to_float(binary) :: float)
+  sig to_integer(binary) :: integer
+  sig to_float(binary) :: float
 end

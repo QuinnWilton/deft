@@ -5,5 +5,5 @@ defmodule Deft.Signatures.IO do
 
   use Deft.Signatures.DSL, for: IO
 
-  sig(puts(top) :: atom)
+  sig puts(top) :: atom
 end
