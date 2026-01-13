@@ -29,6 +29,9 @@ defmodule Deft.PatternMatching do
   - `:branch_meta` - Metadata from the case branch, used as fallback location for literals
   - `:subject` - The case subject AST, for extracting location in error messages
   - `:subject_type` - The type of the case subject, for better error messages
+
+  If options are not provided, falls back to reading `:subj` and `:subj_t` from
+  scoped context (set by parent rules via `&&&`).
   """
   @spec handle_pattern(term(), Type.t(), Context.t(), keyword()) :: result()
   def handle_pattern(pattern, type, %Context{} = ctx, opts \\ []) do
@@ -37,9 +40,10 @@ defmodule Deft.PatternMatching do
         result
 
       {:error, pattern_type} ->
+        # Fall back to scoped context if opts not provided
+        subject = Keyword.get(opts, :subject) || Context.get_scoped(ctx, :subj)
+        subject_type = Keyword.get(opts, :subject_type) || Context.get_scoped(ctx, :subj_t) || type
         branch_meta = Keyword.get(opts, :branch_meta)
-        subject = Keyword.get(opts, :subject)
-        subject_type = Keyword.get(opts, :subject_type, type)
 
         pattern_location = Span.extract(pattern) || Span.extract(branch_meta)
         subject_location = if subject, do: Span.extract(subject), else: nil
