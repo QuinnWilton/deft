@@ -29,4 +29,9 @@ defmodule Deft.Type.Binary do
       string("binary")
     end
   end
+
+  defimpl Deft.Walkable do
+    def children(_node), do: []
+    def rebuild(node, []), do: node
+  end
 end

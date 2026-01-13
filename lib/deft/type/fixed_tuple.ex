@@ -45,4 +45,9 @@ defmodule Deft.Type.FixedTuple do
       )
     end
   end
+
+  defimpl Deft.Walkable do
+    def children(node), do: [node.elements]
+    def rebuild(node, [elements]), do: %{node | elements: elements}
+  end
 end

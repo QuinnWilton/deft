@@ -38,4 +38,9 @@ defmodule Deft.Type.Union do
       ])
     end
   end
+
+  defimpl Deft.Walkable do
+    def children(node), do: [node.fst, node.snd]
+    def rebuild(node, [fst, snd]), do: %{node | fst: fst, snd: snd}
+  end
 end

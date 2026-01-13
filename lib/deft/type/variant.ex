@@ -29,4 +29,9 @@ defmodule Deft.Type.Variant do
       ])
     end
   end
+
+  defimpl Deft.Walkable do
+    def children(node), do: [node.columns]
+    def rebuild(node, [columns]), do: %{node | columns: columns}
+  end
 end

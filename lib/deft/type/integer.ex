@@ -27,4 +27,9 @@ defmodule Deft.Type.Integer do
       string("integer")
     end
   end
+
+  defimpl Deft.Walkable do
+    def children(_node), do: []
+    def rebuild(node, []), do: node
+  end
 end

@@ -49,4 +49,9 @@ defmodule Deft.Type.Fn do
       ])
     end
   end
+
+  defimpl Deft.Walkable do
+    def children(node), do: [node.inputs, node.output]
+    def rebuild(node, [inputs, output]), do: %{node | inputs: inputs, output: output}
+  end
 end

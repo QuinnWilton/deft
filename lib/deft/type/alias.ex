@@ -18,4 +18,9 @@ defmodule Deft.Type.Alias do
       Atom.to_string(t.name)
     end
   end
+
+  defimpl Deft.Walkable do
+    def children(_node), do: []
+    def rebuild(node, []), do: node
+  end
 end

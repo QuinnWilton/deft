@@ -39,4 +39,9 @@ defmodule Deft.Type.Var do
   defimpl Inspect do
     def inspect(t, _opts), do: Atom.to_string(t.name)
   end
+
+  defimpl Deft.Walkable do
+    def children(_node), do: []
+    def rebuild(node, []), do: node
+  end
 end

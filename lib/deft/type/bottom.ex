@@ -25,4 +25,9 @@ defmodule Deft.Type.Bottom do
       string("⊥")
     end
   end
+
+  defimpl Deft.Walkable do
+    def children(_node), do: []
+    def rebuild(node, []), do: node
+  end
 end

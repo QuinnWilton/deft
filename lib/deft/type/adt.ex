@@ -33,4 +33,9 @@ defmodule Deft.Type.ADT do
       ])
     end
   end
+
+  defimpl Deft.Walkable do
+    def children(node), do: [node.variants]
+    def rebuild(node, [variants]), do: %{node | variants: variants}
+  end
 end

@@ -41,4 +41,9 @@ defmodule Deft.Type.FixedList do
       ])
     end
   end
+
+  defimpl Deft.Walkable do
+    def children(node), do: [node.contents]
+    def rebuild(node, [contents]), do: %{node | contents: contents}
+  end
 end

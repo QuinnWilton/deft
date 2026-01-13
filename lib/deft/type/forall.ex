@@ -88,4 +88,9 @@ defmodule Deft.Type.Forall do
       ])
     end
   end
+
+  defimpl Deft.Walkable do
+    def children(node), do: [node.body]
+    def rebuild(node, [body]), do: %{node | body: body}
+  end
 end
