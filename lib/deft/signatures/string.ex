@@ -3,8 +3,14 @@ defmodule Deft.Signatures.String do
   Type signatures for String module functions.
 
   Most String functions can be precisely typed since they operate on
-  and return binary types. Functions that return nullable values or
-  complex types are marked as unsupported.
+  and return binary types.
+
+  ## FFI Conversion
+
+  Some functions return `grapheme | nil` in Elixir. These are typed using
+  `option(binary)` with automatic FFI conversion at call boundaries:
+
+  - `at/2`, `first/1`, `last/1` → `option(binary)`
   """
 
   use Deft.Signatures.DSL, for: String
@@ -109,23 +115,20 @@ defmodule Deft.Signatures.String do
   sig normalize(binary, atom) :: binary
 
   # ============================================================================
-  # Unsupported - Nullable returns
+  # Optional returns (grapheme | nil) - with FFI conversion
   # ============================================================================
 
-  sig_unsupported(first(binary) :: top,
-    reason: "Returns grapheme | nil but Deft has no nil type"
-  )
+  # Returns grapheme | nil, converted to option(binary) at FFI boundary
+  sig at(binary, integer) :: option(binary)
+  sig first(binary) :: option(binary)
+  sig last(binary) :: option(binary)
 
-  sig_unsupported(last(binary) :: top,
-    reason: "Returns grapheme | nil but Deft has no nil type"
-  )
-
-  sig_unsupported(at(binary, integer) :: top,
-    reason: "Returns grapheme | nil but Deft has no nil type"
-  )
+  # ============================================================================
+  # Unsupported - Complex nullable returns
+  # ============================================================================
 
   sig_unsupported(next_grapheme_size(binary) :: top,
-    reason: "Returns {size, rest} | nil but Deft has no nil type"
+    reason: "Returns {size, rest} | nil which cannot be precisely typed as option"
   )
 
   # ============================================================================

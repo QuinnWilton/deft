@@ -4,6 +4,13 @@ defmodule Deft.Signatures.List do
 
   These complement the list operations in Kernel (`hd`, `tl`, `++`, etc.)
   with additional List-specific functions.
+
+  ## FFI Conversion
+
+  Some functions return `value | nil` in Elixir. These are typed using
+  `option(a)` with automatic FFI conversion at call boundaries:
+
+  - `first/1`, `last/1` → `option(a)`
   """
 
   use Deft.Signatures.DSL, for: List
@@ -77,19 +84,19 @@ defmodule Deft.Signatures.List do
   sig keysort([tuple], integer) :: [tuple]
 
   # ============================================================================
-  # Unsupported - Nullable returns
+  # Optional returns (value | nil) - with FFI conversion
   # ============================================================================
 
-  sig_unsupported(first([a]) :: top,
-    reason: "Returns value | nil but Deft has no nil type; use pattern matching or hd/1"
-  )
+  # Returns value | nil, converted to option(a) at FFI boundary
+  sig first([a]) :: option(a)
+  sig last([a]) :: option(a)
+
+  # ============================================================================
+  # Unsupported - Nullable returns with defaults
+  # ============================================================================
 
   sig_unsupported(first([a], b) :: top,
     reason: "Return type is value | default which cannot be precisely typed"
-  )
-
-  sig_unsupported(last([a]) :: top,
-    reason: "Returns value | nil but Deft has no nil type"
   )
 
   sig_unsupported(last([a], b) :: top,

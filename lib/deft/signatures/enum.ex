@@ -6,12 +6,19 @@ defmodule Deft.Signatures.Enum do
   require types Deft cannot represent use `sig_unsupported` with an
   explanation.
 
+  ## FFI Conversion
+
+  Some functions return `value | nil` or `{:ok, value} | :error` in Elixir.
+  These are typed using `option(a)` and `result(a, e)` respectively, with
+  automatic FFI conversion at call boundaries:
+
+  - `at/2`, `find/2`, `find_value/2`, `find_index/2` → `option(a)`
+  - `fetch/2` → `result(a, atom)`
+
   ## Unsupported Categories
 
   - **Map returns**: `group_by/2`, `frequencies/1` - no map type
-  - **Tagged tuples**: `fetch/2` - returns `{:ok, v} | :error`
-  - **Nullable returns**: `find/2`, `at/2` - return `v | nil`
-  - **Raises on empty**: `max/1`, `min/1`, `reduce/2` - behavior depends on input
+  - **Raises on empty**: `max/1`, `min/1`, `random/1`, `reduce/2`
   """
 
   use Deft.Signatures.DSL, for: Enum
@@ -131,39 +138,29 @@ defmodule Deft.Signatures.Enum do
   )
 
   # ============================================================================
-  # Unsupported - Tagged tuple returns
+  # Fetch result returns ({:ok, v} | :error) - with FFI conversion
   # ============================================================================
 
-  sig_unsupported(fetch([a], integer) :: top,
-    reason: "Returns {:ok, value} | :error which requires literal atom types"
-  )
+  # Returns {:ok, value} | :error, converted to fetch_result(a) at FFI boundary
+  sig fetch([a], integer) :: fetch_result(a)
 
   sig_unsupported(fetch!([a], integer) :: a,
-    reason: "Raises on invalid index; prefer Enum.at/3 with default or handle error case"
+    reason: "Raises on invalid index; prefer Enum.fetch/2 with pattern matching"
   )
 
   # ============================================================================
-  # Unsupported - Nullable returns (value | nil)
+  # Optional returns (value | nil) - with FFI conversion
   # ============================================================================
 
-  sig_unsupported(find([a], (a -> boolean)) :: top,
-    reason: "Returns value | nil but Deft has no nil type; use Enum.filter/2 instead"
-  )
+  # Returns value | nil, converted to option(a) at FFI boundary
+  sig at([a], integer) :: option(a)
+  sig find([a], (a -> boolean)) :: option(a)
+  sig find_value([a], (a -> b)) :: option(b)
+  sig find_index([a], (a -> boolean)) :: option(integer)
 
+  # These with defaults don't need FFI conversion (never return nil)
   sig_unsupported(find([a], b, (a -> boolean)) :: top,
     reason: "Returns value | default but return type depends on whether element found"
-  )
-
-  sig_unsupported(find_value([a], (a -> b)) :: top,
-    reason: "Returns value | nil but Deft has no nil type"
-  )
-
-  sig_unsupported(find_index([a], (a -> boolean)) :: top,
-    reason: "Returns integer | nil but Deft has no nil type"
-  )
-
-  sig_unsupported(at([a], integer) :: top,
-    reason: "Returns value | nil but Deft has no nil type; use Enum.fetch/2 or provide default"
   )
 
   sig_unsupported(at([a], integer, b) :: top,
