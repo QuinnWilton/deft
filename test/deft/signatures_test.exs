@@ -1,179 +1,169 @@
 defmodule Deft.SignaturesTest do
-  use ExUnit.Case, async: false
+  use ExUnit.Case, async: true
 
+  alias Deft.Context
   alias Deft.Signatures
   alias Deft.Type
 
-  setup do
-    # Reset signatures before each test
-    Signatures.reset()
-    :ok
-  end
+  describe "TypeSystem.Default signatures" do
+    test "all_signatures returns map of built-in signatures" do
+      sigs = Deft.TypeSystem.Default.all_signatures()
 
-  describe "init/0" do
-    test "initializes process-local registry with builtins" do
-      # Registry should be initialized from reset
-      assert Process.get(:deft_signatures) != nil
-    end
-
-    test "builtins are registered after init" do
-      assert {:ok, _} = Signatures.lookup({Kernel, :+, 2})
-      assert {:ok, _} = Signatures.lookup({Kernel, :length, 1})
-    end
-  end
-
-  describe "builtins/0" do
-    test "returns map of built-in signatures" do
-      builtins = Signatures.builtins()
-
-      assert is_map(builtins)
-      assert map_size(builtins) > 0
+      assert is_map(sigs)
+      assert map_size(sigs) > 0
     end
 
     test "includes arithmetic operators" do
-      builtins = Signatures.builtins()
+      sigs = Deft.TypeSystem.Default.all_signatures()
 
-      assert %Type.Fn{} = builtins[{Kernel, :+, 2}]
-      assert %Type.Fn{} = builtins[{Kernel, :-, 2}]
-      assert %Type.Fn{} = builtins[{Kernel, :*, 2}]
-      assert %Type.Fn{} = builtins[{Kernel, :/, 2}]
+      assert %Type.Fn{} = sigs[{Kernel, :+, 2}]
+      assert %Type.Fn{} = sigs[{Kernel, :-, 2}]
+      assert %Type.Fn{} = sigs[{Kernel, :*, 2}]
+      assert %Type.Fn{} = sigs[{Kernel, :/, 2}]
     end
 
     test "includes comparison operators" do
-      builtins = Signatures.builtins()
+      sigs = Deft.TypeSystem.Default.all_signatures()
 
-      assert %Type.Fn{output: %Type.Boolean{}} = builtins[{Kernel, :==, 2}]
-      assert %Type.Fn{output: %Type.Boolean{}} = builtins[{Kernel, :<, 2}]
+      assert %Type.Fn{output: %Type.Boolean{}} = sigs[{Kernel, :==, 2}]
+      assert %Type.Fn{output: %Type.Boolean{}} = sigs[{Kernel, :<, 2}]
     end
 
     test "includes type guards" do
-      builtins = Signatures.builtins()
+      sigs = Deft.TypeSystem.Default.all_signatures()
 
-      assert %Type.Fn{output: %Type.Boolean{}} = builtins[{Kernel, :is_integer, 1}]
-      assert %Type.Fn{output: %Type.Boolean{}} = builtins[{Kernel, :is_list, 1}]
+      assert %Type.Fn{output: %Type.Boolean{}} = sigs[{Kernel, :is_integer, 1}]
+      assert %Type.Fn{output: %Type.Boolean{}} = sigs[{Kernel, :is_list, 1}]
     end
 
     test "includes list operations" do
-      builtins = Signatures.builtins()
+      sigs = Deft.TypeSystem.Default.all_signatures()
 
-      assert %Type.Fn{output: %Type.Integer{}} = builtins[{Kernel, :length, 1}]
+      # length is polymorphic: forall(a). fn ([a]) -> integer
+      assert %Type.Forall{body: %Type.Fn{output: %Type.Integer{}}} = sigs[{Kernel, :length, 1}]
     end
   end
 
-  describe "register/2" do
-    test "registers a new signature" do
-      sig = Type.fun([Type.integer(), Type.integer()], Type.boolean())
-
-      assert :ok = Signatures.register({MyModule, :my_fun, 2}, sig)
-      assert {:ok, ^sig} = Signatures.lookup({MyModule, :my_fun, 2})
-    end
-
-    test "overwrites existing signature" do
-      sig1 = Type.fun([Type.integer()], Type.integer())
-      sig2 = Type.fun([Type.integer()], Type.boolean())
-
-      Signatures.register({MyModule, :overwrite, 1}, sig1)
-      Signatures.register({MyModule, :overwrite, 1}, sig2)
-
-      assert {:ok, ^sig2} = Signatures.lookup({MyModule, :overwrite, 1})
-    end
-  end
-
-  describe "lookup/1" do
+  describe "Context.lookup_signature/2" do
     test "returns {:ok, type} for registered signature" do
-      assert {:ok, %Type.Fn{}} = Signatures.lookup({Kernel, :+, 2})
+      sigs = Deft.TypeSystem.Default.all_signatures()
+      ctx = Context.new(nil) |> Context.with_signatures(sigs)
+
+      assert {:ok, %Type.Fn{}} = Context.lookup_signature(ctx, {Kernel, :+, 2})
     end
 
     test "returns :error for unregistered signature" do
-      assert :error = Signatures.lookup({NonExistent, :foo, 1})
+      sigs = Deft.TypeSystem.Default.all_signatures()
+      ctx = Context.new(nil) |> Context.with_signatures(sigs)
+
+      assert :error = Context.lookup_signature(ctx, {NonExistent, :foo, 1})
     end
   end
 
-  describe "get/1" do
-    test "returns type for registered signature" do
-      assert %Type.Fn{} = Signatures.get({Kernel, :+, 2})
-    end
+  describe "Signatures.with_signatures/2" do
+    test "creates context with given signatures" do
+      custom_sig = Type.fun([Type.integer()], Type.boolean())
+      custom_sigs = %{{CustomModule, :custom_fn, 1} => custom_sig}
 
-    test "returns nil for unregistered signature" do
-      assert nil == Signatures.get({NonExistent, :foo, 1})
-    end
-  end
-
-  describe "registered?/1" do
-    test "returns true for registered signature" do
-      assert Signatures.registered?({Kernel, :+, 2})
-    end
-
-    test "returns false for unregistered signature" do
-      refute Signatures.registered?({NonExistent, :foo, 1})
+      Signatures.with_signatures(custom_sigs, fn ctx ->
+        assert {:ok, ^custom_sig} = Context.lookup_signature(ctx, {CustomModule, :custom_fn, 1})
+        assert :error = Context.lookup_signature(ctx, {Kernel, :+, 2})
+      end)
     end
   end
 
-  describe "unregister/1" do
-    test "removes a registered signature" do
-      sig = Type.fun([Type.integer()], Type.integer())
-      Signatures.register({MyModule, :to_remove, 1}, sig)
-
-      assert Signatures.registered?({MyModule, :to_remove, 1})
-
-      Signatures.unregister({MyModule, :to_remove, 1})
-
-      refute Signatures.registered?({MyModule, :to_remove, 1})
+  describe "Signatures.with_default_signatures/1" do
+    test "creates context with default type system signatures" do
+      Signatures.with_default_signatures(fn ctx ->
+        assert {:ok, %Type.Fn{}} = Context.lookup_signature(ctx, {Kernel, :+, 2})
+        assert {:ok, %Type.Fn{}} = Context.lookup_signature(ctx, {Kernel, :is_integer, 1})
+      end)
     end
   end
 
-  describe "all/0" do
-    test "returns all registered signatures" do
-      sigs = Signatures.all()
+  describe "Signatures.merge/1" do
+    test "merges multiple signature maps" do
+      sigs1 = %{{Mod1, :f, 1} => Type.fun([Type.integer()], Type.integer())}
+      sigs2 = %{{Mod2, :g, 1} => Type.fun([Type.boolean()], Type.boolean())}
 
-      assert is_list(sigs)
-      assert length(sigs) > 0
-      assert Enum.all?(sigs, fn {mfa, type} -> is_tuple(mfa) and is_struct(type) end)
+      merged = Signatures.merge([sigs1, sigs2])
+
+      assert Map.has_key?(merged, {Mod1, :f, 1})
+      assert Map.has_key?(merged, {Mod2, :g, 1})
+    end
+
+    test "later maps override earlier ones" do
+      sig1 = Type.fun([Type.integer()], Type.integer())
+      sig2 = Type.fun([Type.boolean()], Type.boolean())
+
+      sigs1 = %{{Mod, :f, 1} => sig1}
+      sigs2 = %{{Mod, :f, 1} => sig2}
+
+      merged = Signatures.merge([sigs1, sigs2])
+
+      assert merged[{Mod, :f, 1}] == sig2
     end
   end
 
-  describe "reset/0" do
-    test "clears custom signatures and reloads builtins" do
-      sig = Type.fun([Type.integer()], Type.integer())
-      Signatures.register({MyModule, :custom, 1}, sig)
+  describe "Signatures.build_fn/2" do
+    test "builds a function type" do
+      sig = Signatures.build_fn([Type.integer(), Type.integer()], Type.boolean())
 
-      Signatures.reset()
-
-      refute Signatures.registered?({MyModule, :custom, 1})
-      assert Signatures.registered?({Kernel, :+, 2})
+      assert %Type.Fn{} = sig
+      assert [%Type.Integer{}, %Type.Integer{}] = sig.inputs
+      assert %Type.Boolean{} = sig.output
     end
   end
 
-  describe "signature types" do
+  describe "Signatures.build_forall/3" do
+    test "builds a polymorphic function type" do
+      sig = Signatures.build_forall([:a], [Type.fixed_list(Type.var(:a))], Type.var(:a))
+
+      assert %Type.Forall{vars: [:a]} = sig
+      assert %Type.Fn{} = sig.body
+    end
+  end
+
+  describe "signature types from Deft.Signatures.Kernel" do
     test "arithmetic operators have number inputs and outputs" do
-      {:ok, plus} = Signatures.lookup({Kernel, :+, 2})
+      sigs = Deft.Signatures.Kernel.signatures()
+      plus = sigs[{Kernel, :+, 2}]
 
       assert [%Type.Number{}, %Type.Number{}] = plus.inputs
       assert %Type.Number{} = plus.output
     end
 
     test "division returns float" do
-      {:ok, div} = Signatures.lookup({Kernel, :/, 2})
+      sigs = Deft.Signatures.Kernel.signatures()
+      div = sigs[{Kernel, :/, 2}]
 
       assert %Type.Float{} = div.output
     end
 
     test "integer division returns integer" do
-      {:ok, div} = Signatures.lookup({Kernel, :div, 2})
+      sigs = Deft.Signatures.Kernel.signatures()
+      div = sigs[{Kernel, :div, 2}]
 
       assert %Type.Integer{} = div.output
     end
 
     test "rounding functions return integer" do
-      {:ok, ceil} = Signatures.lookup({Kernel, :ceil, 1})
-      {:ok, floor} = Signatures.lookup({Kernel, :floor, 1})
-      {:ok, round} = Signatures.lookup({Kernel, :round, 1})
-      {:ok, trunc} = Signatures.lookup({Kernel, :trunc, 1})
+      sigs = Deft.Signatures.Kernel.signatures()
 
-      assert %Type.Integer{} = ceil.output
-      assert %Type.Integer{} = floor.output
-      assert %Type.Integer{} = round.output
-      assert %Type.Integer{} = trunc.output
+      assert %Type.Integer{} = sigs[{Kernel, :ceil, 1}].output
+      assert %Type.Integer{} = sigs[{Kernel, :floor, 1}].output
+      assert %Type.Integer{} = sigs[{Kernel, :round, 1}].output
+      assert %Type.Integer{} = sigs[{Kernel, :trunc, 1}].output
+    end
+
+    test "polymorphic list operations" do
+      sigs = Deft.Signatures.Kernel.signatures()
+
+      hd_sig = sigs[{Kernel, :hd, 1}]
+      assert %Type.Forall{vars: [:a]} = hd_sig
+
+      concat_sig = sigs[{Kernel, :++, 2}]
+      assert %Type.Forall{vars: [:a, :b]} = concat_sig
     end
   end
 end

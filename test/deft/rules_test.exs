@@ -217,7 +217,9 @@ defmodule Deft.RulesTest do
 
   describe "Builtins rules" do
     setup do
-      %{ctx: Context.new(__ENV__)}
+      signatures = Deft.TypeSystem.Default.all_signatures()
+      ctx = Context.new(__ENV__) |> Context.with_signatures(signatures)
+      %{ctx: ctx}
     end
 
     test "local_call rule handles arithmetic", %{ctx: ctx} do

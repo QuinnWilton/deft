@@ -31,7 +31,14 @@ defmodule Deft.TypeCase do
   end
 
   setup do
-    %{ctx: Deft.Context.new(__ENV__, features: [:exhaustiveness_checking])}
+    # Get signatures from the default type system
+    signatures = Deft.TypeSystem.Default.all_signatures()
+
+    ctx =
+      Deft.Context.new(__ENV__, features: [:exhaustiveness_checking])
+      |> Deft.Context.with_signatures(signatures)
+
+    %{ctx: ctx}
   end
 end
 

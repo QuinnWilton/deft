@@ -15,6 +15,14 @@ defmodule DeftTest do
   alias Deft.Type
   alias Deft.TypeChecker
 
+  # Helper to create a context with default signatures for type checking.
+  defp context_with_signatures(env) do
+    signatures = Deft.TypeSystem.Default.all_signatures()
+
+    Context.new(env)
+    |> Context.with_signatures(signatures)
+  end
+
   # ============================================================================
   # Expression Type Checking
   # ============================================================================
@@ -23,7 +31,7 @@ defmodule DeftTest do
     env = __ENV__
 
     check all({expr, expected} <- Generators.Code.expression(), max_shrinking_steps: 0) do
-      ctx = Context.new(env)
+      ctx = context_with_signatures(env)
       {:ok, _erased, actual, _bindings, _ctx} = TypeChecker.check(expr, ctx)
       assert Type.well_formed?(actual)
       assert Subtyping.subtype_of?(expected, actual)
@@ -297,7 +305,7 @@ defmodule DeftTest do
     env = __ENV__
 
     check all({expr, _} <- Generators.Code.expression(), max_shrinking_steps: 0) do
-      ctx = Context.new(env)
+      ctx = context_with_signatures(env)
 
       {:ok, _, original_type, _, _} = TypeChecker.check(expr, ctx)
 
@@ -312,7 +320,7 @@ defmodule DeftTest do
     env = __ENV__
 
     check all({expr, _} <- Generators.Code.expression(), max_shrinking_steps: 0) do
-      ctx = Context.new(env)
+      ctx = context_with_signatures(env)
 
       {:ok, _, original_type, _, _} = TypeChecker.check(expr, ctx)
 
@@ -327,7 +335,7 @@ defmodule DeftTest do
     env = __ENV__
 
     check all({expr, _} <- Generators.Code.expression(), max_shrinking_steps: 0) do
-      ctx = Context.new(env)
+      ctx = context_with_signatures(env)
 
       {:ok, _, original_type, _, _} = TypeChecker.check(expr, ctx)
 
@@ -342,7 +350,7 @@ defmodule DeftTest do
     env = __ENV__
 
     check all({expr, _} <- Generators.Code.expression(), max_shrinking_steps: 0) do
-      ctx = Context.new(env)
+      ctx = context_with_signatures(env)
 
       {:ok, _, original_type, _, _} = TypeChecker.check(expr, ctx)
 
@@ -357,7 +365,7 @@ defmodule DeftTest do
     env = __ENV__
 
     check all({expr, _} <- Generators.Code.expression(), max_shrinking_steps: 0) do
-      ctx = Context.new(env)
+      ctx = context_with_signatures(env)
 
       {:ok, _, original_type, _, _} = TypeChecker.check(expr, ctx)
 
@@ -372,7 +380,7 @@ defmodule DeftTest do
     env = __ENV__
 
     check all({expr, _} <- Generators.Code.expression(), max_shrinking_steps: 0) do
-      ctx = Context.new(env)
+      ctx = context_with_signatures(env)
 
       {:ok, _, original_type, _, _} = TypeChecker.check(expr, ctx)
 
@@ -387,7 +395,7 @@ defmodule DeftTest do
     env = __ENV__
 
     check all({expr, _} <- Generators.Code.expression(), max_shrinking_steps: 0) do
-      ctx = Context.new(env)
+      ctx = context_with_signatures(env)
 
       {:ok, _, original_type, _, _} = TypeChecker.check(expr, ctx)
 
