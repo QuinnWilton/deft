@@ -61,6 +61,10 @@ defmodule Deft.Error.Formatter do
     tee_down: "┬"
   }
 
+  # Maximum width for source lines to prevent terminal wrapping
+  # This leaves room for line numbers, box characters, and some padding
+  @max_source_width 80
+
   @doc """
   Formats a single error for display.
   """
@@ -354,11 +358,14 @@ defmodule Deft.Error.Formatter do
   # Format a context line (no span, just surrounding code)
   defp format_context_line(line_num, source_line, line_num_width, use_colors) do
     line_str = String.pad_leading(Integer.to_string(line_num), line_num_width)
+    # Prefix is: line_num + " │ " (3 extra chars)
+    prefix_width = line_num_width + 3
+    truncated_line = truncate_source_line(source_line, prefix_width)
 
     if use_colors do
-      "#{@colors.dim}#{line_str} #{@box.vertical}#{@colors.reset} #{source_line}"
+      "#{@colors.dim}#{line_str} #{@box.vertical}#{@colors.reset} #{truncated_line}"
     else
-      "#{line_str} #{@box.vertical} #{source_line}"
+      "#{line_str} #{@box.vertical} #{truncated_line}"
     end
   end
 
@@ -368,15 +375,19 @@ defmodule Deft.Error.Formatter do
 
     # Format the source line
     line_str = String.pad_leading(Integer.to_string(line_num), line_num_width)
+    # Prefix is: line_num + " │ " (3 extra chars)
+    prefix_width = line_num_width + 3
+    truncated_line = truncate_source_line(source_line, prefix_width)
 
     source =
       if use_colors do
-        "#{@colors.dim}#{line_str}#{@colors.reset} #{@colors.dim}#{@box.vertical}#{@colors.reset} #{source_line}"
+        "#{@colors.dim}#{line_str}#{@colors.reset} #{@colors.dim}#{@box.vertical}#{@colors.reset} #{truncated_line}"
       else
-        "#{line_str} #{@box.vertical} #{source_line}"
+        "#{line_str} #{@box.vertical} #{truncated_line}"
       end
 
     # Format pointer lines for each span (each span produces 2 lines: underline + label)
+    # Note: We pass the original source_line for column calculations, but display truncated
     pointer_lines =
       spans
       |> Enum.flat_map(fn span -> format_span_pointer(span, source_line, padding, use_colors) end)
@@ -583,12 +594,15 @@ defmodule Deft.Error.Formatter do
     if Enum.empty?(formatted_lines) do
       # Fall back to just showing the single line we have
       line_str = String.pad_leading(Integer.to_string(line), line_num_width)
+      # Prefix is: line_num + " │ " (3 extra chars)
+      prefix_width = line_num_width + 3
+      truncated_line = truncate_source_line(source_line, prefix_width)
 
       source =
         if use_colors do
-          "#{@colors.dim}#{line_str}#{@colors.reset} #{@colors.dim}#{@box.vertical}#{@colors.reset} #{source_line}"
+          "#{@colors.dim}#{line_str}#{@colors.reset} #{@colors.dim}#{@box.vertical}#{@colors.reset} #{truncated_line}"
         else
-          "#{line_str} #{@box.vertical} #{source_line}"
+          "#{line_str} #{@box.vertical} #{truncated_line}"
         end
 
       col = column || 1
@@ -630,12 +644,15 @@ defmodule Deft.Error.Formatter do
   defp format_main_line_with_pointer(line, source_line, column, line_num_width, error, use_colors) do
     padding = String.duplicate(" ", line_num_width)
     line_str = String.pad_leading(Integer.to_string(line), line_num_width)
+    # Prefix is: line_num + " │ " (3 extra chars)
+    prefix_width = line_num_width + 3
+    truncated_line = truncate_source_line(source_line, prefix_width)
 
     source =
       if use_colors do
-        "#{@colors.dim}#{line_str}#{@colors.reset} #{@colors.dim}#{@box.vertical}#{@colors.reset} #{source_line}"
+        "#{@colors.dim}#{line_str}#{@colors.reset} #{@colors.dim}#{@box.vertical}#{@colors.reset} #{truncated_line}"
       else
-        "#{line_str} #{@box.vertical} #{source_line}"
+        "#{line_str} #{@box.vertical} #{truncated_line}"
       end
 
     col = column || 1
@@ -954,6 +971,18 @@ defmodule Deft.Error.Formatter do
     case Regex.run(~r/^\s*/, line) do
       [leading_whitespace] -> String.length(leading_whitespace) + 1
       _ -> 1
+    end
+  end
+
+  # Truncate a source line to prevent terminal wrapping.
+  # Takes into account the prefix width (line numbers, box chars, etc.)
+  defp truncate_source_line(line, prefix_width) do
+    max_content_width = max(@max_source_width - prefix_width, 20)
+
+    if String.length(line) > max_content_width do
+      String.slice(line, 0, max_content_width - 1) <> "…"
+    else
+      line
     end
   end
 end
