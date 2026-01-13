@@ -8,10 +8,100 @@ defmodule Deft.Rules.DSL do
 
   ## Judgment Forms
 
-  - `expr ~> {erased, type}` - Synthesis: infer type of expr
-  - `expr <~ expected >>> erased` - Checking: check expr against expected type
-  - `actual <<< expected` - Subtyping: assert actual is subtype of expected
-  - `bindings +++ premise` - Context extension: add bindings for premise
+  ### Synthesis
+
+      expr ~> {erased, type}
+
+  Synthesizes (infers) the type of an expression. Returns the erased form
+  and the inferred type.
+
+  ### Synth All
+
+      exprs ~>> {erased_list, types_list}
+
+  Synthesizes types for a list of expressions. Returns parallel lists of
+  erased forms and types.
+
+  ### Context Extension
+
+      bindings +++ expr ~> {erased, type}
+
+  Extends the typing context with additional bindings before synthesizing.
+  Bindings are scoped to the premise only.
+
+  ### Scoped Context (Parent-to-Child)
+
+      (exprs &&& [key: value]) ~>> {erased, types_a, types_b}
+
+  Passes scoped attributes to child rules and auto-unzips tuple results.
+  Each child rule returns `{a, b}`, collected into `{[a...], [b...]}`.
+
+  ### Checking
+
+      expr <~ expected_type >>> erased
+      expr <~ expected_type >>> {erased, actual_type}
+
+  Checks an expression against an expected type. The expression's type
+  must be a subtype of the expected type.
+
+  ### Check All
+
+      exprs <<~ expected_type >>> erased_list   # homogeneous
+      exprs <<~ expected_types >>> erased_list  # heterogeneous
+
+  Two modes: if the right side is a single type, checks all expressions against
+  that type. If it's a list of types, checks each expression against its
+  corresponding type.
+
+  ### Pattern Judgment
+
+      pattern <~> expected_type >>> {erased, type, bindings}
+
+  Checks a pattern against an expected type. Returns the erased pattern,
+  the pattern's type, and any bindings produced.
+
+  ## Escape Hatches
+
+  ### Compute Block
+
+      compute pattern do
+        # arbitrary Elixir code
+      end
+
+  For complex logic that doesn't fit the declarative model.
+
+  ### Feature Check
+
+      if_feature :feature_name do
+        # code executed only if feature is enabled
+      end
+
+  Conditionally executes code based on feature flags.
+
+  ### Scoped Attribute Read
+
+      subj_t = scoped(:subj_t)
+
+  Reads a scoped attribute set by a parent rule via `&&&`.
+
+  ## Conclusion Forms
+
+      conclude erased ~> type
+      conclude erased ~> type, bind: bindings
+
+  The `bind:` option overrides accumulated bindings with explicit ones.
+
+  ## Rule Requirements
+
+      defrule :name, pattern do
+        # premises
+        conclude erased ~> type
+
+        requires([:feature_a, :feature_b])
+      end
+
+  The `requires` clause declares features that must be enabled for the
+  rule to apply. If features are missing, returns `{:error, {:missing_features, [...]}}`.
 
   ## Example
 
@@ -20,11 +110,11 @@ defmodule Deft.Rules.DSL do
       end
 
       defrule :fn, %AST.Fn{args: args, body: body, fn_meta: fn_meta, arrow_meta: arrow_meta} do
-        args ~> {erased_args, input_types}
-        body ~> {erased_body, output_type}
+        args ~>> {args_e, input_ts, arg_bs}
+        (arg_bs +++ body) ~> {body_e, output_t}
 
-        conclude {:fn, fn_meta, [{:->, arrow_meta, [erased_args, erased_body]}]}
-              ~> Type.fun(input_types, output_type)
+        conclude Erased.fn_expr(fn_meta, arrow_meta, args_e, body_e)
+              ~> Type.fun(input_ts, output_t)
       end
 
   ## Binding Flow
@@ -32,14 +122,12 @@ defmodule Deft.Rules.DSL do
   Bindings from each premise automatically flow to subsequent premises,
   following Turnstile's lexically-scoped binding semantics.
 
-  ## Escape Hatch
+  ## Naming Conventions
 
-  For complex logic that doesn't fit the declarative model, use `compute`:
-
-      compute {result, type} do
-        # arbitrary Elixir code
-        Enum.map(items, fn item -> ... end)
-      end
+  - `_e` suffix: erased forms (e.g., `expr_e`, `args_e`)
+  - `_t` suffix: types (e.g., `expr_t`, `output_t`)
+  - `_ts` suffix: type lists (e.g., `elems_ts`, `input_ts`)
+  - `_bs` suffix: bindings (e.g., `arg_bs`, `pat_bs`)
   """
 
   @doc """
@@ -282,75 +370,31 @@ defmodule Deft.Rules.DSL do
     generate_synth_code(expr, erased_var, type_var)
   end
 
-  # Synthesis with pattern match on type: expr ~> {erased, %Type.Fn{...} = type_var}
-  defp generate_premise_code({:~>, _, [expr, {:=, _, [type_pattern, {erased_var, type_var}]}]}) do
-    synth_code = generate_synth_code(expr, erased_var, type_var)
-    pattern_match = {:=, [], [type_pattern, type_var]}
-    {:__block__, [], [synth_code, pattern_match]}
-  end
-
-  # Synthesis: {:synth, expr, {erased, type}} (expanded form from operator macro)
-  defp generate_premise_code({:synth, expr, {erased_var, type_var}}) do
-    generate_synth_code(expr, erased_var, type_var)
-  end
-
-  # Checking: expr <~ expected >>> erased (unexpanded form)
-  defp generate_premise_code({:>>>, _, [{:<~, _, [expr, expected]}, erased_var]}) do
-    generate_check_code(expr, expected, erased_var)
-  end
-
-  # Checking: {:elaborate, {:check, expr, expected}, erased} (expanded form)
-  defp generate_premise_code({:elaborate, {:check, expr, expected}, erased_var}) do
-    generate_check_code(expr, expected, erased_var)
-  end
-
-  # Checking without erased binding: expr <~ expected (unexpanded form)
-  defp generate_premise_code({:<~, _, [expr, expected]}) do
-    generate_check_no_erased_code(expr, expected)
-  end
-
-  # Checking without erased: {:check, expr, expected} (expanded form)
-  defp generate_premise_code({:check, expr, expected}) do
-    generate_check_no_erased_code(expr, expected)
-  end
-
-  # Subtyping: actual <<< expected (unexpanded form)
-  defp generate_premise_code({:<<<, _, [actual, expected]}) do
-    generate_subtype_code(actual, expected)
-  end
-
-  # Subtyping: {:subtype, actual, expected} (expanded form)
-  defp generate_premise_code({:subtype, actual, expected}) do
-    generate_subtype_code(actual, expected)
-  end
-
-  # Synth all: exprs ~>> {erased_list, types_list} (unexpanded form)
+  # Synth all: exprs ~>> {erased_list, types_list}
   defp generate_premise_code({:~>>, _, [exprs, {erased_var, types_var}]}) do
     generate_synth_all_code(exprs, erased_var, types_var)
   end
 
-  # Synth all: {:synth_all, exprs, {erased_list, types_list}} (expanded form)
-  defp generate_premise_code({:synth_all, exprs, {erased_var, types_var}}) do
-    generate_synth_all_code(exprs, erased_var, types_var)
+  # Scoped synth all with 3-element binding: (exprs &&& [k: v]) ~>> {erased, a, b}
+  # Auto-unzips {a, b} tuple results into separate lists
+  # NOTE: Must come before the general 3-element pattern below
+  defp generate_premise_code(
+         {:~>>, _,
+          [
+            {:&&&, _, [exprs, scope_attrs]},
+            {:{}, _, [erased_var, a_var, b_var]}
+          ]}
+       ) do
+    generate_scoped_synth_all_3(exprs, scope_attrs, erased_var, a_var, b_var)
   end
 
-  # Check all with erased binding: exprs <<~ expected_types >>> erased_list (unexpanded form)
-  defp generate_premise_code({:>>>, _, [{:<<~, _, [exprs, expected]}, erased_var]}) do
-    generate_check_all_code(exprs, expected, erased_var)
+  # Synth all with explicit bindings: exprs ~>> {erased_list, types_list, bindings_list}
+  defp generate_premise_code({:~>>, _, [exprs, {:{}, _, [erased_var, types_var, bindings_var]}]}) do
+    generate_synth_all_with_bindings_code(exprs, erased_var, types_var, bindings_var)
   end
 
-  # Check all with erased binding: {:elaborate, {:check_all, exprs, expected}, erased} (expanded form)
-  defp generate_premise_code({:elaborate, {:check_all, exprs, expected}, erased_var}) do
-    generate_check_all_code(exprs, expected, erased_var)
-  end
-
-  # Context extension: extra_bindings +++ premise (unexpanded form)
+  # Context extension: extra_bindings +++ premise
   defp generate_premise_code({:+++, _, [extra_bindings, premise]}) do
-    generate_context_extension_code(extra_bindings, premise)
-  end
-
-  # Context extension: {:extend_ctx, bindings, premise} (expanded form from operator macro)
-  defp generate_premise_code({:extend_ctx, extra_bindings, premise}) do
     generate_context_extension_code(extra_bindings, premise)
   end
 
@@ -371,6 +415,64 @@ defmodule Deft.Rules.DSL do
     end
   end
 
+  # Scoped attribute read: var = scoped(:key)
+  # Generates: var = Deft.Context.get_scoped(ctx, :key)
+  defp generate_premise_code({:=, _, [var, {:scoped, _, [key]}]}) do
+    ctx_var = Macro.var(:ctx, nil)
+
+    quote do
+      unquote(var) = Deft.Context.get_scoped(unquote(ctx_var), unquote(key))
+    end
+  end
+
+  # Pattern judgment: pattern <~> expected_type >>> {erased, type, bindings}
+  # Generates: {erased, type, bindings} = PatternMatching.handle_pattern(pattern, expected_type, ctx)
+  defp generate_premise_code(
+         {:>>>, _,
+          [
+            {:<~>, _, [pattern, expected_type]},
+            {:{}, _, [erased_var, type_var, bindings_var]}
+          ]}
+       ) do
+    ctx_var = Macro.var(:ctx, nil)
+
+    quote do
+      {unquote(erased_var), unquote(type_var), unquote(bindings_var)} =
+        Deft.PatternMatching.handle_pattern(
+          unquote(pattern),
+          unquote(expected_type),
+          unquote(ctx_var)
+        )
+    end
+  end
+
+  # Checking with type binding: expr <~ expected_type >>> {erased, type}
+  # Checks expression against expected type, binds erased form and actual type.
+  # NOTE: More specific patterns must come BEFORE the general `>>> erased_var` pattern.
+  defp generate_premise_code(
+         {:>>>, _, [{:<~, _, [expr, expected_type]}, {erased_var, type_var}]}
+       ) do
+    generate_check_with_type_code(expr, expected_type, erased_var, type_var)
+  end
+
+  defp generate_premise_code(
+         {:>>>, _, [{:<~, _, [expr, expected_type]}, {:{}, _, [erased_var, type_var]}]}
+       ) do
+    generate_check_with_type_code(expr, expected_type, erased_var, type_var)
+  end
+
+  # Checking: expr <~ expected_type >>> erased
+  # Checks expression against expected type, binds erased form.
+  defp generate_premise_code({:>>>, _, [{:<~, _, [expr, expected_type]}, erased_var]}) do
+    generate_check_code(expr, expected_type, erased_var)
+  end
+
+  # Check all: exprs <<~ expected_types >>> erased_list
+  # Checks list of expressions against list of expected types.
+  defp generate_premise_code({:>>>, _, [{:<<~, _, [exprs, expected_types]}, erased_var]}) do
+    generate_check_all_code(exprs, expected_types, erased_var)
+  end
+
   # Plain assignment or pattern match (for destructuring, etc.)
   defp generate_premise_code({:=, _, [_left, _right]} = assignment) do
     assignment
@@ -384,6 +486,25 @@ defmodule Deft.Rules.DSL do
   # ============================================================================
   # Helper functions for premise code generation
   # ============================================================================
+
+  # Helper for scoped synth with 3-element binding (auto-unzip)
+  defp generate_scoped_synth_all_3(exprs, scope_attrs, erased_var, a_var, b_var) do
+    bindings_var = Macro.var(:bindings, nil)
+    ctx_var = Macro.var(:ctx, nil)
+
+    quote do
+      __scoped_ctx__ = Deft.Context.with_scoped(unquote(ctx_var), unquote(scope_attrs))
+
+      {unquote(erased_var), __results__, _} =
+        Deft.Rules.DSL.Helpers.synth_all_with_ctx!(
+          unquote(exprs),
+          unquote(bindings_var),
+          __scoped_ctx__
+        )
+
+      {unquote(a_var), unquote(b_var)} = Enum.unzip(__results__)
+    end
+  end
 
   defp generate_synth_with_context_code(extra_bindings, expr, erased_var, type_var) do
     new_bindings_var = Macro.var(:__new_bindings__, __MODULE__)
@@ -417,48 +538,6 @@ defmodule Deft.Rules.DSL do
     end
   end
 
-  defp generate_check_code(expr, expected, erased_var) do
-    new_bindings_var = Macro.var(:__new_bindings__, __MODULE__)
-    bindings_var = Macro.var(:bindings, nil)
-    ctx_var = Macro.var(:ctx, nil)
-
-    quote do
-      {unquote(erased_var), _, unquote(new_bindings_var)} =
-        Deft.Rules.DSL.Helpers.check!(
-          unquote(expr),
-          unquote(expected),
-          unquote(bindings_var),
-          unquote(ctx_var)
-        )
-
-      unquote(bindings_var) = unquote(bindings_var) ++ unquote(new_bindings_var)
-    end
-  end
-
-  defp generate_check_no_erased_code(expr, expected) do
-    new_bindings_var = Macro.var(:__new_bindings__, __MODULE__)
-    bindings_var = Macro.var(:bindings, nil)
-    ctx_var = Macro.var(:ctx, nil)
-
-    quote do
-      {_, _, unquote(new_bindings_var)} =
-        Deft.Rules.DSL.Helpers.check!(
-          unquote(expr),
-          unquote(expected),
-          unquote(bindings_var),
-          unquote(ctx_var)
-        )
-
-      unquote(bindings_var) = unquote(bindings_var) ++ unquote(new_bindings_var)
-    end
-  end
-
-  defp generate_subtype_code(actual, expected) do
-    quote do
-      Deft.Rules.DSL.Helpers.require_subtype!(unquote(actual), unquote(expected))
-    end
-  end
-
   defp generate_synth_all_code(exprs, erased_var, types_var) do
     new_bindings_var = Macro.var(:__new_bindings__, __MODULE__)
     bindings_var = Macro.var(:bindings, nil)
@@ -472,21 +551,13 @@ defmodule Deft.Rules.DSL do
     end
   end
 
-  defp generate_check_all_code(exprs, expected, erased_var) do
-    new_bindings_var = Macro.var(:__new_bindings__, __MODULE__)
-    bindings_var = Macro.var(:bindings, nil)
+  # Synth all with explicit bindings - does not auto-merge
+  defp generate_synth_all_with_bindings_code(exprs, erased_var, types_var, bindings_var) do
     ctx_var = Macro.var(:ctx, nil)
 
     quote do
-      {unquote(erased_var), unquote(new_bindings_var)} =
-        Deft.Rules.DSL.Helpers.check_all!(
-          unquote(exprs),
-          unquote(expected),
-          unquote(bindings_var),
-          unquote(ctx_var)
-        )
-
-      unquote(bindings_var) = unquote(bindings_var) ++ unquote(new_bindings_var)
+      {unquote(erased_var), unquote(types_var), unquote(bindings_var)} =
+        Deft.Rules.DSL.Helpers.synth_all!(unquote(exprs), unquote(ctx_var))
     end
   end
 
@@ -500,6 +571,60 @@ defmodule Deft.Rules.DSL do
       unquote(bindings_var) = unquote(bindings_var) ++ unquote(extra_bindings)
       unquote(inner_code)
       unquote(bindings_var) = unquote(old_bindings_var)
+    end
+  end
+
+  defp generate_check_code(expr, expected_type, erased_var) do
+    new_bindings_var = Macro.var(:__new_bindings__, __MODULE__)
+    bindings_var = Macro.var(:bindings, nil)
+    ctx_var = Macro.var(:ctx, nil)
+
+    quote do
+      {unquote(erased_var), _, unquote(new_bindings_var)} =
+        Deft.Rules.DSL.Helpers.check!(
+          unquote(expr),
+          unquote(expected_type),
+          unquote(bindings_var),
+          unquote(ctx_var)
+        )
+
+      unquote(bindings_var) = unquote(bindings_var) ++ unquote(new_bindings_var)
+    end
+  end
+
+  defp generate_check_with_type_code(expr, expected_type, erased_var, type_var) do
+    new_bindings_var = Macro.var(:__new_bindings__, __MODULE__)
+    bindings_var = Macro.var(:bindings, nil)
+    ctx_var = Macro.var(:ctx, nil)
+
+    quote do
+      {unquote(erased_var), unquote(type_var), unquote(new_bindings_var)} =
+        Deft.Rules.DSL.Helpers.check!(
+          unquote(expr),
+          unquote(expected_type),
+          unquote(bindings_var),
+          unquote(ctx_var)
+        )
+
+      unquote(bindings_var) = unquote(bindings_var) ++ unquote(new_bindings_var)
+    end
+  end
+
+  defp generate_check_all_code(exprs, expected_types, erased_var) do
+    new_bindings_var = Macro.var(:__new_bindings__, __MODULE__)
+    bindings_var = Macro.var(:bindings, nil)
+    ctx_var = Macro.var(:ctx, nil)
+
+    quote do
+      {unquote(erased_var), unquote(new_bindings_var)} =
+        Deft.Rules.DSL.Helpers.check_all!(
+          unquote(exprs),
+          unquote(expected_types),
+          unquote(bindings_var),
+          unquote(ctx_var)
+        )
+
+      unquote(bindings_var) = unquote(bindings_var) ++ unquote(new_bindings_var)
     end
   end
 
@@ -551,14 +676,22 @@ defmodule Deft.Rules.DSL.Operators do
   @moduledoc """
   Custom operators for the declarative typing rule DSL.
 
-  These operators are used in premise and conclusion forms:
-  - `~>` - Synthesis judgment (single)
-  - `~>>` - Synthesis judgment (all)
-  - `<~` - Checking judgment (single)
-  - `<<~` - Checking judgment (all)
-  - `>>>` - Elaborates to (binds erased form)
-  - `<<<` - Subtyping assertion
-  - `+++` - Context extension
+  ## Synthesis Operators
+
+  - `~>` - Synthesis judgment: `expr ~> {erased, type}`
+  - `~>>` - Synth all: `exprs ~>> {erased_list, types_list}`
+
+  ## Checking Operators
+
+  - `<~` - Checking judgment: `expr <~ expected >>> erased` or `expr <~ expected >>> {erased, type}`
+  - `<<~` - Check all: `exprs <<~ type(s)` (homogeneous if single type, heterogeneous if list)
+
+  ## Other Operators
+
+  - `+++` - Context extension: `bindings +++ premise`
+  - `&&&` - Scoped context: `(exprs &&& [k: v]) ~>> {erased, a, b}`
+  - `<~>` - Pattern judgment: `pattern <~> type >>> {erased, type, bindings}`
+  - `>>>` - Elaborates to (binds result of `<~`, `<~>`)
   """
 
   # These are just markers - the actual transformation happens in the DSL macro
@@ -569,19 +702,21 @@ defmodule Deft.Rules.DSL.Operators do
     quote do: {:synth, unquote(left), unquote(right)}
   end
 
-  @doc "Checking: expr <~ expected"
+  @doc """
+  Checking judgment: checks expression against expected type.
+
+  Must be followed by `>>>` to bind the result:
+
+      expr <~ expected_type >>> erased
+      expr <~ expected_type >>> {erased, actual_type}
+  """
   defmacro left <~ right do
     quote do: {:check, unquote(left), unquote(right)}
   end
 
-  @doc "Elaborates to: (expr <~ type) >>> erased"
+  @doc "Elaborates to: binds result of `<~` or `<~>` judgment"
   defmacro left >>> right do
     quote do: {:elaborate, unquote(left), unquote(right)}
-  end
-
-  @doc "Subtyping: actual <<< expected"
-  defmacro left <<< right do
-    quote do: {:subtype, unquote(left), unquote(right)}
   end
 
   @doc "Context extension: bindings +++ premise"
@@ -594,9 +729,49 @@ defmodule Deft.Rules.DSL.Operators do
     quote do: {:synth_all, unquote(left), unquote(right)}
   end
 
-  @doc "Check all: exprs <<~ expected_types"
+  @doc """
+  Check all: checks list of expressions against expected type(s).
+
+  Two modes based on the right-hand side:
+  - **Homogeneous** (single type): `exprs <<~ type` - all expressions checked against same type
+  - **Heterogeneous** (list of types): `exprs <<~ types` - each expression checked against corresponding type
+
+  Must be followed by `>>>` to bind the result:
+
+      # Homogeneous: check all list elements are integers
+      elements <<~ Type.integer() >>> elements_e
+
+      # Heterogeneous: check function args against parameter types
+      args <<~ input_types >>> args_e
+  """
   defmacro left <<~ right do
     quote do: {:check_all, unquote(left), unquote(right)}
+  end
+
+  @doc """
+  Scoped context: adds scoped attributes for child rules.
+
+  Used in conjunction with ~>> to pass context from parent rules to child rules.
+  For example, a :case rule can pass subj_t to :case_branch rules:
+
+      (branches &&& [subj_t: subj_t]) ~>> {branches_e, pat_ts, body_ts}
+
+  Note: Due to operator precedence, parentheses are required around `exprs &&& [...]`.
+  """
+  defmacro left &&& right do
+    quote do: {:scoped_ctx, unquote(left), unquote(right)}
+  end
+
+  @doc """
+  Pattern judgment: pattern <~> expected_type checks pattern against type.
+
+  Returns erased pattern, pattern type, and bindings produced by pattern matching.
+  Must be followed by >>> to bind results:
+
+      pattern <~> subject_type >>> {erased_pattern, pattern_type, pattern_bindings}
+  """
+  defmacro left <~> right do
+    quote do: {:pattern_judgment, unquote(left), unquote(right)}
   end
 end
 
@@ -640,27 +815,28 @@ defmodule Deft.Rules.DSL.Helpers do
 
   @doc """
   Checks an expression against an expected type with bindings injected.
-  Returns {erased, type, new_bindings}.
+
+  Synthesizes the expression's type, then verifies it is a subtype of the
+  expected type. Returns {erased, actual_type, new_bindings}.
   """
   def check!(expr, expected_type, bindings, ctx) do
-    expr_with_bindings = DeftHelpers.inject_bindings(expr, bindings)
+    # First synthesize the expression's type
+    {erased, actual_type, new_bindings} = synth!(expr, bindings, ctx)
 
-    case TypeChecker.check_against(expr_with_bindings, expected_type, ctx) do
-      {:ok, erased, type, new_bindings, _ctx} ->
-        {erased, type, new_bindings}
+    # Then verify it's a subtype of expected
+    unless Subtyping.subtype_of?(expected_type, actual_type) do
+      error =
+        Error.type_mismatch(
+          expected: expected_type,
+          actual: actual_type,
+          expression: expr,
+          location: Error.extract_location(expr)
+        )
 
-      {:error, {:no_matching_rule, ast}} ->
-        error =
-          Error.no_matching_rule(
-            ast: ast,
-            location: Error.extract_location(ast)
-          )
-
-        raise_or_accumulate(ctx, error)
-
-      {:error, reason} ->
-        raise "Check failed: #{inspect(reason)}"
+      raise_or_accumulate(ctx, error)
     end
+
+    {erased, actual_type, new_bindings}
   end
 
   @doc """
@@ -783,32 +959,74 @@ defmodule Deft.Rules.DSL.Helpers do
   end
 
   @doc """
-  Checks a list of expressions against expected types.
-  Returns {erased_list, bindings_list}.
+  Synthesizes types for a list of expressions with a custom context.
+
+  This is used by the `&&&` operator to pass scoped attributes to child rules.
+  Returns {erased_list, types_list, bindings_list}.
   """
-  def check_all!(exprs, expected_types, bindings, ctx) do
-    if length(exprs) != length(expected_types) do
+  def synth_all_with_ctx!(exprs, bindings, ctx) do
+    {erased_list, types_list, bindings_list} =
+      Enum.reduce(exprs, {[], [], bindings}, fn expr, {acc_erased, acc_types, acc_bindings} ->
+        {erased, type, new_bindings} = synth!(expr, acc_bindings, ctx)
+        {acc_erased ++ [erased], acc_types ++ [type], acc_bindings ++ new_bindings}
+      end)
+
+    {erased_list, types_list, bindings_list}
+  end
+
+  @doc """
+  Checks a list of expressions against expected type(s).
+
+  Two modes based on the second argument:
+  - **Homogeneous** (single type): Each expression is checked against the same type
+  - **Heterogeneous** (list of types): Each expression is checked against its corresponding type
+
+  Returns {erased_list, bindings_list}.
+
+  ## Examples
+
+      # Homogeneous: all elements must be integers
+      check_all!(elements, Type.integer(), bindings, ctx)
+
+      # Heterogeneous: check args[i] against param_types[i]
+      check_all!(args, param_types, bindings, ctx)
+  """
+  def check_all!(exprs, expected, bindings, ctx) when is_list(expected) do
+    # Heterogeneous mode: check each expr against corresponding type
+    if length(exprs) != length(expected) do
+      # Use type_mismatch with tuple types to show arity difference
       error =
         Error.type_mismatch(
-          expected: "#{length(expected_types)} arguments",
-          actual: "#{length(exprs)} arguments",
+          expected: Type.fixed_tuple(expected),
+          actual: Type.fixed_tuple(List.duplicate(Type.top(), length(exprs))),
           notes: [
-            "Function expects #{length(expected_types)} argument(s)",
-            "Got #{length(exprs)} argument(s)"
-          ],
-          suggestions: ["Check the number of arguments passed to this function"]
+            "Expected #{length(expected)} argument(s), got #{length(exprs)}"
+          ]
         )
 
-      Error.raise!(error)
+      Error.raise!(error, ctx)
     end
 
     {erased_list, bindings_list} =
-      Enum.zip(exprs, expected_types)
-      |> Enum.reduce({[], bindings}, fn {expr, expected}, {acc_erased, acc_bindings} ->
-        {erased, _type, new_bindings} = check!(expr, expected, acc_bindings, ctx)
+      exprs
+      |> Enum.zip(expected)
+      |> Enum.reduce({[], bindings}, fn {expr, expected_type}, {acc_erased, acc_bindings} ->
+        {erased, _type, new_bindings} = check!(expr, expected_type, acc_bindings, ctx)
         {acc_erased ++ [erased], acc_bindings ++ new_bindings}
       end)
 
     {erased_list, bindings_list}
   end
+
+  def check_all!(exprs, expected_type, bindings, ctx) do
+    # Homogeneous mode: check all exprs against the same type
+    {erased_list, bindings_list} =
+      Enum.reduce(exprs, {[], bindings}, fn expr, {acc_erased, acc_bindings} ->
+        {erased, _type, new_bindings} = check!(expr, expected_type, acc_bindings, ctx)
+        {acc_erased ++ [erased], acc_bindings ++ new_bindings}
+      end)
+
+    {erased_list, bindings_list}
+  end
+
 end
