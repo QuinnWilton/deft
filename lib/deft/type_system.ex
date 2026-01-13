@@ -236,7 +236,12 @@ defmodule Deft.TypeSystem.Default do
   include(Deft.Rules.Builtins)
 
   signatures(Deft.Signatures.Kernel)
+  signatures(Deft.Signatures.Enum)
+  signatures(Deft.Signatures.List)
   signatures(Deft.Signatures.String)
+  signatures(Deft.Signatures.Integer)
+  signatures(Deft.Signatures.Float)
+  signatures(Deft.Signatures.Tuple)
   signatures(Deft.Signatures.IO)
 
   features([:exhaustiveness_checking])
