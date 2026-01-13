@@ -12,9 +12,11 @@ defmodule Deft.Guards do
   alias Deft.Context
   alias Deft.Error
   alias Deft.Signatures
+  alias Deft.Substitution
   alias Deft.Subtyping
   alias Deft.Type
   alias Deft.TypeChecker
+  alias Deft.Unification
 
   @comparisons [:!=, :!==, :<, :<=, :==, :===, :>, :>=]
   @unary_math [:-, :abs, :ceil, :floor, :round, :trunc]
@@ -338,48 +340,8 @@ defmodule Deft.Guards do
     {[term], term_t, bindings}
   end
 
-  # hd: list(a) -> a (preserves element type)
-  defp do_handle_guard(:hd, [term_ast], ctx) do
-    {:ok, term, term_t, bindings, _} = TypeChecker.check(term_ast, ctx)
-
-    unless Subtyping.subtype_of?(Type.list(), term_t) do
-      Error.raise!(
-        Error.type_mismatch(
-          expected: Type.list(),
-          actual: term_t,
-          location: Error.extract_location(term_ast),
-          expression: term_ast,
-          notes: ["`hd` requires a `list` argument"]
-        ),
-        ctx
-      )
-    end
-
-    # Extract element type if available, otherwise fall back to top.
-    element_type = extract_list_contents(term_t)
-
-    {[term], element_type, bindings}
-  end
-
-  # tl: list(a) -> list(a) (preserves list type)
-  defp do_handle_guard(:tl, [term_ast], ctx) do
-    {:ok, term, term_t, bindings, _} = TypeChecker.check(term_ast, ctx)
-
-    unless Subtyping.subtype_of?(Type.list(), term_t) do
-      Error.raise!(
-        Error.type_mismatch(
-          expected: Type.list(),
-          actual: term_t,
-          location: Error.extract_location(term_ast),
-          expression: term_ast,
-          notes: ["`tl` requires a `list` argument"]
-        ),
-        ctx
-      )
-    end
-
-    {[term], term_t, bindings}
-  end
+  # Note: hd and tl are now handled by polymorphic signatures via the fallback.
+  # The signature `forall a. [a] -> a` preserves element types through unification.
 
   # elem: tuple, integer -> union of element types
   defp do_handle_guard(:elem, [tuple_ast, index_ast], ctx) do
@@ -426,15 +388,13 @@ defmodule Deft.Guards do
       {:ok, %Type.Fn{inputs: input_types, output: output_type}} ->
         handle_with_signature(name, args, input_types, output_type, ctx)
 
+      {:ok, %Type.Forall{vars: vars, body: %Type.Fn{inputs: inputs, output: output}}} ->
+        handle_polymorphic_signature(name, args, vars, inputs, output, ctx)
+
       :error ->
         Error.raise!(Error.unsupported_call(name: name, arity: arity), ctx)
     end
   end
-
-  # Safely extract list contents type, falling back to top for generic lists.
-  defp extract_list_contents(%Type.FixedList{} = list), do: Type.FixedList.contents(list)
-  defp extract_list_contents(%Type.List{}), do: Type.top()
-  defp extract_list_contents(_), do: Type.top()
 
   # Safely extract tuple element types as a union, falling back to top for generic tuples.
   defp extract_tuple_element_type(%Type.FixedTuple{} = tuple) do
@@ -472,5 +432,67 @@ defmodule Deft.Guards do
       end)
 
     {erased_args, output_type, bindings}
+  end
+
+  # Handle a polymorphic guard signature (Type.Forall)
+  defp handle_polymorphic_signature(name, args, vars, inputs, output, ctx) do
+    # Synthesize all arguments to get their types
+    {erased_args, arg_types, bindings} =
+      args
+      |> Enum.with_index(1)
+      |> Enum.reduce({[], [], []}, fn {arg_ast, index}, {erased_acc, types_acc, bindings_acc} ->
+        {:ok, erased, actual_type, bindings, _} = TypeChecker.check(arg_ast, ctx)
+
+        # Verify arity matches (should always pass since we matched on arity above)
+        if index > length(inputs) do
+          Error.raise!(
+            Error.type_mismatch(
+              expected: Type.fixed_tuple(inputs),
+              actual: Type.fixed_tuple(types_acc ++ [actual_type]),
+              notes: ["Expected #{length(inputs)} argument(s), got #{index}"]
+            ),
+            ctx
+          )
+        end
+
+        {erased_acc ++ [erased], types_acc ++ [actual_type], bindings_acc ++ bindings}
+      end)
+
+    # Infer type variable bindings via unification
+    case Unification.infer(vars, inputs, arg_types) do
+      {:ok, subst} ->
+        instantiated_inputs = Enum.map(inputs, &Substitution.substitute(&1, subst))
+        instantiated_output = Substitution.substitute(output, subst)
+
+        # Verify arguments are subtypes of instantiated input types
+        Enum.zip([args, arg_types, instantiated_inputs])
+        |> Enum.with_index(1)
+        |> Enum.each(fn {{arg_ast, arg_t, input_t}, index} ->
+          unless Subtyping.subtype_of?(input_t, arg_t) do
+            Error.raise!(
+              Error.type_mismatch(
+                expected: input_t,
+                actual: arg_t,
+                location: Error.extract_location(arg_ast),
+                expression: arg_ast,
+                notes: ["Argument #{index} to `#{name}` has wrong type"]
+              ),
+              ctx
+            )
+          end
+        end)
+
+        {erased_args, instantiated_output, bindings}
+
+      {:error, reason} ->
+        Error.raise!(
+          Error.type_mismatch(
+            expected: Type.forall(vars, Type.fun(inputs, output)),
+            actual: Type.fixed_tuple(arg_types),
+            notes: ["Type inference failed: #{inspect(reason)}"]
+          ),
+          ctx
+        )
+    end
   end
 end

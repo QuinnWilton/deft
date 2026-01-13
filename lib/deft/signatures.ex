@@ -44,9 +44,15 @@ defmodule Deft.Signatures do
 
   These are the type signatures for Elixir's standard library
   functions that are commonly used in typed code.
+
+  List operations like `hd`, `tl`, `++`, `--` are polymorphic,
+  allowing them to preserve element type information.
   """
-  @spec builtins() :: %{{module(), atom(), non_neg_integer()} => Type.Fn.t()}
+  @spec builtins() :: %{{module(), atom(), non_neg_integer()} => Type.Fn.t() | Type.Forall.t()}
   def builtins do
+    # Type variables for polymorphic signatures
+    a = Type.var(:a)
+
     %{
       # Arithmetic operators
       {Kernel, :+, 2} => Type.fun([Type.number(), Type.number()], Type.number()),
@@ -98,12 +104,14 @@ defmodule Deft.Signatures do
       {Kernel, :is_map, 1} => Type.fun([Type.top()], Type.boolean()),
       {Kernel, :is_nil, 1} => Type.fun([Type.top()], Type.boolean()),
 
-      # List operations
-      {Kernel, :hd, 1} => Type.fun([Type.list()], Type.top()),
-      {Kernel, :tl, 1} => Type.fun([Type.list()], Type.list()),
+      # Polymorphic list operations
+      {Kernel, :hd, 1} => Type.forall([:a], Type.fun([Type.fixed_list(a)], a)),
+      {Kernel, :tl, 1} => Type.forall([:a], Type.fun([Type.fixed_list(a)], Type.fixed_list(a))),
       {Kernel, :length, 1} => Type.fun([Type.list()], Type.integer()),
-      {Kernel, :++, 2} => Type.fun([Type.list(), Type.list()], Type.list()),
-      {Kernel, :--, 2} => Type.fun([Type.list(), Type.list()], Type.list()),
+      {Kernel, :++, 2} =>
+        Type.forall([:a], Type.fun([Type.fixed_list(a), Type.fixed_list(a)], Type.fixed_list(a))),
+      {Kernel, :--, 2} =>
+        Type.forall([:a], Type.fun([Type.fixed_list(a), Type.fixed_list(a)], Type.fixed_list(a))),
 
       # Tuple operations
       {Kernel, :elem, 2} => Type.fun([Type.tuple(), Type.integer()], Type.top()),
