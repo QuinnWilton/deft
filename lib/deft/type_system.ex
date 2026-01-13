@@ -55,9 +55,10 @@ defmodule Deft.TypeSystem do
   """
   defmacro __using__(_opts) do
     quote do
-      import Deft.TypeSystem, only: [include: 1, include_first: 1, features: 1]
+      import Deft.TypeSystem, only: [include: 1, include_first: 1, features: 1, signatures: 1]
       Module.register_attribute(__MODULE__, :deft_included_rules, accumulate: true)
       Module.register_attribute(__MODULE__, :deft_prepended_rules, accumulate: true)
+      Module.register_attribute(__MODULE__, :deft_signature_modules, accumulate: true)
       Module.register_attribute(__MODULE__, :deft_features, accumulate: false)
       Module.put_attribute(__MODULE__, :deft_features, [])
 
@@ -69,10 +70,13 @@ defmodule Deft.TypeSystem do
   defmacro __before_compile__(env) do
     included = Module.get_attribute(env.module, :deft_included_rules) || []
     prepended = Module.get_attribute(env.module, :deft_prepended_rules) || []
+    signature_modules = Module.get_attribute(env.module, :deft_signature_modules) || []
     features = Module.get_attribute(env.module, :deft_features) || []
 
     # Prepended rules go first (in reverse order of declaration), then included rules
     all_rule_modules = Enum.reverse(prepended) ++ Enum.reverse(included)
+    # Signature modules in declaration order
+    all_signature_modules = Enum.reverse(signature_modules)
 
     quote do
       @doc """
@@ -113,11 +117,31 @@ defmodule Deft.TypeSystem do
       end
 
       @doc """
-      Creates a typing context with this type system's features enabled.
+      Returns all signature modules included in this type system.
+      """
+      @spec signature_modules() :: [module()]
+      def signature_modules, do: unquote(all_signature_modules)
+
+      @doc """
+      Returns all signatures from all included signature modules.
+
+      Returns a map of `{module, function, arity} => type`.
+      """
+      @spec all_signatures() :: %{{module(), atom(), non_neg_integer()} => Deft.Type.t()}
+      def all_signatures do
+        Enum.reduce(signature_modules(), %{}, fn mod, acc ->
+          Code.ensure_loaded(mod)
+          Map.merge(acc, mod.signatures())
+        end)
+      end
+
+      @doc """
+      Creates a typing context with this type system's features and signatures.
       """
       @spec context(Macro.Env.t()) :: Deft.Context.t()
       def context(env) do
         Deft.Context.new(env, features: features())
+        |> Deft.Context.with_signatures(all_signatures())
       end
 
       @doc """
@@ -176,6 +200,24 @@ defmodule Deft.TypeSystem do
       Module.put_attribute(__MODULE__, :deft_features, unquote(feature_list))
     end
   end
+
+  @doc """
+  Includes a signature module in the type system.
+
+  Signature modules define type signatures for external functions.
+  These signatures are scoped to the type system and won't leak
+  to other type systems.
+
+  ## Example
+
+      signatures Deft.Signatures.Kernel
+      signatures Deft.Signatures.Enum
+  """
+  defmacro signatures(signature_module) do
+    quote do
+      @deft_signature_modules unquote(signature_module)
+    end
+  end
 end
 
 defmodule Deft.TypeSystem.Default do
@@ -192,6 +234,10 @@ defmodule Deft.TypeSystem.Default do
   include(Deft.Rules.Functions)
   include(Deft.Rules.ControlFlow)
   include(Deft.Rules.Builtins)
+
+  signatures(Deft.Signatures.Kernel)
+  signatures(Deft.Signatures.String)
+  signatures(Deft.Signatures.IO)
 
   features([:exhaustiveness_checking])
 end
