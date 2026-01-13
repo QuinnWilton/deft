@@ -417,4 +417,108 @@ defmodule Deft.SubtypingTest do
       assert_subtype(Type.bottom(), Type.number())
     end
   end
+
+  # ============================================================================
+  # check_subtype/3 Detailed Error Reporting
+  # ============================================================================
+
+  alias Deft.Subtyping
+
+  describe "check_subtype/3 path tracking" do
+    test "returns :ok for valid subtype" do
+      assert :ok = Subtyping.check_subtype(Type.number(), Type.integer(), nil)
+    end
+
+    test "returns mismatch info for invalid subtype" do
+      assert {:mismatch, info} = Subtyping.check_subtype(Type.integer(), Type.boolean(), :expr)
+      assert info.expected == Type.integer()
+      assert info.actual == Type.boolean()
+      assert info.expr == :expr
+      assert info.path == []
+    end
+
+    test "FixedList mismatch includes element type info" do
+      super = Type.fixed_list(Type.integer())
+      sub = Type.fixed_list(Type.boolean())
+
+      assert {:mismatch, info} = Subtyping.check_subtype(super, sub, :expr)
+      assert info.expected == Type.integer()
+      assert info.actual == Type.boolean()
+    end
+
+    test "FixedTuple mismatch includes path with element index" do
+      super = Type.fixed_tuple([Type.integer(), Type.float()])
+      sub = Type.fixed_tuple([Type.integer(), Type.boolean()])
+
+      exprs = [:expr0, :expr1]
+      assert {:mismatch, info} = Subtyping.check_subtype(super, sub, exprs)
+
+      # Path should include index of mismatching element
+      assert 1 in info.path
+      assert info.expected == Type.float()
+      assert info.actual == Type.boolean()
+      assert info.expr == :expr1
+    end
+
+    test "FixedTuple first element mismatch" do
+      super = Type.fixed_tuple([Type.float(), Type.integer()])
+      sub = Type.fixed_tuple([Type.boolean(), Type.integer()])
+
+      exprs = [:expr0, :expr1]
+      assert {:mismatch, info} = Subtyping.check_subtype(super, sub, exprs)
+
+      assert 0 in info.path
+      assert info.expected == Type.float()
+      assert info.actual == Type.boolean()
+      assert info.expr == :expr0
+    end
+
+    test "Fn input mismatch includes :input in path" do
+      # fn(Number) -> Boolean expected, fn(Integer) -> Boolean actual
+      # This is a mismatch because inputs are contravariant:
+      # fn(Integer) can only accept Integer, but fn(Number) must accept any Number
+      super = Type.fun([Type.number()], Type.boolean())
+      sub = Type.fun([Type.integer()], Type.boolean())
+
+      exprs = [:input_expr]
+      assert {:mismatch, info} = Subtyping.check_subtype(super, sub, exprs)
+
+      # Path should include :input marker and index
+      assert :input in info.path
+    end
+
+    test "Fn output mismatch" do
+      super = Type.fun([Type.integer()], Type.integer())
+      sub = Type.fun([Type.integer()], Type.boolean())
+
+      assert {:mismatch, info} = Subtyping.check_subtype(super, sub, nil)
+      assert info.expected == Type.integer()
+      assert info.actual == Type.boolean()
+    end
+
+    test "Fn arity mismatch returns full type info" do
+      super = Type.fun([Type.integer()], Type.boolean())
+      sub = Type.fun([Type.integer(), Type.integer()], Type.boolean())
+
+      assert {:mismatch, info} = Subtyping.check_subtype(super, sub, nil)
+      assert info.expected == super
+      assert info.actual == sub
+    end
+
+    test "nested tuple path tracking" do
+      # Tuple containing a tuple: {Integer, {Float, Boolean}}
+      # vs {Integer, {Float, Integer}}
+      inner_super = Type.fixed_tuple([Type.float(), Type.boolean()])
+      inner_sub = Type.fixed_tuple([Type.float(), Type.integer()])
+      outer_super = Type.fixed_tuple([Type.integer(), inner_super])
+      outer_sub = Type.fixed_tuple([Type.integer(), inner_sub])
+
+      assert {:mismatch, info} = Subtyping.check_subtype(outer_super, outer_sub, nil)
+
+      # Path should track nested indices
+      assert 1 in info.path
+      assert info.expected == Type.boolean()
+      assert info.actual == Type.integer()
+    end
+  end
 end
