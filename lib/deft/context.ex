@@ -29,8 +29,10 @@ defmodule Deft.Context do
     :env,
     # Variable name -> type mappings (list of {AST.Local, Type} tuples)
     type_env: [],
-    # ADT name -> Type.ADT mappings
+    # ADT name -> Type.ADT mappings (local to current deft block)
     adt_env: [],
+    # ADT registry from included datatype modules (shared across modules)
+    adt_registry: %{},
     # Function signatures for type checking external function calls
     signature_env: %{},
     # Enabled features like :polymorphism, :strict_subtyping
@@ -57,6 +59,7 @@ defmodule Deft.Context do
           env: Macro.Env.t() | nil,
           type_env: [{term(), Type.t()}],
           adt_env: [{atom(), Type.t()}],
+          adt_registry: %{atom() => Type.t()},
           signature_env: map(),
           features: [atom()],
           on_compute: (term(), term() -> any()) | nil,
@@ -186,6 +189,37 @@ defmodule Deft.Context do
           {:ok, Type.t()} | :error
   def lookup_signature(%__MODULE__{signature_env: signatures}, mfa) do
     Map.fetch(signatures, mfa)
+  end
+
+  # ============================================================================
+  # ADT Registry (Cross-Module ADT Sharing)
+  # ============================================================================
+
+  @doc """
+  Sets the ADT registry for cross-module ADT lookups.
+
+  The registry is a map of `name => Type.ADT` from included datatype modules.
+  """
+  @spec with_adt_registry(t(), map()) :: t()
+  def with_adt_registry(%__MODULE__{} = ctx, registry) when is_map(registry) do
+    %{ctx | adt_registry: registry}
+  end
+
+  @doc """
+  Looks up an ADT by name, checking both local adt_env and the registry.
+
+  Local ADT definitions (from the current deft block) take precedence over
+  registry definitions (from included modules).
+
+  Returns `{:ok, type}` if found, `:error` otherwise.
+  """
+  @spec lookup_adt(t(), atom()) :: {:ok, Type.t()} | :error
+  def lookup_adt(%__MODULE__{adt_env: adt_env, adt_registry: registry}, name) do
+    # First check local adt_env (from current deft block)
+    case List.keyfind(adt_env, name, 1) do
+      {:adt, ^name, type} -> {:ok, type}
+      nil -> Map.fetch(registry, name)
+    end
   end
 
   # ============================================================================

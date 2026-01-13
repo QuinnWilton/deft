@@ -12,12 +12,18 @@ defmodule Deft.TypeSystem do
         use Deft.TypeSystem
 
         # Include base rule sets
-        include Deft.Rules.Core
-        include Deft.Rules.Functions
-        include Deft.Rules.ControlFlow
+        include_rule Deft.Rules.Core
+        include_rule Deft.Rules.Functions
+        include_rule Deft.Rules.ControlFlow
 
         # Include builtin guards
-        include Deft.Rules.Builtins
+        include_rule Deft.Rules.Builtins
+
+        # Include signatures
+        include_signatures Deft.Signatures.Kernel
+
+        # Include datatypes
+        include_datatypes MyApp.Datatypes
 
         # Enable specific features
         features [:exhaustiveness_checking, :strict_subtyping]
@@ -47,7 +53,7 @@ defmodule Deft.TypeSystem do
   priority:
 
       include_first MyApp.CustomRules       # Applied before other rules
-      include Deft.Rules.Core   # Applied after CustomRules
+      include_rule Deft.Rules.Core          # Applied after CustomRules
   """
 
   @doc """
@@ -55,10 +61,22 @@ defmodule Deft.TypeSystem do
   """
   defmacro __using__(_opts) do
     quote do
-      import Deft.TypeSystem, only: [include: 1, include_first: 1, features: 1, signatures: 1]
+      import Deft.TypeSystem,
+        only: [
+          include_rule: 1,
+          include_first: 1,
+          features: 1,
+          include_signatures: 1,
+          include_datatypes: 1,
+          # Keep old names for backwards compatibility (deprecated)
+          include: 1,
+          signatures: 1
+        ]
+
       Module.register_attribute(__MODULE__, :deft_included_rules, accumulate: true)
       Module.register_attribute(__MODULE__, :deft_prepended_rules, accumulate: true)
       Module.register_attribute(__MODULE__, :deft_signature_modules, accumulate: true)
+      Module.register_attribute(__MODULE__, :deft_adt_modules, accumulate: true)
       Module.register_attribute(__MODULE__, :deft_features, accumulate: false)
       Module.put_attribute(__MODULE__, :deft_features, [])
 
@@ -70,13 +88,16 @@ defmodule Deft.TypeSystem do
   defmacro __before_compile__(env) do
     included = Module.get_attribute(env.module, :deft_included_rules) || []
     prepended = Module.get_attribute(env.module, :deft_prepended_rules) || []
-    signature_modules = Module.get_attribute(env.module, :deft_signature_modules) || []
+    signature_modules_with_loc = Module.get_attribute(env.module, :deft_signature_modules) || []
+    adt_modules_with_loc = Module.get_attribute(env.module, :deft_adt_modules) || []
     features = Module.get_attribute(env.module, :deft_features) || []
 
     # Prepended rules go first (in reverse order of declaration), then included rules
     all_rule_modules = Enum.reverse(prepended) ++ Enum.reverse(included)
-    # Signature modules in declaration order
-    all_signature_modules = Enum.reverse(signature_modules)
+
+    # Signature and ADT modules in declaration order (with location info)
+    all_signature_modules_data = Enum.reverse(signature_modules_with_loc)
+    all_adt_modules_data = Enum.reverse(adt_modules_with_loc)
 
     quote do
       @doc """
@@ -120,19 +141,42 @@ defmodule Deft.TypeSystem do
       Returns all signature modules included in this type system.
       """
       @spec signature_modules() :: [module()]
-      def signature_modules, do: unquote(all_signature_modules)
+      def signature_modules do
+        unquote(Macro.escape(all_signature_modules_data))
+        |> Enum.map(fn {mod, _file, _line} -> mod end)
+      end
 
       @doc """
       Returns all signatures from all included signature modules.
 
       Returns a map of `{module, function, arity} => type`.
+      Raises a compile error if conflicting definitions are found.
       """
       @spec all_signatures() :: %{{module(), atom(), non_neg_integer()} => Deft.Type.t()}
       def all_signatures do
-        Enum.reduce(signature_modules(), %{}, fn mod, acc ->
-          Code.ensure_loaded(mod)
-          Map.merge(acc, mod.signatures())
-        end)
+        Deft.TypeSystem.Conflict.merge_signatures(
+          unquote(Macro.escape(all_signature_modules_data))
+        )
+      end
+
+      @doc """
+      Returns all ADT modules included in this type system.
+      """
+      @spec adt_modules() :: [module()]
+      def adt_modules do
+        unquote(Macro.escape(all_adt_modules_data))
+        |> Enum.map(fn {mod, _file, _line} -> mod end)
+      end
+
+      @doc """
+      Returns all datatypes from all included ADT modules.
+
+      Returns a map of `name => Type.ADT`.
+      Raises a compile error if conflicting definitions are found.
+      """
+      @spec all_datatypes() :: %{atom() => Deft.Type.t()}
+      def all_datatypes do
+        Deft.TypeSystem.Conflict.merge_datatypes(unquote(Macro.escape(all_adt_modules_data)))
       end
 
       @doc """
@@ -142,6 +186,7 @@ defmodule Deft.TypeSystem do
       def context(env) do
         Deft.Context.new(env, features: features())
         |> Deft.Context.with_signatures(all_signatures())
+        |> Deft.Context.with_adt_registry(all_datatypes())
       end
 
       @doc """
@@ -163,8 +208,19 @@ defmodule Deft.TypeSystem do
 
   ## Example
 
-      include Deft.Rules.Core
-      include Deft.Rules.Functions
+      include_rule Deft.Rules.Core
+      include_rule Deft.Rules.Functions
+  """
+  defmacro include_rule(rule_module) do
+    quote do
+      @deft_included_rules unquote(rule_module)
+    end
+  end
+
+  @doc """
+  Includes a rule module in the type system.
+
+  Deprecated: Use `include_rule/1` instead.
   """
   defmacro include(rule_module) do
     quote do
@@ -180,7 +236,7 @@ defmodule Deft.TypeSystem do
   ## Example
 
       include_first MyApp.CustomRules       # These take priority
-      include Deft.Rules.Core   # Fallback rules
+      include_rule Deft.Rules.Core          # Fallback rules
   """
   defmacro include_first(rule_module) do
     quote do
@@ -210,12 +266,50 @@ defmodule Deft.TypeSystem do
 
   ## Example
 
-      signatures Deft.Signatures.Kernel
-      signatures Deft.Signatures.Enum
+      include_signatures Deft.Signatures.Kernel
+      include_signatures Deft.Signatures.Enum
+  """
+  defmacro include_signatures(signature_module) do
+    line = __CALLER__.line
+    file = __CALLER__.file
+
+    quote do
+      @deft_signature_modules {unquote(signature_module), unquote(file), unquote(line)}
+    end
+  end
+
+  @doc """
+  Includes a signature module in the type system.
+
+  Deprecated: Use `include_signatures/1` instead.
   """
   defmacro signatures(signature_module) do
+    line = __CALLER__.line
+    file = __CALLER__.file
+
     quote do
-      @deft_signature_modules unquote(signature_module)
+      @deft_signature_modules {unquote(signature_module), unquote(file), unquote(line)}
+    end
+  end
+
+  @doc """
+  Includes an ADT module in the type system.
+
+  ADT modules define algebraic data types that can be used across modules.
+  These datatypes are scoped to the type system and won't leak
+  to other type systems.
+
+  ## Example
+
+      include_datatypes MyApp.Datatypes
+      include_datatypes Deft.Datatypes.Core
+  """
+  defmacro include_datatypes(adt_module) do
+    line = __CALLER__.line
+    file = __CALLER__.file
+
+    quote do
+      @deft_adt_modules {unquote(adt_module), unquote(file), unquote(line)}
     end
   end
 end
@@ -230,19 +324,21 @@ defmodule Deft.TypeSystem.Default do
 
   use Deft.TypeSystem
 
-  include(Deft.Rules.Core)
-  include(Deft.Rules.Functions)
-  include(Deft.Rules.ControlFlow)
-  include(Deft.Rules.Builtins)
+  include_rule Deft.Rules.Core
+  include_rule Deft.Rules.Functions
+  include_rule Deft.Rules.ControlFlow
+  include_rule Deft.Rules.Builtins
 
-  signatures(Deft.Signatures.Kernel)
-  signatures(Deft.Signatures.Enum)
-  signatures(Deft.Signatures.List)
-  signatures(Deft.Signatures.String)
-  signatures(Deft.Signatures.Integer)
-  signatures(Deft.Signatures.Float)
-  signatures(Deft.Signatures.Tuple)
-  signatures(Deft.Signatures.IO)
+  include_signatures Deft.Signatures.Kernel
+  include_signatures Deft.Signatures.Enum
+  include_signatures Deft.Signatures.List
+  include_signatures Deft.Signatures.String
+  include_signatures Deft.Signatures.Integer
+  include_signatures Deft.Signatures.Float
+  include_signatures Deft.Signatures.Tuple
+  include_signatures Deft.Signatures.IO
+
+  include_datatypes Deft.Datatypes.Core
 
   features([:exhaustiveness_checking])
 end

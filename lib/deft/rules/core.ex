@@ -102,13 +102,13 @@ defmodule Deft.Rules.Core do
     {erased_exprs, final_type}
   end
 
-  defp handle_def_data(%AST.DefData{} = node) do
+  defp handle_def_data(%AST.DefData{params: params} = node) do
     variants =
       Enum.map(node.variants, fn %AST.Variant{} = variant ->
         Type.variant(variant.name, node.name, variant.columns)
       end)
 
-    Type.adt(node.name, variants)
+    Type.adt(node.name, variants, params)
   end
 
   # ============================================================================

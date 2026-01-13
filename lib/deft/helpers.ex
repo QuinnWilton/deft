@@ -76,10 +76,17 @@ defmodule Deft.Helpers do
   @spec inject_bindings(term(), [term()]) :: term()
   def inject_bindings(ast, bindings) do
     Enum.reduce(bindings, ast, fn
-      {:adt, %AST.Local{name: name}, %Type.ADT{} = type}, acc ->
+      {:adt, %AST.Local{name: name}, %Type.ADT{params: params} = type}, acc ->
         # Match on name only - context can differ between macro expansion phases
         Walker.postwalk(acc, fn
-          %Type.Alias{name: ^name} ->
+          # Instantiated ADT reference: option(integer) where option has params
+          %Type.Alias{name: ^name, args: args}
+          when is_list(args) and length(args) == length(params) and args != [] ->
+            Type.ADT.instantiate(type, args)
+
+          # Non-parameterized ADT reference: option where option has no params
+          # OR uninstantiated reference to parameterized ADT
+          %Type.Alias{name: ^name, args: []} ->
             type
 
           other ->
