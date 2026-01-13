@@ -138,6 +138,7 @@ defmodule Deft.Declare do
   defp parse_type({:top, _, _}), do: quote(do: Deft.Type.top())
   defp parse_type({:bottom, _, _}), do: quote(do: Deft.Type.bottom())
   defp parse_type({:string, _, _}), do: quote(do: Deft.Type.binary())
+  defp parse_type({:binary, _, _}), do: quote(do: Deft.Type.binary())
   defp parse_type({nil, _, _}), do: quote(do: Deft.Type.atom())
 
   # Type variable (single lowercase letter) - treated as top for now
