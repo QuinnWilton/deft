@@ -14,7 +14,6 @@ defmodule Deft.Rules.ControlFlow do
   alias Deft.AST
   alias Deft.AST.Erased
   alias Deft.Error
-  alias Deft.PatternMatching
   alias Deft.Span
   alias Deft.Subtyping
   alias Deft.Type
@@ -24,11 +23,8 @@ defmodule Deft.Rules.ControlFlow do
   # ============================================================================
 
   defrule :if, %AST.If{predicate: pred, do: do_, else: else_, meta: meta} do
-    # Synthesize predicate
-    pred ~> {pred_e, pred_t}
-
-    # Check predicate type subtypes boolean
-    pred_t <<< Type.boolean()
+    # Check predicate against boolean
+    pred <~ Type.boolean() >>> pred_e
 
     # Synthesize branches
     do_ ~> {do_e, do_t}
@@ -45,77 +41,42 @@ defmodule Deft.Rules.ControlFlow do
   # ============================================================================
 
   defrule :cond, %AST.Cond{branches: branches, meta: meta} do
-    compute {erased_branches, types} do
-      Enum.map(branches, fn %AST.CondBranch{predicate: pred, body: body, meta: branch_meta} ->
-        {erased_pred, pred_type, _} = Deft.Rules.DSL.Helpers.synth!(pred, [], ctx)
-        require_subtype!(pred_type, Type.boolean())
+    # Synthesize all branches - each branch rule returns body_t
+    branches ~>> {branches_e, body_ts}
 
-        {erased_body, body_type, _} = Deft.Rules.DSL.Helpers.synth!(body, [], ctx)
-
-        {Erased.branch(branch_meta, erased_pred, erased_body), body_type}
-      end)
-      |> Enum.unzip()
-    end
-
-    conclude(Erased.cond_expr(meta, erased_branches) ~> union_types(types))
+    conclude(Erased.cond_expr(meta, branches_e) ~> union_types(body_ts))
   end
 
   # ============================================================================
   # Case Expression Rule
   # ============================================================================
 
-  defrule :case, %AST.Case{subject: subject, branches: branches, meta: meta} do
+  defrule :case, %AST.Case{subject: subj, branches: branches, meta: meta} do
     # Synthesize subject
-    subject ~> {erased_subject, subject_type}
+    subj ~> {subj_e, subj_t}
 
-    # Process all branches
-    compute {erased_branches, pattern_types, branch_types} do
-      Enum.map(branches, fn %AST.CaseBranch{pattern: pattern, body: body, meta: branch_meta} ->
-        # Handle pattern against subject type
-        {erased_pattern, pattern_type, pattern_bindings} =
-          PatternMatching.handle_pattern(pattern, subject_type, ctx,
-            branch_meta: branch_meta,
-            subject: subject,
-            subject_type: subject_type
-          )
-
-        # Synthesize body with pattern bindings
-        all_bindings = bindings ++ pattern_bindings
-
-        {erased_body, body_type, _} =
-          Deft.Rules.DSL.Helpers.synth!(body, all_bindings, ctx)
-
-        {Erased.branch(branch_meta, erased_pattern, erased_body), pattern_type, body_type}
-      end)
-      |> Enum.reduce({[], [], []}, fn {e, p, b}, {es, ps, bs} ->
-        {es ++ [e], ps ++ [p], bs ++ [b]}
-      end)
-    end
+    # Synthesize all branches with subject type and subject AST in scoped context
+    # The 3-element binding auto-unzips {pat_t, body_t} tuples from each branch
+    (branches &&& [subj_t: subj_t, subj: subj]) ~>> {branches_e, pat_ts, body_ts}
 
     # Check exhaustiveness if feature enabled
     if_feature :exhaustiveness_checking do
       Deft.Rules.ControlFlow.exhaustive_check!(
-        subject_type,
-        pattern_types,
-        subject: subject,
+        subj_t,
+        pat_ts,
+        subject: subj,
         branches: branches,
         ctx: ctx
       )
     end
 
     conclude(
-      Erased.case_expr(meta, erased_subject, erased_branches)
-      ~> union_types(branch_types)
+      Erased.case_expr(meta, subj_e, branches_e)
+      ~> union_types(body_ts)
     )
   end
 
-  @doc false
-  # Backwards-compatible 2-argument version for testing
-  def exhaustive_check!(subject_type, pattern_types) do
-    exhaustive_check!(subject_type, pattern_types, nil)
-  end
-
-  def exhaustive_check!(subject_type, pattern_types, opts)
+  def exhaustive_check!(subject_type, pattern_types, opts \\ nil)
 
   # Simple location-only call (for tests and simple cases)
   def exhaustive_check!(%Type.Union{} = subject_type, pattern_types, nil) do
@@ -219,20 +180,57 @@ defmodule Deft.Rules.ControlFlow do
   # Match (Assignment) Rule
   # ============================================================================
 
-  defrule :match, %AST.Match{pattern: pattern, value: value, meta: meta} do
+  defrule :match, %AST.Match{pattern: pat, value: val, meta: meta} do
     # Synthesize the value
-    value ~> {erased_value, value_type}
+    val ~> {val_e, val_t}
 
-    # Handle pattern matching
-    compute {erased_pattern, pattern_bindings} do
-      {erased_pattern, _pattern_type, pattern_bindings} =
-        PatternMatching.handle_pattern(pattern, value_type, ctx)
+    # Handle pattern matching using pattern judgment
+    pat <~> val_t >>> {pat_e, _pat_t, pat_bs}
 
-      {erased_pattern, pattern_bindings}
-    end
+    conclude(Erased.match(meta, pat_e, val_e) ~> val_t, bind: pat_bs)
+  end
 
-    conclude(Erased.match(meta, erased_pattern, erased_value) ~> value_type,
-      bind: pattern_bindings
+  # ============================================================================
+  # Case Branch Rule (for use with scoped context)
+  # ============================================================================
+
+  # Types a case branch against a subject type passed via scoped context.
+  #
+  # This rule is invoked when the parent `:case` rule uses:
+  #     (branches &&& [subj_t: subj_t, subj: subj]) ~>> {branches_e, pat_ts, body_ts}
+  #
+  # The scoped context provides subject info for error messages in pattern matching.
+  # Returns {pat_t, body_t} as its synthesized type.
+  defrule :case_branch, %AST.CaseBranch{pattern: pat, body: body, meta: meta} do
+    subj_t = scoped(:subj_t)
+
+    # Pattern judgment - handle_pattern reads subj/subj_t from scoped context for errors
+    pat <~> subj_t >>> {pat_e, pat_t, pat_bs}
+
+    # Synthesize body with pattern bindings in scope
+    pat_bs +++ body ~> {body_e, body_t}
+
+    # Return {pat_t, body_t} for parent to collect and unzip
+    conclude(
+      Erased.branch(meta, pat_e, body_e)
+      ~> {pat_t, body_t}
     )
+  end
+
+  # ============================================================================
+  # Cond Branch Rule
+  # ============================================================================
+
+  # Types a cond branch (predicate -> body).
+  #
+  # Returns body_t as its synthesized type.
+  defrule :cond_branch, %AST.CondBranch{predicate: pred, body: body, meta: meta} do
+    # Check predicate against boolean
+    pred <~ Type.boolean() >>> pred_e
+
+    # Synthesize body
+    body ~> {body_e, body_t}
+
+    conclude(Erased.branch(meta, pred_e, body_e) ~> body_t)
   end
 end

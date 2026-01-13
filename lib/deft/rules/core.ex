@@ -42,7 +42,7 @@ defmodule Deft.Rules.Core do
   # ============================================================================
 
   defrule :annotation, %AST.Annotation{pattern: pattern, type: type} do
-    compute {erased, result_bindings} do
+    compute {pat_e, bs} do
       case pattern do
         %AST.Local{name: name, meta: meta, context: context} = local ->
           {{name, meta, context}, [{local, type}]}
@@ -52,7 +52,7 @@ defmodule Deft.Rules.Core do
       end
     end
 
-    conclude(erased ~> type, bind: result_bindings)
+    conclude(pat_e ~> type, bind: bs)
   end
 
   # ============================================================================
@@ -60,11 +60,11 @@ defmodule Deft.Rules.Core do
   # ============================================================================
 
   defrule :block, %AST.Block{exprs: exprs, meta: meta} do
-    compute {erased_exprs, final_type} do
+    compute {exprs_e, result_t} do
       Deft.Rules.Core.check_block_exprs(exprs, ctx)
     end
 
-    conclude(Erased.block(meta, erased_exprs) ~> final_type)
+    conclude(Erased.block(meta, exprs_e) ~> result_t)
   end
 
   @doc false
@@ -115,10 +115,10 @@ defmodule Deft.Rules.Core do
   # Tuple Rule
   # ============================================================================
 
-  defrule :tuple, %AST.Tuple{elements: elements, meta: meta} do
-    elements ~>> {erased_elements, types}
+  defrule :tuple, %AST.Tuple{elements: elems, meta: meta} do
+    elems ~>> {elems_e, elems_ts}
 
-    conclude(Erased.tuple(meta, erased_elements) ~> Type.fixed_tuple(types))
+    conclude(Erased.tuple(meta, elems_e) ~> Type.fixed_tuple(elems_ts))
   end
 
   # ============================================================================
@@ -126,22 +126,22 @@ defmodule Deft.Rules.Core do
   # ============================================================================
 
   defrule :pair, %AST.Pair{fst: fst, snd: snd} do
-    fst ~> {erased_fst, fst_type}
-    snd ~> {erased_snd, snd_type}
+    fst ~> {fst_e, fst_t}
+    snd ~> {snd_e, snd_t}
 
-    conclude(Erased.pair(erased_fst, erased_snd) ~> Type.fixed_tuple([fst_type, snd_type]))
+    conclude(Erased.pair(fst_e, snd_e) ~> Type.fixed_tuple([fst_t, snd_t]))
   end
 
   # ============================================================================
   # List Rule
   # ============================================================================
 
-  defrule :list, %AST.List{elements: elements} do
-    elements ~>> {erased_elements, types}
+  defrule :list, %AST.List{elements: elems} do
+    elems ~>> {elems_e, elems_ts}
 
-    elem_type = union_types(types)
+    elem_t = union_types(elems_ts)
 
-    conclude(erased_elements ~> Type.fixed_list(elem_type))
+    conclude(elems_e ~> Type.fixed_list(elem_t))
   end
 
   # ============================================================================
@@ -149,15 +149,15 @@ defmodule Deft.Rules.Core do
   # ============================================================================
 
   defrule :cons, %AST.Cons{head: head, rest: rest, meta: meta} do
-    head ~> {erased_head, head_type}
-    rest ~> {erased_rest, rest_type}
+    head ~> {head_e, head_t}
+    rest ~> {rest_e, rest_t}
 
-    compute result_type do
+    compute result_t do
       # The rest must be a list type.
-      case rest_type do
+      case rest_t do
         %Type.FixedList{} ->
-          elem_type = Type.FixedList.contents(rest_type)
-          Type.fixed_list(Type.union(head_type, elem_type))
+          elem_t = Type.FixedList.contents(rest_t)
+          Type.fixed_list(Type.union(head_t, elem_t))
 
         %Type.List{} ->
           Type.list()
@@ -166,12 +166,12 @@ defmodule Deft.Rules.Core do
           Deft.Error.raise!(
             Deft.Error.type_mismatch(
               expected: Type.list(),
-              actual: rest_type
+              actual: rest_t
             )
           )
       end
     end
 
-    conclude(Erased.cons(meta, erased_head, erased_rest) ~> result_type)
+    conclude(Erased.cons(meta, head_e, rest_e) ~> result_t)
   end
 end

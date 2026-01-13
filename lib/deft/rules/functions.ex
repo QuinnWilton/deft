@@ -11,7 +11,6 @@ defmodule Deft.Rules.Functions do
 
   alias Deft.AST
   alias Deft.AST.Erased
-  alias Deft.Subtyping
   alias Deft.Type
 
   # ============================================================================
@@ -21,16 +20,14 @@ defmodule Deft.Rules.Functions do
   defrule :fn, %AST.Fn{args: args, body: body, fn_meta: fn_meta, arrow_meta: arrow_meta} do
     # Synthesize arguments (which should be annotations, producing bindings)
     # These bindings are scoped to the function body, not returned to caller
-    compute {erased_args, input_types, arg_bindings} do
-      synth_all!(args, ctx)
-    end
+    args ~>> {args_e, input_ts, arg_bs}
 
     # Synthesize body with argument bindings in scope
-    (arg_bindings +++ body) ~> {erased_body, output_type}
+    (arg_bs +++ body) ~> {body_e, output_t}
 
     conclude(
-      Erased.fn_expr(fn_meta, arrow_meta, erased_args, erased_body)
-      ~> Type.fun(input_types, output_type)
+      Erased.fn_expr(fn_meta, arrow_meta, args_e, body_e)
+      ~> Type.fun(input_ts, output_t)
     )
   end
 
@@ -44,38 +41,29 @@ defmodule Deft.Rules.Functions do
     fun_meta: fun_meta,
     args_meta: args_meta
   } do
-    # Synthesize the function
-    fun ~> {erased_fun, fun_type}
+    # Synthesize the function to get its type
+    fun ~> {fun_e, fun_t}
 
-    # Synthesize arguments
-    args ~>> {erased_args, arg_types}
-
-    # Validate and extract output type
-    compute output do
-      case fun_type do
-        %Type.Fn{inputs: inputs, output: output} ->
-          if length(inputs) == length(arg_types) and Subtyping.subtypes_of?(inputs, arg_types) do
-            output
-          else
-            Deft.Error.raise!(
-              Deft.Error.type_mismatch(
-                expected: Type.fixed_tuple(inputs),
-                actual: Type.fixed_tuple(arg_types)
-              )
-            )
-          end
+    # Extract input/output types from function type
+    compute {input_ts, output_t} do
+      case fun_t do
+        %Type.Fn{inputs: input_ts, output: output_t} ->
+          {input_ts, output_t}
 
         _ ->
           Deft.Error.raise!(
             Deft.Error.type_mismatch(
               expected: Type.fun([], Type.top()),
-              actual: fun_type,
-              notes: ["Expected a function type but got: #{inspect(fun_type)}"]
+              actual: fun_t,
+              notes: ["Expected a function type but got: #{inspect(fun_t)}"]
             )
           )
       end
     end
 
-    conclude(Erased.fn_apply(fun_meta, args_meta, erased_fun, erased_args) ~> output)
+    # Check arguments against expected input types (heterogeneous mode)
+    args <<~ input_ts >>> args_e
+
+    conclude(Erased.fn_apply(fun_meta, args_meta, fun_e, args_e) ~> output_t)
   end
 end

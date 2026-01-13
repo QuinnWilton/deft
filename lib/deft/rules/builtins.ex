@@ -14,16 +14,14 @@ defmodule Deft.Rules.Builtins do
   alias Deft.Error
   alias Deft.Guards
   alias Deft.Signatures
-  alias Deft.Subtyping
   alias Deft.Type
-  alias Deft.TypeChecker
 
   # ============================================================================
   # Local Call Rule (Guards and Built-in Functions)
   # ============================================================================
 
   defrule :local_call, %AST.LocalCall{name: name, args: args, meta: meta} do
-    compute {erased_args, type, call_bindings} do
+    compute {args_e, result_t, bs} do
       arity = length(args)
 
       cond do
@@ -33,31 +31,12 @@ defmodule Deft.Rules.Builtins do
 
         # Check current module's signatures (for deft-defined functions)
         ctx.env && Signatures.registered?({ctx.env.module, name, arity}) ->
-          {:ok, %Type.Fn{inputs: input_types, output: output_type}} =
+          {:ok, %Type.Fn{inputs: input_ts, output: output_t}} =
             Signatures.lookup({ctx.env.module, name, arity})
 
-          {erased_args, bindings} =
-            args
-            |> Enum.zip(input_types)
-            |> Enum.reduce({[], []}, fn {arg, expected_type}, {erased_acc, bindings_acc} ->
-              {:ok, erased, actual_type, bindings, _} = TypeChecker.check(arg, ctx)
-
-              unless Subtyping.subtype_of?(expected_type, actual_type) do
-                Error.raise!(
-                  Error.type_mismatch(
-                    expected: expected_type,
-                    actual: actual_type,
-                    location: Error.extract_location(arg),
-                    expression: arg
-                  ),
-                  ctx
-                )
-              end
-
-              {erased_acc ++ [erased], bindings_acc ++ bindings}
-            end)
-
-          {erased_args, output_type, bindings}
+          # Check arguments against input types (heterogeneous mode)
+          {args_e, bs} = check_all!(args, input_ts, [], ctx)
+          {args_e, output_t, bs}
 
         true ->
           location = Error.extract_location(meta)
@@ -75,7 +54,7 @@ defmodule Deft.Rules.Builtins do
       end
     end
 
-    conclude(Erased.local_call(meta, name, erased_args) ~> type, bind: call_bindings)
+    conclude(Erased.local_call(meta, name, args_e) ~> result_t, bind: bs)
   end
 
   # ============================================================================
@@ -83,46 +62,27 @@ defmodule Deft.Rules.Builtins do
   # ============================================================================
 
   defrule :remote_call, %AST.RemoteCall{
-    module: module,
-    function: function,
+    module: mod,
+    function: func,
     args: args,
     meta: meta
   } do
-    compute {erased_args, type, call_bindings} do
+    compute {args_e, result_t, bs} do
       arity = length(args)
 
-      case Signatures.lookup({module, function, arity}) do
-        {:ok, %Type.Fn{inputs: input_types, output: output_type}} ->
-          {erased_args, bindings} =
-            args
-            |> Enum.zip(input_types)
-            |> Enum.reduce({[], []}, fn {arg, expected_type}, {erased_acc, bindings_acc} ->
-              {:ok, erased, actual_type, bindings, _} = TypeChecker.check(arg, ctx)
-
-              unless Subtyping.subtype_of?(expected_type, actual_type) do
-                Error.raise!(
-                  Error.type_mismatch(
-                    expected: expected_type,
-                    actual: actual_type,
-                    location: Error.extract_location(arg),
-                    expression: arg
-                  ),
-                  ctx
-                )
-              end
-
-              {erased_acc ++ [erased], bindings_acc ++ bindings}
-            end)
-
-          {erased_args, output_type, bindings}
+      case Signatures.lookup({mod, func, arity}) do
+        {:ok, %Type.Fn{inputs: input_ts, output: output_t}} ->
+          # Check arguments against input types (heterogeneous mode)
+          {args_e, bs} = check_all!(args, input_ts, [], ctx)
+          {args_e, output_t, bs}
 
         :error ->
           location = Error.extract_location(meta)
-          call_ast = %AST.RemoteCall{module: module, function: function, args: args, meta: meta}
+          call_ast = %AST.RemoteCall{module: mod, function: func, args: args, meta: meta}
 
           Error.raise!(
             Error.unsupported_call(
-              name: {module, function},
+              name: {mod, func},
               arity: arity,
               location: location,
               expression: call_ast
@@ -132,27 +92,27 @@ defmodule Deft.Rules.Builtins do
       end
     end
 
-    conclude(Erased.remote_call(meta, module, function, erased_args) ~> type, bind: call_bindings)
+    conclude(Erased.remote_call(meta, mod, func, args_e) ~> result_t, bind: bs)
   end
 
   # ============================================================================
   # Function Capture Rule (&function/arity or &Module.function/arity)
   # ============================================================================
 
-  defrule :capture, %AST.Capture{module: module, function: function, arity: arity, meta: meta} do
-    compute fn_type do
+  defrule :capture, %AST.Capture{module: mod, function: func, arity: arity, meta: meta} do
+    compute fn_t do
       # Determine the module to look up: explicit module for remote, ctx.env.module for local
-      lookup_module = module || (ctx.env && ctx.env.module)
+      lookup_mod = mod || (ctx.env && ctx.env.module)
 
-      case lookup_module && Signatures.lookup({lookup_module, function, arity}) do
-        {:ok, %Type.Fn{} = fn_type} ->
-          fn_type
+      case lookup_mod && Signatures.lookup({lookup_mod, func, arity}) do
+        {:ok, %Type.Fn{} = fn_t} ->
+          fn_t
 
         _ ->
           # Not found in signatures - error
-          name = if module, do: {module, function}, else: function
+          name = if mod, do: {mod, func}, else: func
           location = Error.extract_location(meta)
-          capture_ast = %AST.Capture{module: module, function: function, arity: arity, meta: meta}
+          capture_ast = %AST.Capture{module: mod, function: func, arity: arity, meta: meta}
 
           Error.raise!(
             Error.unsupported_call(
@@ -166,7 +126,7 @@ defmodule Deft.Rules.Builtins do
       end
     end
 
-    conclude(Erased.capture(meta, module, function, arity) ~> fn_type)
+    conclude(Erased.capture(meta, mod, func, arity) ~> fn_t)
   end
 
   # ============================================================================
@@ -176,38 +136,16 @@ defmodule Deft.Rules.Builtins do
   defrule :type_constructor_call, %AST.TypeConstructorCall{
     name: name,
     args: args,
-    type: adt_type,
+    type: adt_t,
     variant: variant,
     meta: meta
   } do
-    # Synthesize arguments
-    args ~>> {erased_args, arg_types}
-
-    # Validate arguments match variant columns using detailed checking.
-    compute :ok do
-      expected = Deft.Type.fixed_tuple(variant.columns)
-      actual = Deft.Type.fixed_tuple(arg_types)
-      ctx = var!(ctx, nil)
-      # Pass the original args for element-level span tracking.
-      require_subtype!(
-        actual,
-        expected,
-        %AST.TypeConstructorCall{
-          name: name,
-          args: args,
-          type: adt_type,
-          variant: variant,
-          meta: meta
-        },
-        ctx
-      )
-
-      :ok
-    end
+    # Check arguments against variant column types (heterogeneous mode)
+    args <<~ variant.columns >>> args_e
 
     # Build erased tuple representation
-    columns = [name | erased_args]
+    cols_e = [name | args_e]
 
-    conclude(Erased.tuple(meta, columns) ~> adt_type)
+    conclude(Erased.tuple(meta, cols_e) ~> adt_t)
   end
 end
