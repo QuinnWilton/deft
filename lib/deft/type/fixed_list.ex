@@ -28,9 +28,8 @@ defmodule Deft.Type.FixedList do
 
   defimpl AST do
     def to_raw_ast(type) do
-      contents = Enum.map(type.contents, &@protocol.to_raw_ast/1)
-
-      [contents]
+      contents_ast = @protocol.to_raw_ast(type.contents)
+      [contents_ast]
     end
   end
 
