@@ -1,14 +1,43 @@
 defmodule Deft.AST.DefData do
+  @moduledoc """
+  AST node for algebraic data type definitions.
+
+  ## Fields
+
+  - `name` - The ADT name (as AST.Local)
+  - `variants` - List of AST.Variant nodes
+  - `params` - List of type parameter names (atoms), empty for monomorphic ADTs
+  - `def_meta` - Metadata from the defdata macro call
+  - `variants_meta` - Metadata from the :: operator
+  """
+
   use Deft.AST.Node,
-    fields: [:name, :variants, :def_meta, :variants_meta],
+    fields: [:name, :variants, :params, :def_meta, :variants_meta],
     children: [:variants],
     no_meta: true
 
   alias Deft.AST
 
-  def new(name, variants, def_meta \\ [], variants_meta \\ [])
+  @doc """
+  Creates a new DefData AST node.
+
+  ## Parameters
+
+  - `name` - The ADT name (AST.Local)
+  - `variants` - List of AST.Variant nodes
+  - `def_meta` - Metadata from defdata macro
+  - `variants_meta` - Metadata from :: operator
+  - `params` - Optional list of type parameter names (default: [])
+  """
+  def new(name, variants, def_meta \\ [], variants_meta \\ [], params \\ [])
       when is_list(variants) and length(variants) > 0 do
-    %__MODULE__{name: name, variants: variants, def_meta: def_meta, variants_meta: variants_meta}
+    %__MODULE__{
+      name: name,
+      variants: variants,
+      params: params,
+      def_meta: def_meta,
+      variants_meta: variants_meta
+    }
   end
 
   defimpl AST do

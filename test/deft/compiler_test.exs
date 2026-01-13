@@ -242,7 +242,7 @@ defmodule Deft.CompilerTest do
 
       error =
         assert_raise CompileError, fn ->
-          Compiler.compile_adt_variant(variant_ast, adt_name)
+          Compiler.compile_adt_variant(variant_ast, adt_name, [])
         end
 
       # Error should be a malformed type error for the empty list

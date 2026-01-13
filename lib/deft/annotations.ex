@@ -56,10 +56,15 @@ defmodule Deft.Annotations do
   @doc """
   Parses an Elixir AST type annotation into a Deft type.
 
+  ## Options
+
+  - `:allow_variables` - When `true`, single lowercase letters are parsed as
+    type variables. Default: `false`.
+
   Raises `CompileError` if the annotation is malformed or unrecognized.
   """
-  @spec parse(term()) :: Type.t()
-  def parse(ast) do
-    TypeParser.parse!(ast, output: :type)
+  @spec parse(term(), keyword()) :: Type.t()
+  def parse(ast, opts \\ []) do
+    TypeParser.parse!(ast, Keyword.put(opts, :output, :type))
   end
 end

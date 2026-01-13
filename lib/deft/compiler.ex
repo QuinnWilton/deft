@@ -18,11 +18,26 @@ defmodule Deft.Compiler do
     AST.Block.new(exprs, meta)
   end
 
+  # Parameterized ADT: defdata name(params) :: variants
+  def compile(
+        {:defdata, def_meta, [{:"::", variants_meta, [{name, name_meta, params}, variants]}]}
+      )
+      when is_atom(name) and is_list(params) and params != [] do
+    # Extract param names from AST: [{:a, _, nil}, {:b, _, nil}] -> [:a, :b]
+    param_names = Enum.map(params, fn {param_name, _, _} -> param_name end)
+
+    name_ast = AST.Local.new(name, nil, name_meta)
+    variants = compile_adt_variants(variants, name_ast, param_names)
+
+    AST.DefData.new(name_ast, variants, def_meta, variants_meta, param_names)
+  end
+
+  # Non-parameterized ADT: defdata name :: variants
   def compile({:defdata, def_meta, [{:"::", variants_meta, [{name, name_meta, ctx}, variants]}]}) do
     name = AST.Local.new(name, ctx, name_meta)
-    variants = compile_adt_variants(variants, name)
+    variants = compile_adt_variants(variants, name, [])
 
-    AST.DefData.new(name, variants, def_meta, variants_meta)
+    AST.DefData.new(name, variants, def_meta, variants_meta, [])
   end
 
   def compile({:fn, fn_meta, [{:->, arrow_meta, [args, body]}]}) do
@@ -358,28 +373,34 @@ defmodule Deft.Compiler do
     Error.raise!(error)
   end
 
-  def compile_adt_variant({name, meta, columns}, adt_name) do
-    columns = parse_adt_columns(columns, name, adt_name)
+  def compile_adt_variant({name, meta, columns}, adt_name, params) do
+    columns = parse_adt_columns(columns, name, adt_name, params)
 
     AST.Variant.new(name, adt_name, columns, meta)
   end
 
-  def compile_adt_variants({:|, _, [first, rest]}, adt_name) do
-    first = compile_adt_variant(first, adt_name)
-    rest = compile_adt_variants(rest, adt_name)
+  # Header clause for default value
+  def compile_adt_variants(ast, adt_name, params \\ [])
+
+  def compile_adt_variants({:|, _, [first, rest]}, adt_name, params) do
+    first = compile_adt_variant(first, adt_name, params)
+    rest = compile_adt_variants(rest, adt_name, params)
 
     [first | rest]
   end
 
-  def compile_adt_variants({name, meta, columns}, adt_name) do
-    columns = parse_adt_columns(columns, name, adt_name)
+  def compile_adt_variants({name, meta, columns}, adt_name, params) do
+    columns = parse_adt_columns(columns, name, adt_name, params)
     variant = AST.Variant.new(name, adt_name, columns, meta)
 
     [variant]
   end
 
-  defp parse_adt_columns(columns, _variant_name, _adt_name) do
-    Enum.map(columns, &Annotations.parse/1)
+  defp parse_adt_columns(columns, _variant_name, _adt_name, params) do
+    # Allow type variables in column annotations when params is non-empty
+    Enum.map(columns, fn column ->
+      Annotations.parse(column, allow_variables: params != [])
+    end)
   end
 
   # ============================================================================
