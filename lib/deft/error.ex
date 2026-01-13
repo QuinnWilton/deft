@@ -50,6 +50,7 @@ defmodule Deft.Error do
           | :unsupported_syntax
           | :unsupported_pattern
           | :unsupported_function
+          | :conflicting_definition
 
   @type location :: {String.t() | nil, non_neg_integer() | nil, non_neg_integer() | nil}
 
@@ -112,7 +113,8 @@ defmodule Deft.Error do
     subtype_violation: "E0009",
     unsupported_syntax: "E0010",
     unsupported_pattern: "E0011",
-    unsupported_function: "E0012"
+    unsupported_function: "E0012",
+    conflicting_definition: "E0013"
   }
 
   # ============================================================================
@@ -559,6 +561,77 @@ defmodule Deft.Error do
       suggestions: [],
       notes: [reason]
     }
+  end
+
+  @doc """
+  Creates a conflicting definition error.
+
+  Raised when multiple included modules define the same function signature
+  or datatype.
+
+  ## Options
+
+  - `:key` - The conflicting key (e.g., `{Module, :function, arity}` or `:datatype_name`) (required)
+  - `:kind` - The kind of definition (`:signature` or `:datatype`) (required)
+  - `:definitions` - List of `{module, file, line, type}` tuples for each conflicting definition (required)
+  """
+  @spec conflicting_definition(keyword()) :: t()
+  def conflicting_definition(opts) do
+    key = Keyword.fetch!(opts, :key)
+    kind = Keyword.fetch!(opts, :kind)
+    definitions = Keyword.fetch!(opts, :definitions)
+
+    key_str = format_conflict_key(key, kind)
+    kind_str = if kind == :signature, do: "signature", else: "datatype"
+
+    # Build spans for each conflicting definition
+    spans =
+      definitions
+      |> Enum.with_index()
+      |> Enum.map(fn {{mod, file, line, type}, idx} ->
+        label = if idx == 0, do: "first defined here", else: "also defined here"
+        span_kind = if idx == 0, do: :secondary, else: :primary
+
+        %{
+          location: {file, line, nil},
+          label: "#{label} (from #{inspect(mod)})",
+          type: type,
+          kind: span_kind
+        }
+      end)
+
+    notes =
+      ["Multiple modules define the same #{kind_str}:"] ++
+        Enum.map(definitions, fn {mod, file, line, type} ->
+          "  #{inspect(mod)} at #{Path.basename(file)}:#{line} defines: #{format_type(type)}"
+        end)
+
+    # Get location from first span
+    first_location =
+      case spans do
+        [%{location: loc} | _] -> loc
+        _ -> nil
+      end
+
+    %__MODULE__{
+      code: :conflicting_definition,
+      message: "Conflicting #{kind_str} definitions for `#{key_str}`",
+      location: first_location,
+      spans: spans,
+      suggestions: [
+        "Remove one of the conflicting definitions",
+        "Use only one module that defines #{key_str}"
+      ],
+      notes: notes
+    }
+  end
+
+  defp format_conflict_key({mod, fun, arity}, :signature) do
+    "#{inspect(mod)}.#{fun}/#{arity}"
+  end
+
+  defp format_conflict_key(name, :datatype) when is_atom(name) do
+    "#{name}"
   end
 
   # ============================================================================
