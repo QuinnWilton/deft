@@ -54,6 +54,11 @@ defmodule Deft.TypeParser.Emitter do
     Type.alias(name, context)
   end
 
+  def to_type(%AST.Application{name: name, args: args}) do
+    arg_types = Enum.map(args, &to_type/1)
+    Type.Alias.new(name, nil, arg_types)
+  end
+
   # ============================================================================
   # to_quoted/1 - Convert AST to quoted Elixir AST
   # ============================================================================
@@ -131,6 +136,11 @@ defmodule Deft.TypeParser.Emitter do
     quote do: Deft.Type.alias(unquote(name), unquote(context))
   end
 
+  def to_quoted(%AST.Application{name: name, args: args}) do
+    quoted_args = Enum.map(args, &to_quoted/1)
+    quote do: Deft.Type.Alias.new(unquote(name), nil, unquote(quoted_args))
+  end
+
   # ============================================================================
   # collect_variables/1 - Extract type variable names
   # ============================================================================
@@ -164,6 +174,10 @@ defmodule Deft.TypeParser.Emitter do
 
   defp do_collect_variables(%AST.Function{inputs: inputs, output: output}) do
     Enum.flat_map(inputs, &do_collect_variables/1) ++ do_collect_variables(output)
+  end
+
+  defp do_collect_variables(%AST.Application{args: args}) do
+    Enum.flat_map(args, &do_collect_variables/1)
   end
 
   defp do_collect_variables(%AST.Primitive{}), do: []

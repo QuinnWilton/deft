@@ -148,6 +148,23 @@ defmodule Deft.TypeParser.Parser do
     parse(inner, opts)
   end
 
+  # Type application: typename(args) like option(integer), result(t, e)
+  # Must come before the variable/alias clause to match args as a list
+  def parse({name, meta, args}, opts) when is_atom(name) and is_list(args) and args != [] do
+    name_str = Atom.to_string(name)
+
+    # Only treat as type application if it's a lowercase multi-char name
+    # that isn't a builtin type with special handling (list is handled above)
+    if name_str =~ ~r/^[a-z]/ and String.length(name_str) > 1 and name not in [:list] do
+      with {:ok, arg_types} <- parse_all(args, opts) do
+        {:ok, %AST.Application{name: name, args: arg_types, span: extract_span(meta)}}
+      end
+    else
+      # Fall through to error for unrecognized function-call syntax
+      {:error, build_error({name, meta, args}, opts, "Unrecognized type expression.")}
+    end
+  end
+
   # Type variable or alias: name when is_atom(name)
   def parse({name, meta, context}, opts) when is_atom(name) and is_atom(context) do
     name_str = Atom.to_string(name)

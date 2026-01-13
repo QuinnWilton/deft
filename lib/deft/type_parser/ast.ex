@@ -109,6 +109,22 @@ defmodule Deft.TypeParser.AST do
     defstruct [:name, :context, :span]
   end
 
+  defmodule Application do
+    @moduledoc """
+    A type application: `option(integer)`, `result(string, error)`.
+
+    Represents a parameterized type being instantiated with concrete type arguments.
+    """
+    @type t :: %__MODULE__{
+            name: atom(),
+            args: [Deft.TypeParser.AST.t()],
+            span: Deft.TypeParser.AST.span()
+          }
+
+    @enforce_keys [:name, :args]
+    defstruct [:name, :args, :span]
+  end
+
   defmodule Abstract do
     @moduledoc """
     An abstract type without element information: `list` or `tuple`.
@@ -132,5 +148,6 @@ defmodule Deft.TypeParser.AST do
           | Function.t()
           | Variable.t()
           | Alias.t()
+          | Application.t()
           | Abstract.t()
 end
