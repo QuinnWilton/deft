@@ -1,15 +1,10 @@
 defmodule Deft.AST.CondBranch do
+  use Deft.AST.Node, fields: [:predicate, :body], children: [:predicate, :body]
+
   alias Deft.AST
 
-  @enforce_keys [:predicate, :body, :meta]
-  defstruct @enforce_keys
-
   def new(predicate, body, meta \\ []) do
-    %__MODULE__{
-      predicate: predicate,
-      body: body,
-      meta: meta
-    }
+    %__MODULE__{predicate: predicate, body: body, meta: meta}
   end
 
   defimpl AST do

@@ -1,14 +1,10 @@
 defmodule Deft.AST.Literal do
+  use Deft.AST.Node, fields: [:value], children: []
+
   alias Deft.AST
 
-  @enforce_keys [:value, :meta]
-  defstruct @enforce_keys
-
   def new(value, meta \\ []) do
-    %__MODULE__{
-      value: value,
-      meta: meta
-    }
+    %__MODULE__{value: value, meta: meta}
   end
 
   defimpl AST do

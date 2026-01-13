@@ -1,23 +1,10 @@
 defmodule Deft.AST.TypeConstructorCall do
+  use Deft.AST.Node, fields: [:name, :args, :type, :variant], children: [:args]
+
   alias Deft.AST
 
-  @enforce_keys [
-    :name,
-    :args,
-    :type,
-    :variant,
-    :meta
-  ]
-  defstruct @enforce_keys
-
   def new(name, args, type, variant, meta \\ []) when is_list(args) do
-    %__MODULE__{
-      name: name,
-      args: args,
-      type: type,
-      variant: variant,
-      meta: meta
-    }
+    %__MODULE__{name: name, args: args, type: type, variant: variant, meta: meta}
   end
 
   defimpl AST do

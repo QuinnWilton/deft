@@ -1,15 +1,10 @@
 defmodule Deft.AST.Pair do
+  use Deft.AST.Node, fields: [:fst, :snd], children: [:fst, :snd]
+
   alias Deft.AST
 
-  @enforce_keys [:fst, :snd]
-  defstruct [:fst, :snd, meta: []]
-
   def new(fst, snd, meta \\ []) do
-    %__MODULE__{
-      fst: fst,
-      snd: snd,
-      meta: meta
-    }
+    %__MODULE__{fst: fst, snd: snd, meta: meta}
   end
 
   defimpl AST do

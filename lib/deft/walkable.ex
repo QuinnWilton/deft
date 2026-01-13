@@ -124,19 +124,35 @@ defmodule Deft.AST.Node do
       end
 
   This generates:
-  - A struct with the specified fields plus :meta
-  - A new/N constructor function
+  - A struct with the specified fields plus :meta (unless no_meta: true)
   - A Walkable protocol implementation
+
+  ## Options
+
+  - `fields` - List of struct fields (required)
+  - `children` - List of fields to walk (defaults to all fields)
+  - `meta_default` - Default value for :meta field (defaults to [])
+  - `no_meta` - If true, don't add automatic :meta field (for nodes with custom meta)
   """
 
   defmacro __using__(opts) do
     fields = Keyword.get(opts, :fields, [])
     children = Keyword.get(opts, :children, fields)
     meta_default = Keyword.get(opts, :meta_default, [])
+    no_meta = Keyword.get(opts, :no_meta, false)
+
+    struct_fields =
+      if no_meta do
+        fields
+      else
+        fields ++ [meta: meta_default]
+      end
+
+    enforce_keys = fields -- [:meta]
 
     quote do
-      @enforce_keys unquote(fields -- [:meta])
-      defstruct unquote(fields) ++ [meta: unquote(meta_default)]
+      @enforce_keys unquote(enforce_keys)
+      defstruct unquote(struct_fields)
 
       @doc "Returns the list of child field names for walking."
       def __children_fields__, do: unquote(children)

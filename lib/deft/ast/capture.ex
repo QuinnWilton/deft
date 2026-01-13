@@ -3,8 +3,9 @@ defmodule Deft.AST.Capture do
   AST node for function capture expressions like &double/1 or &String.to_integer/1.
   """
 
+  use Deft.AST.Node, fields: [:module, :function, :arity], children: []
+
   alias Deft.AST
-  alias Deft.Walkable
 
   @type t :: %__MODULE__{
           module: module() | nil,
@@ -12,9 +13,6 @@ defmodule Deft.AST.Capture do
           arity: non_neg_integer(),
           meta: keyword()
         }
-
-  @enforce_keys [:module, :function, :arity, :meta]
-  defstruct @enforce_keys
 
   @doc """
   Creates a new Capture node.
@@ -24,12 +22,7 @@ defmodule Deft.AST.Capture do
   - `arity` is the function arity
   """
   def new(module, function, arity, meta \\ []) do
-    %__MODULE__{
-      module: module,
-      function: function,
-      arity: arity,
-      meta: meta
-    }
+    %__MODULE__{module: module, function: function, arity: arity, meta: meta}
   end
 
   defimpl AST do
@@ -46,17 +39,6 @@ defmodule Deft.AST.Capture do
         slash = {:/, [], [name, node.arity]}
         {:&, node.meta, [slash]}
       end
-    end
-  end
-
-  defimpl Walkable do
-    def children(_node) do
-      # Captures have no child nodes to walk
-      []
-    end
-
-    def rebuild(node, []) do
-      node
     end
   end
 end

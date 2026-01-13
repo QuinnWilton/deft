@@ -1,16 +1,13 @@
 defmodule Deft.AST.Fn do
+  use Deft.AST.Node,
+    fields: [:body, :args, :fn_meta, :arrow_meta],
+    children: [:body, :args],
+    no_meta: true
+
   alias Deft.AST
 
-  @enforce_keys [:body, :args, :fn_meta, :arrow_meta]
-  defstruct @enforce_keys
-
   def new(body, args, fn_meta \\ [], arrow_meta \\ []) do
-    %__MODULE__{
-      body: body,
-      args: args,
-      fn_meta: fn_meta,
-      arrow_meta: arrow_meta
-    }
+    %__MODULE__{body: body, args: args, fn_meta: fn_meta, arrow_meta: arrow_meta}
   end
 
   defimpl AST do

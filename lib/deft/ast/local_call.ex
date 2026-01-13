@@ -1,15 +1,10 @@
 defmodule Deft.AST.LocalCall do
+  use Deft.AST.Node, fields: [:name, :args], children: [:args]
+
   alias Deft.AST
 
-  @enforce_keys [:name, :args, :meta]
-  defstruct @enforce_keys
-
   def new(name, args, meta \\ []) do
-    %__MODULE__{
-      name: name,
-      args: args,
-      meta: meta
-    }
+    %__MODULE__{name: name, args: args, meta: meta}
   end
 
   defimpl AST do

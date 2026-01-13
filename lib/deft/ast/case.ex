@@ -1,15 +1,10 @@
 defmodule Deft.AST.Case do
+  use Deft.AST.Node, fields: [:subject, :branches], children: [:subject, :branches]
+
   alias Deft.AST
 
-  @enforce_keys [:subject, :branches, :meta]
-  defstruct @enforce_keys
-
   def new(subject, branches, meta \\ []) do
-    %__MODULE__{
-      subject: subject,
-      branches: branches,
-      meta: meta
-    }
+    %__MODULE__{subject: subject, branches: branches, meta: meta}
   end
 
   defimpl AST do

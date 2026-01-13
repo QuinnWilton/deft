@@ -1,14 +1,10 @@
 defmodule Deft.AST.Block do
+  use Deft.AST.Node, fields: [:exprs], children: [:exprs]
+
   alias Deft.AST
 
-  @enforce_keys [:exprs, :meta]
-  defstruct @enforce_keys
-
   def new(exprs, meta \\ []) do
-    %__MODULE__{
-      exprs: exprs,
-      meta: meta
-    }
+    %__MODULE__{exprs: exprs, meta: meta}
   end
 
   defimpl AST do

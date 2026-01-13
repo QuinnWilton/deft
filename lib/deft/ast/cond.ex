@@ -1,14 +1,10 @@
 defmodule Deft.AST.Cond do
+  use Deft.AST.Node, fields: [:branches], children: [:branches]
+
   alias Deft.AST
 
-  @enforce_keys [:branches, :meta]
-  defstruct @enforce_keys
-
   def new(branches, meta \\ []) do
-    %__MODULE__{
-      branches: branches,
-      meta: meta
-    }
+    %__MODULE__{branches: branches, meta: meta}
   end
 
   defimpl AST do

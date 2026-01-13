@@ -1,21 +1,10 @@
 defmodule Deft.AST.Variant do
+  use Deft.AST.Node, fields: [:name, :adt_name, :columns], children: [:columns]
+
   alias Deft.AST
 
-  @enforce_keys [
-    :name,
-    :adt_name,
-    :columns,
-    :meta
-  ]
-  defstruct @enforce_keys
-
   def new(name, adt_name, columns, meta \\ []) do
-    %__MODULE__{
-      name: name,
-      adt_name: adt_name,
-      columns: columns,
-      meta: meta
-    }
+    %__MODULE__{name: name, adt_name: adt_name, columns: columns, meta: meta}
   end
 
   defimpl AST do

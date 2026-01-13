@@ -1,15 +1,10 @@
 defmodule Deft.AST.CaseBranch do
+  use Deft.AST.Node, fields: [:pattern, :body], children: [:pattern, :body]
+
   alias Deft.AST
 
-  @enforce_keys [:pattern, :body, :meta]
-  defstruct @enforce_keys
-
   def new(pattern, body, meta \\ []) do
-    %__MODULE__{
-      pattern: pattern,
-      body: body,
-      meta: meta
-    }
+    %__MODULE__{pattern: pattern, body: body, meta: meta}
   end
 
   defimpl AST do

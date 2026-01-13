@@ -1,15 +1,10 @@
 defmodule Deft.AST.Annotation do
+  use Deft.AST.Node, fields: [:pattern, :type], children: [:pattern, :type]
+
   alias Deft.AST
 
-  @enforce_keys [:pattern, :type, :meta]
-  defstruct @enforce_keys
-
   def new(pattern, type, meta \\ []) do
-    %__MODULE__{
-      pattern: pattern,
-      type: type,
-      meta: meta
-    }
+    %__MODULE__{pattern: pattern, type: type, meta: meta}
   end
 
   defimpl AST do

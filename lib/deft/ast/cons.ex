@@ -1,15 +1,10 @@
 defmodule Deft.AST.Cons do
+  use Deft.AST.Node, fields: [:head, :rest], children: [:head, :rest]
+
   alias Deft.AST
 
-  @enforce_keys [:head, :rest, :meta]
-  defstruct @enforce_keys
-
   def new(head, rest, meta \\ []) do
-    %__MODULE__{
-      head: head,
-      rest: rest,
-      meta: meta
-    }
+    %__MODULE__{head: head, rest: rest, meta: meta}
   end
 
   defimpl AST do

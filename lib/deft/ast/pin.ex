@@ -1,14 +1,10 @@
 defmodule Deft.AST.Pin do
+  use Deft.AST.Node, fields: [:expr], children: [:expr]
+
   alias Deft.AST
 
-  @enforce_keys [:expr, :meta]
-  defstruct @enforce_keys
-
   def new(expr, meta \\ []) do
-    %__MODULE__{
-      expr: expr,
-      meta: meta
-    }
+    %__MODULE__{expr: expr, meta: meta}
   end
 
   defimpl AST do
