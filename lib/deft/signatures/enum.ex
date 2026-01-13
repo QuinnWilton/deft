@@ -85,21 +85,12 @@ defmodule Deft.Signatures.Enum do
   sig with_index([a], integer) :: [{a, integer}]
 
   # ============================================================================
-  # Splitting - Note: These return {list, list} tuples
-  # The type parser has a limitation with {[a], [a]} syntax, so we use top
+  # Splitting
   # ============================================================================
 
-  sig_unsupported(split([a], integer) :: top,
-    reason: "Returns {[a], [a]} tuple which the type parser cannot handle"
-  )
-
-  sig_unsupported(split_while([a], (a -> boolean)) :: top,
-    reason: "Returns {[a], [a]} tuple which the type parser cannot handle"
-  )
-
-  sig_unsupported(split_with([a], (a -> boolean)) :: top,
-    reason: "Returns {[a], [a]} tuple which the type parser cannot handle"
-  )
+  sig split([a], integer) :: {[a], [a]}
+  sig split_while([a], (a -> boolean)) :: {[a], [a]}
+  sig split_with([a], (a -> boolean)) :: {[a], [a]}
 
   # ============================================================================
   # Iteration (side effects)

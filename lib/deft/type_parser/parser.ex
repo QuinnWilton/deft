@@ -98,7 +98,7 @@ defmodule Deft.TypeParser.Parser do
   end
 
   # 2-tuple (pair syntax): {type1, type2}
-  def parse({elem0, elem1}, opts) when not is_list(elem0) do
+  def parse({elem0, elem1}, opts) do
     with {:ok, e0} <- parse(elem0, opts),
          {:ok, e1} <- parse(elem1, opts) do
       {:ok, %AST.Tuple{elements: [e0, e1], span: nil}}

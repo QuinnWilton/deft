@@ -111,6 +111,28 @@ defmodule Deft.TypeParser.ParserTest do
       assert {:ok, %AST.Tuple{elements: [_, %AST.Tuple{elements: [_, _]}]}} =
                Parser.parse(ast, [])
     end
+
+    test "parses 2-tuple with list elements" do
+      # {[a], [a]} - common return type for split functions
+      ast = {[{:a, [], nil}], [{:a, [], nil}]}
+
+      assert {:ok, %AST.Tuple{elements: [list1, list2]}} =
+               Parser.parse(ast, allow_variables: true)
+
+      assert %AST.List{element: %AST.Variable{name: :a}} = list1
+      assert %AST.List{element: %AST.Variable{name: :a}} = list2
+    end
+
+    test "parses 2-tuple with mixed list and primitive" do
+      # {[a], integer}
+      ast = {[{:a, [], nil}], {:integer, [], nil}}
+
+      assert {:ok, %AST.Tuple{elements: [list, prim]}} =
+               Parser.parse(ast, allow_variables: true)
+
+      assert %AST.List{element: %AST.Variable{name: :a}} = list
+      assert %AST.Primitive{kind: :integer} = prim
+    end
   end
 
   # ============================================================================
