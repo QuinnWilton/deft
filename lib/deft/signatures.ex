@@ -52,6 +52,7 @@ defmodule Deft.Signatures do
   def builtins do
     # Type variables for polymorphic signatures
     a = Type.var(:a)
+    b = Type.var(:b)
 
     %{
       # Arithmetic operators
@@ -108,10 +109,15 @@ defmodule Deft.Signatures do
       {Kernel, :hd, 1} => Type.forall([:a], Type.fun([Type.fixed_list(a)], a)),
       {Kernel, :tl, 1} => Type.forall([:a], Type.fun([Type.fixed_list(a)], Type.fixed_list(a))),
       {Kernel, :length, 1} => Type.fun([Type.list()], Type.integer()),
+      # ++ concatenates two lists, result contains union of element types
       {Kernel, :++, 2} =>
-        Type.forall([:a], Type.fun([Type.fixed_list(a), Type.fixed_list(a)], Type.fixed_list(a))),
+        Type.forall(
+          [:a, :b],
+          Type.fun([Type.fixed_list(a), Type.fixed_list(b)], Type.fixed_list(Type.union(a, b)))
+        ),
+      # -- removes elements, result type is same as first list
       {Kernel, :--, 2} =>
-        Type.forall([:a], Type.fun([Type.fixed_list(a), Type.fixed_list(a)], Type.fixed_list(a))),
+        Type.forall([:a, :b], Type.fun([Type.fixed_list(a), Type.fixed_list(b)], Type.fixed_list(a))),
 
       # Tuple operations
       {Kernel, :elem, 2} => Type.fun([Type.tuple(), Type.integer()], Type.top()),
