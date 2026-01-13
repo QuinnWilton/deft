@@ -59,11 +59,15 @@ defmodule Deft do
     source_lines = read_source_lines(__CALLER__.file)
     block = Compiler.compile(block)
 
+    # Get signatures from the default type system
+    signatures = Deft.TypeSystem.Default.all_signatures()
+
     ctx =
       Context.new(__CALLER__,
         source_lines: source_lines,
         error_mode: :accumulate
       )
+      |> Context.with_signatures(signatures)
 
     # Initialize error accumulator.
     Process.put(:deft_accumulated_errors, [])
@@ -93,11 +97,15 @@ defmodule Deft do
     source_lines = read_source_lines(__CALLER__.file)
     block = Compiler.compile(block)
 
+    # Get signatures from the default type system
+    signatures = Deft.TypeSystem.Default.all_signatures()
+
     ctx =
       Context.new(__CALLER__,
         source_lines: source_lines,
         error_mode: :accumulate
       )
+      |> Context.with_signatures(signatures)
 
     # Initialize error accumulator.
     Process.put(:deft_accumulated_errors, [])
@@ -173,13 +181,15 @@ defmodule Deft do
     type_system = Keyword.get(opts, :type_system, Deft.TypeSystem.Default)
 
     quote do
-      import Deft, only: [compile: 1, deft: 2, defdata: 1]
+      import Deft, only: [compile: 1, deft: 2, defdata: 1, signatures: 1]
       require Deft
 
       Module.register_attribute(__MODULE__, :deft, accumulate: true)
       Module.register_attribute(__MODULE__, :deft_definitions, accumulate: true)
       Module.register_attribute(__MODULE__, :deft_adts, accumulate: true)
       Module.register_attribute(__MODULE__, :deft_adt_names, accumulate: true)
+      Module.register_attribute(__MODULE__, :deft_module_signatures, accumulate: true)
+      Module.register_attribute(__MODULE__, :deft_signature_modules, accumulate: true)
       Module.register_attribute(__MODULE__, :deft_type_system, persist: true)
       Module.put_attribute(__MODULE__, :deft_type_system, unquote(type_system))
 
@@ -224,6 +234,43 @@ defmodule Deft do
   end
 
   @doc """
+  Includes a signature module's signatures into this module's scope.
+
+  Signatures included this way are only available within this module,
+  unlike signatures included in a type system which are globally available
+  to all modules using that type system.
+
+  ## Example
+
+      defmodule MyModule do
+        use Deft
+
+        # Include signatures for an external library
+        signatures MyApp.Signatures.ExternalLib
+
+        deft process(x :: integer) :: string do
+          ExternalLib.convert(x)  # Type-checked using included signatures
+        end
+      end
+
+  ## Defining Signature Modules
+
+  Signature modules are defined using `Deft.Signatures.DSL`:
+
+      defmodule MyApp.Signatures.ExternalLib do
+        use Deft.Signatures.DSL, for: ExternalLib
+
+        sig convert(integer) :: string
+        sig parse(string) :: integer
+      end
+  """
+  defmacro signatures(signature_module) do
+    quote do
+      @deft_signature_modules unquote(signature_module)
+    end
+  end
+
+  @doc """
   Defines a typed function with inline type annotations.
 
   The function signature is extracted from the parameter annotations
@@ -261,10 +308,9 @@ defmodule Deft do
     # Evaluate return type
     {evaluated_return_type, _} = Code.eval_quoted(return_type_parsed, [], __CALLER__)
 
-    # Build the signature immediately and register it during macro expansion
+    # Build the signature for module-local registration
     # This ensures all signatures are known before type checking begins
     signature = Deft.Type.fun(evaluated_param_types, evaluated_return_type)
-    Deft.Signatures.register({module, name, arity}, signature)
 
     # Store definition for deferred type-checking in __before_compile__
     # We store: {name, arity, params, evaluated_param_types, evaluated_return_type, body, caller, meta, return_type_location}
@@ -281,6 +327,9 @@ defmodule Deft do
     }
 
     quote do
+      # Store signature in module attribute for later use
+      @deft_module_signatures {{unquote(module), unquote(name), unquote(arity)},
+                               unquote(Macro.escape(signature))}
       @deft_definitions unquote(Macro.escape(definition))
     end
   end
@@ -295,11 +344,27 @@ defmodule Deft do
   defmacro __before_compile__(env) do
     definitions = Module.get_attribute(env.module, :deft_definitions) || []
     adts = Module.get_attribute(env.module, :deft_adts) || []
+    module_signatures = Module.get_attribute(env.module, :deft_module_signatures) || []
+    signature_modules = Module.get_attribute(env.module, :deft_signature_modules) || []
     type_system = Module.get_attribute(env.module, :deft_type_system) || Deft.TypeSystem.Default
 
     # Get features and registry from the type system
     features = type_system.features()
     registry = type_system.registry()
+
+    # Build initial module signatures map from collected signatures
+    initial_module_sigs = Enum.into(module_signatures, %{})
+
+    # Get type system signatures
+    type_system_sigs = type_system.all_signatures()
+
+    # Load signatures from module-level signature modules
+    module_level_sigs =
+      signature_modules
+      |> Enum.reverse()
+      |> Enum.reduce(%{}, fn sig_mod, acc ->
+        Map.merge(acc, sig_mod.signatures())
+      end)
 
     # Process ADT definitions to create bindings
     adt_bindings = process_adts(adts)
@@ -310,33 +375,50 @@ defmodule Deft do
     # Build a map from alias names to ADT types for resolution
     alias_map = build_alias_map(adt_bindings)
 
-    # FIRST PASS: Update all signatures with resolved types
+    # FIRST PASS: Resolve all signatures with ADT types
     # This must happen before type-checking so that function calls resolve correctly
-    definitions_with_resolved_types =
-      Enum.map(definitions, fn {name, arity, params, param_types, return_type, body,
-                                caller_escaped, fn_meta, return_type_loc} ->
+    {definitions_with_resolved_types, resolved_module_sigs} =
+      Enum.map_reduce(definitions, initial_module_sigs, fn {name, arity, params, param_types,
+                                                            return_type, body, caller_escaped,
+                                                            fn_meta, return_type_loc},
+                                                           sigs_acc ->
         caller = Code.eval_quoted(caller_escaped) |> elem(0)
 
         # Resolve alias types in parameter types and return type
         resolved_param_types = Enum.map(param_types, &resolve_aliases(&1, alias_map))
         resolved_return_type = resolve_aliases(return_type, alias_map)
 
-        # Update the signature in the registry with resolved types
+        # Update the signature map with resolved types
         resolved_signature = Deft.Type.fun(resolved_param_types, resolved_return_type)
-        Deft.Signatures.register({caller.module, name, arity}, resolved_signature)
+        updated_sigs = Map.put(sigs_acc, {caller.module, name, arity}, resolved_signature)
 
         # Return the definition with resolved types for the second pass
-        {name, arity, params, resolved_param_types, resolved_return_type, body, caller, fn_meta,
-         return_type_loc}
+        def_with_resolved =
+          {name, arity, params, resolved_param_types, resolved_return_type, body, caller, fn_meta,
+           return_type_loc}
+
+        {def_with_resolved, updated_sigs}
       end)
+
+    # Merge signatures in order of precedence (later overrides earlier):
+    # 1. Type system signatures (global base)
+    # 2. Module-level included signatures (scoped to this module)
+    # 3. deft function signatures defined in this module (highest priority)
+    all_signatures =
+      type_system_sigs
+      |> Map.merge(module_level_sigs)
+      |> Map.merge(resolved_module_sigs)
 
     # SECOND PASS: Type-check all function bodies and generate function definitions
     function_defs =
       Enum.map(definitions_with_resolved_types, fn {name, arity, params, resolved_param_types,
                                                     resolved_return_type, body, caller, fn_meta,
                                                     return_type_loc} ->
+        # Expand module aliases before compiling so cross-module calls resolve correctly
+        expanded_body = expand_module_aliases(body, caller)
+
         # Compile and type-check the body
-        compiled_body = Compiler.compile(body)
+        compiled_body = Compiler.compile(expanded_body)
 
         ctx =
           Context.new(caller,
@@ -344,6 +426,7 @@ defmodule Deft do
             error_mode: :accumulate,
             features: features
           )
+          |> Context.with_signatures(all_signatures)
 
         # Add ADT bindings to context
         ctx = Context.bind_all(ctx, adt_bindings)
@@ -651,6 +734,23 @@ defmodule Deft do
 
   # Base types pass through unchanged
   defp resolve_aliases(type, _alias_map), do: type
+
+  # Expands module aliases in AST so remote calls use fully qualified module names.
+  # This ensures that when we look up `__deft__(:signatures)` on a remote module,
+  # we're looking at the correct module (not an unresolved alias).
+  defp expand_module_aliases(ast, env) do
+    Macro.prewalk(ast, fn
+      # Remote call: Module.function(args) where Module is an alias
+      {{:., dot_meta, [{:__aliases__, alias_meta, parts}, func]}, call_meta, args} ->
+        # Expand the alias to get the fully qualified module name
+        expanded = Macro.expand({:__aliases__, alias_meta, parts}, env)
+        {{:., dot_meta, [expanded, func]}, call_meta, args}
+
+      # Keep everything else unchanged
+      other ->
+        other
+    end)
+  end
 
   # Raises a compile error with a user-friendly stacktrace pointing to the error location.
   # This provides a much better developer experience than showing internal Deft stacktraces.
