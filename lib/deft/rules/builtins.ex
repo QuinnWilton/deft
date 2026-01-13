@@ -25,6 +25,7 @@ defmodule Deft.Rules.Builtins do
   alias Deft.AST.Erased
   alias Deft.Context
   alias Deft.Error
+  alias Deft.FFI
   alias Deft.Substitution
   alias Deft.Subtyping
   alias Deft.Type
@@ -286,14 +287,26 @@ defmodule Deft.Rules.Builtins do
     args: args,
     meta: meta
   } do
-    compute {args_e, result_t, bs} do
+    compute {erased_call, result_t, bs} do
       arity = length(args)
 
-      # First try context lookup, then fall back to deft module lookup
-      signature =
+      # First try context lookup, then fall back to deft module lookup.
+      # Track whether signature is external (needs FFI conversion) or from Deft module.
+      {signature, is_external} =
         case Context.lookup_signature(var!(ctx, nil), {mod, func, arity}) do
-          {:ok, sig} -> {:ok, sig}
-          :error -> Deft.Rules.Builtins.lookup_deft_module_signature(mod, func, arity)
+          {:ok, sig} ->
+            # From TypeSystem signatures = external Elixir function
+            {{:ok, sig}, true}
+
+          :error ->
+            case Deft.Rules.Builtins.lookup_deft_module_signature(mod, func, arity) do
+              {:ok, sig} ->
+                # From Deft module = already typed, no FFI conversion
+                {{:ok, sig}, false}
+
+              :error ->
+                {:error, false}
+            end
         end
 
       case signature do
@@ -317,7 +330,18 @@ defmodule Deft.Rules.Builtins do
         {:ok, %Type.Fn{inputs: input_ts, output: output_t}} ->
           # Check arguments against input types (heterogeneous mode)
           {args_e, bs} = check_all!(args, input_ts, [], var!(ctx, nil))
-          {args_e, output_t, bs}
+
+          # Build raw call and wrap with FFI conversion if external
+          raw_call = Erased.remote_call(meta, mod, func, args_e)
+
+          erased_call =
+            if is_external do
+              FFI.maybe_wrap_conversion(raw_call, output_t, meta)
+            else
+              raw_call
+            end
+
+          {erased_call, output_t, bs}
 
         {:ok, %Type.Forall{vars: vars, body: %Type.Fn{inputs: inputs, output: output}}} ->
           # Synthesize all arguments to get their types
@@ -366,7 +390,17 @@ defmodule Deft.Rules.Builtins do
                 end
               end)
 
-              {erased_args, instantiated_output, bindings}
+              # Build raw call and wrap with FFI conversion if external
+              raw_call = Erased.remote_call(meta, mod, func, erased_args)
+
+              erased_call =
+                if is_external do
+                  FFI.maybe_wrap_conversion(raw_call, instantiated_output, meta)
+                else
+                  raw_call
+                end
+
+              {erased_call, instantiated_output, bindings}
 
             {:error, reason} ->
               Error.raise!(
@@ -395,7 +429,7 @@ defmodule Deft.Rules.Builtins do
       end
     end
 
-    conclude(Erased.remote_call(meta, mod, func, args_e) ~> result_t, bind: bs)
+    conclude(erased_call ~> result_t, bind: bs)
   end
 
   # ============================================================================
