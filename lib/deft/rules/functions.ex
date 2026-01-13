@@ -5,6 +5,7 @@ defmodule Deft.Rules.Functions do
   These rules handle:
   - Anonymous functions (fn)
   - Function application (f.(args))
+  - Polymorphic function instantiation (Type.Forall)
   """
 
   use Deft.Rules.DSL
@@ -12,6 +13,8 @@ defmodule Deft.Rules.Functions do
   alias Deft.AST
   alias Deft.AST.Erased
   alias Deft.Type
+  alias Deft.Substitution
+  alias Deft.Unification
 
   # ============================================================================
   # Anonymous Function Rule
@@ -44,11 +47,53 @@ defmodule Deft.Rules.Functions do
     # Synthesize the function to get its type
     fun ~> {fun_e, fun_t}
 
-    # Extract input/output types from function type
-    compute {input_ts, output_t} do
+    # Handle polymorphic vs monomorphic functions differently
+    compute {args_e, output_t} do
       case fun_t do
+        # Polymorphic function: synthesize args for type inference, then check
+        %Type.Forall{vars: vars, body: %Type.Fn{inputs: inputs, output: output}} ->
+          # Synthesize arguments to get their types for unification
+          {args_erased, arg_ts, _bs} = synth_all!(args, var!(ctx, nil))
+
+          # Verify arity
+          if length(arg_ts) != length(inputs) do
+            Deft.Error.raise!(
+              Deft.Error.type_mismatch(
+                expected: Type.fixed_tuple(inputs),
+                actual: Type.fixed_tuple(arg_ts),
+                notes: ["Expected #{length(inputs)} argument(s), got #{length(arg_ts)}"]
+              )
+            )
+          end
+
+          # Infer type variable bindings via unification
+          case Unification.infer(vars, inputs, arg_ts) do
+            {:ok, subst} ->
+              instantiated_inputs = Enum.map(inputs, &Substitution.substitute(&1, subst))
+              instantiated_output = Substitution.substitute(output, subst)
+
+              # Verify arguments are subtypes of instantiated input types
+              Enum.zip([args, arg_ts, instantiated_inputs])
+              |> Enum.each(fn {arg_expr, arg_t, input_t} ->
+                require_subtype!(arg_t, input_t, arg_expr, var!(ctx, nil))
+              end)
+
+              {args_erased, instantiated_output}
+
+            {:error, reason} ->
+              Deft.Error.raise!(
+                Deft.Error.type_mismatch(
+                  expected: fun_t,
+                  actual: Type.fixed_tuple(arg_ts),
+                  notes: ["Type inference failed: #{inspect(reason)}"]
+                )
+              )
+          end
+
+        # Monomorphic function: use checking mode for arguments (original behavior)
         %Type.Fn{inputs: input_ts, output: output_t} ->
-          {input_ts, output_t}
+          {args_erased, _bs} = check_all!(args, input_ts, [], var!(ctx, nil))
+          {args_erased, output_t}
 
         _ ->
           Deft.Error.raise!(
@@ -60,9 +105,6 @@ defmodule Deft.Rules.Functions do
           )
       end
     end
-
-    # Check arguments against expected input types (heterogeneous mode)
-    args <<~ input_ts >>> args_e
 
     conclude(Erased.fn_apply(fun_meta, args_meta, fun_e, args_e) ~> output_t)
   end
