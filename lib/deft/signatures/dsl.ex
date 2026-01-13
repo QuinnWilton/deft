@@ -59,7 +59,7 @@ defmodule Deft.Signatures.DSL do
     source_module = Keyword.fetch!(opts, :for)
 
     quote do
-      import Deft.Signatures.DSL, only: [sig: 1, sig: 2]
+      import Deft.Signatures.DSL, only: [sig: 1, sig: 2, sig_unsupported: 2, sig_unsupported: 3]
       require Deft.Signatures.DSL
 
       Module.register_attribute(__MODULE__, :deft_source_module, persist: true)
@@ -149,6 +149,83 @@ defmodule Deft.Signatures.DSL do
     raise ArgumentError,
           "Invalid sig syntax. Expected: sig :name, [types...] :: return_type\n" <>
             "Got: sig #{inspect(name)}, #{Macro.to_string(expr)}"
+  end
+
+  @doc """
+  Marks a function as explicitly unsupported with a reason.
+
+  When called, the type checker will emit a compile-time error with
+  the reason explaining why this function cannot be typed.
+
+  ## Syntax
+
+  For regular function names:
+
+      sig_unsupported name(arg_types...) :: return_type,
+        reason: "Why this function cannot be typed"
+
+  For operators:
+
+      sig_unsupported :name, [arg_types...] :: return_type,
+        reason: "Why this function cannot be typed"
+
+  ## Examples
+
+      # Map-returning function
+      sig_unsupported group_by([a], (a -> b)) :: top,
+        reason: "Returns a map type which Deft cannot represent"
+
+      # Tagged tuple return
+      sig_unsupported parse(binary) :: {integer, binary},
+        reason: "Returns {:ok, value} | :error which requires literal atom types"
+  """
+  # Standard syntax: sig_unsupported name(args) :: return, reason: "..."
+  defmacro sig_unsupported({:"::", _, [{name, _, args}, _return_type]}, opts)
+           when is_atom(name) do
+    args = args || []
+    reason = Keyword.fetch!(opts, :reason)
+    build_unsupported_signature(name, length(args), reason)
+  end
+
+  defmacro sig_unsupported(expr, opts) when is_list(opts) do
+    raise ArgumentError,
+          "Invalid sig_unsupported syntax. Expected: sig_unsupported name(types...) :: return_type, reason: \"...\"\n" <>
+            "or sig_unsupported :name, [types...] :: return_type, reason: \"...\"\n" <>
+            "Got: sig_unsupported #{Macro.to_string(expr)}, #{inspect(opts)}"
+  end
+
+  # Operator syntax: sig_unsupported :name, [args] :: return, reason: "..."
+  defmacro sig_unsupported(name, {:"::", _, [args, _return_type]}, opts)
+           when is_atom(name) and is_list(args) do
+    reason = Keyword.fetch!(opts, :reason)
+    build_unsupported_signature(name, length(args), reason)
+  end
+
+  defmacro sig_unsupported(name, expr, opts) when is_list(opts) do
+    raise ArgumentError,
+          "Invalid sig_unsupported syntax. Expected: sig_unsupported :name, [types...] :: return_type, reason: \"...\"\n" <>
+            "Got: sig_unsupported #{inspect(name)}, #{Macro.to_string(expr)}, #{inspect(opts)}"
+  end
+
+  defp build_unsupported_signature(name, arity, reason) do
+    # Build the AST for creating the Type.Unsupported struct at runtime
+    # Note: @deft_source_module is resolved at compile-time in the target module
+    type_ast =
+      quote do
+        Deft.Type.Unsupported.new(
+          @deft_source_module,
+          unquote(name),
+          unquote(arity),
+          unquote(reason)
+        )
+      end
+
+    # Escape the AST so it's stored as data, not evaluated
+    escaped_ast = Macro.escape(type_ast)
+
+    quote do
+      @deft_signatures {unquote(name), unquote(arity), unquote(escaped_ast)}
+    end
   end
 
   defp build_signature(name, args, return_type) do

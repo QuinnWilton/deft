@@ -88,6 +88,35 @@ defmodule Deft.ErrorTest do
     end
   end
 
+  describe "unsupported_function/1" do
+    test "creates error with module, function, arity, and reason" do
+      error =
+        Error.unsupported_function(
+          module: MyModule,
+          function: :my_func,
+          arity: 2,
+          reason: "Returns a map type which Deft cannot represent"
+        )
+
+      assert error.code == :unsupported_function
+      assert error.message =~ "MyModule.my_func/2"
+      assert error.message =~ "cannot be typed"
+      assert Enum.any?(error.notes, &(&1 == "Returns a map type which Deft cannot represent"))
+    end
+
+    test "includes reason in notes" do
+      error =
+        Error.unsupported_function(
+          module: Enum,
+          function: :group_by,
+          arity: 2,
+          reason: "Map types are not supported"
+        )
+
+      assert ["Map types are not supported"] = error.notes
+    end
+  end
+
   describe "inexhaustive_patterns/1" do
     test "creates error with missing patterns" do
       missing = Type.variant(:some, nil, [Type.integer()])
@@ -183,6 +212,9 @@ defmodule Deft.ErrorTest do
       assert Error.error_code_string(:no_matching_rule) == "E0007"
       assert Error.error_code_string(:missing_features) == "E0008"
       assert Error.error_code_string(:subtype_violation) == "E0009"
+      assert Error.error_code_string(:unsupported_syntax) == "E0010"
+      assert Error.error_code_string(:unsupported_pattern) == "E0011"
+      assert Error.error_code_string(:unsupported_function) == "E0012"
     end
 
     test "returns E0000 for unknown codes" do

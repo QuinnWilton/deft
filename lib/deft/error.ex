@@ -49,6 +49,7 @@ defmodule Deft.Error do
           | :subtype_violation
           | :unsupported_syntax
           | :unsupported_pattern
+          | :unsupported_function
 
   @type location :: {String.t() | nil, non_neg_integer() | nil, non_neg_integer() | nil}
 
@@ -110,7 +111,8 @@ defmodule Deft.Error do
     missing_features: "E0008",
     subtype_violation: "E0009",
     unsupported_syntax: "E0010",
-    unsupported_pattern: "E0011"
+    unsupported_pattern: "E0011",
+    unsupported_function: "E0012"
   }
 
   # ============================================================================
@@ -521,6 +523,41 @@ defmodule Deft.Error do
       spans: Keyword.get(opts, :spans, []),
       suggestions: Keyword.get(opts, :suggestions, []),
       notes: Keyword.get(opts, :notes, [])
+    }
+  end
+
+  @doc """
+  Creates an error for calling an explicitly unsupported function.
+
+  This error is raised when a function has been explicitly marked as
+  unsupported via `sig_unsupported` in a signature module, with a reason
+  explaining why the function cannot be typed.
+
+  ## Options
+
+  - `:module` - The module containing the function (required)
+  - `:function` - The function name (required)
+  - `:arity` - The function arity (required)
+  - `:reason` - Why this function is unsupported (required)
+  - `:location` - Source location
+  - `:expression` - The call expression AST
+  - `:spans` - List of labeled spans for multi-span display
+  """
+  @spec unsupported_function(keyword()) :: t()
+  def unsupported_function(opts) do
+    mod = Keyword.fetch!(opts, :module)
+    func = Keyword.fetch!(opts, :function)
+    arity = Keyword.fetch!(opts, :arity)
+    reason = Keyword.fetch!(opts, :reason)
+
+    %__MODULE__{
+      code: :unsupported_function,
+      message: "Function `#{inspect(mod)}.#{func}/#{arity}` cannot be typed",
+      expression: Keyword.get(opts, :expression),
+      location: Keyword.get(opts, :location),
+      spans: Keyword.get(opts, :spans, []),
+      suggestions: [],
+      notes: [reason]
     }
   end
 

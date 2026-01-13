@@ -21,6 +21,7 @@ defmodule Deft.Type do
           | Type.Top.t()
           | Type.Tuple.t()
           | Type.Union.t()
+          | Type.Unsupported.t()
           | Type.Var.t()
           | Type.Variant.t()
 

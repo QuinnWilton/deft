@@ -297,6 +297,23 @@ defmodule Deft.Rules.Builtins do
         end
 
       case signature do
+        {:ok, %Type.Unsupported{reason: reason}} ->
+          # Function explicitly marked as unsupported
+          location = Error.extract_location(meta)
+          call_ast = %AST.RemoteCall{module: mod, function: func, args: args, meta: meta}
+
+          Error.raise!(
+            Error.unsupported_function(
+              module: mod,
+              function: func,
+              arity: arity,
+              reason: reason,
+              location: location,
+              expression: call_ast
+            ),
+            var!(ctx, nil)
+          )
+
         {:ok, %Type.Fn{inputs: input_ts, output: output_t}} ->
           # Check arguments against input types (heterogeneous mode)
           {args_e, bs} = check_all!(args, input_ts, [], var!(ctx, nil))
@@ -391,6 +408,23 @@ defmodule Deft.Rules.Builtins do
       lookup_mod = mod || (var!(ctx, nil).env && var!(ctx, nil).env.module)
 
       case lookup_mod && Context.lookup_signature(var!(ctx, nil), {lookup_mod, func, arity}) do
+        {:ok, %Type.Unsupported{reason: reason}} ->
+          # Function explicitly marked as unsupported
+          location = Error.extract_location(meta)
+          capture_ast = %AST.Capture{module: mod, function: func, arity: arity, meta: meta}
+
+          Error.raise!(
+            Error.unsupported_function(
+              module: lookup_mod,
+              function: func,
+              arity: arity,
+              reason: reason,
+              location: location,
+              expression: capture_ast
+            ),
+            var!(ctx, nil)
+          )
+
         {:ok, %Type.Fn{} = fn_t} ->
           fn_t
 
