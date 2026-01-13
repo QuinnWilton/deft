@@ -23,8 +23,8 @@ defmodule Deft.Rules.Builtins do
 
   alias Deft.AST
   alias Deft.AST.Erased
+  alias Deft.Context
   alias Deft.Error
-  alias Deft.Signatures
   alias Deft.Substitution
   alias Deft.Subtyping
   alias Deft.Type
@@ -151,8 +151,8 @@ defmodule Deft.Rules.Builtins do
           {[tuple, index], result_t, tuple_bindings ++ index_bindings}
 
         # Check Kernel signatures (polymorphic and monomorphic)
-        Signatures.registered?({Kernel, name, arity}) ->
-          case Signatures.lookup({Kernel, name, arity}) do
+        Context.lookup_signature(var!(ctx, nil), {Kernel, name, arity}) != :error ->
+          case Context.lookup_signature(var!(ctx, nil), {Kernel, name, arity}) do
             {:ok, %Type.Fn{inputs: input_ts, output: output_t}} ->
               {args_e, bs} = check_all!(args, input_ts, [], var!(ctx, nil))
               {args_e, output_t, bs}
@@ -162,8 +162,10 @@ defmodule Deft.Rules.Builtins do
               {erased_args, arg_types, bindings} =
                 args
                 |> Enum.with_index(1)
-                |> Enum.reduce({[], [], []}, fn {arg_ast, idx}, {erased_acc, types_acc, bindings_acc} ->
-                  {:ok, erased, actual_type, bindings, _} = TypeChecker.check(arg_ast, var!(ctx, nil))
+                |> Enum.reduce({[], [], []}, fn {arg_ast, idx},
+                                                {erased_acc, types_acc, bindings_acc} ->
+                  {:ok, erased, actual_type, bindings, _} =
+                    TypeChecker.check(arg_ast, var!(ctx, nil))
 
                   if idx > length(inputs) do
                     Error.raise!(
@@ -222,9 +224,11 @@ defmodule Deft.Rules.Builtins do
           end
 
         # Check current module's signatures (for deft-defined functions)
-        var!(ctx, nil).env && Signatures.registered?({var!(ctx, nil).env.module, name, arity}) ->
+        var!(ctx, nil).env &&
+            Context.lookup_signature(var!(ctx, nil), {var!(ctx, nil).env.module, name, arity}) !=
+              :error ->
           {:ok, %Type.Fn{inputs: input_ts, output: output_t}} =
-            Signatures.lookup({var!(ctx, nil).env.module, name, arity})
+            Context.lookup_signature(var!(ctx, nil), {var!(ctx, nil).env.module, name, arity})
 
           {args_e, bs} = check_all!(args, input_ts, [], var!(ctx, nil))
           {args_e, output_t, bs}
@@ -252,6 +256,30 @@ defmodule Deft.Rules.Builtins do
   # Remote Call Rule (Module.function(args))
   # ============================================================================
 
+  @doc false
+  # Looks up a signature from a deft module's __deft__(:signatures).
+  # Returns {:ok, signature} or :error.
+  def lookup_deft_module_signature(mod, func, arity) do
+    if Code.ensure_loaded?(mod) and function_exported?(mod, :__deft__, 1) do
+      case mod.__deft__(:signatures) do
+        sigs when is_list(sigs) ->
+          # Signatures stored as [{name, arity, param_types, return_type}, ...]
+          case Enum.find(sigs, fn {n, a, _, _} -> n == func and a == arity end) do
+            {_, _, param_types, return_type} ->
+              {:ok, Type.fun(param_types, return_type)}
+
+            nil ->
+              :error
+          end
+
+        _ ->
+          :error
+      end
+    else
+      :error
+    end
+  end
+
   defrule :remote_call, %AST.RemoteCall{
     module: mod,
     function: func,
@@ -261,7 +289,14 @@ defmodule Deft.Rules.Builtins do
     compute {args_e, result_t, bs} do
       arity = length(args)
 
-      case Signatures.lookup({mod, func, arity}) do
+      # First try context lookup, then fall back to deft module lookup
+      signature =
+        case Context.lookup_signature(var!(ctx, nil), {mod, func, arity}) do
+          {:ok, sig} -> {:ok, sig}
+          :error -> Deft.Rules.Builtins.lookup_deft_module_signature(mod, func, arity)
+        end
+
+      case signature do
         {:ok, %Type.Fn{inputs: input_ts, output: output_t}} ->
           # Check arguments against input types (heterogeneous mode)
           {args_e, bs} = check_all!(args, input_ts, [], var!(ctx, nil))
@@ -272,7 +307,8 @@ defmodule Deft.Rules.Builtins do
           {erased_args, arg_types, bindings} =
             args
             |> Enum.with_index(1)
-            |> Enum.reduce({[], [], []}, fn {arg_ast, idx}, {erased_acc, types_acc, bindings_acc} ->
+            |> Enum.reduce({[], [], []}, fn {arg_ast, idx},
+                                            {erased_acc, types_acc, bindings_acc} ->
               {:ok, erased, actual_type, bindings, _} = TypeChecker.check(arg_ast, var!(ctx, nil))
 
               if idx > length(inputs) do
@@ -354,7 +390,7 @@ defmodule Deft.Rules.Builtins do
       # Determine the module to look up: explicit module for remote, ctx.env.module for local
       lookup_mod = mod || (var!(ctx, nil).env && var!(ctx, nil).env.module)
 
-      case lookup_mod && Signatures.lookup({lookup_mod, func, arity}) do
+      case lookup_mod && Context.lookup_signature(var!(ctx, nil), {lookup_mod, func, arity}) do
         {:ok, %Type.Fn{} = fn_t} ->
           fn_t
 
@@ -395,7 +431,7 @@ defmodule Deft.Rules.Builtins do
     meta: meta
   } do
     # Check arguments against variant column types (heterogeneous mode)
-    args <<~ variant.columns >>> args_e
+    (args <<~ variant.columns) >>> args_e
 
     # Build erased tuple representation
     cols_e = [name | args_e]
