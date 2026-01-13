@@ -13,6 +13,7 @@ defmodule Deft.Type do
           | Type.FixedTuple.t()
           | Type.Float.t()
           | Type.Fn.t()
+          | Type.Forall.t()
           | Type.Integer.t()
           | Type.Intersection.t()
           | Type.List.t()
@@ -20,6 +21,7 @@ defmodule Deft.Type do
           | Type.Top.t()
           | Type.Tuple.t()
           | Type.Union.t()
+          | Type.Var.t()
           | Type.Variant.t()
 
   @types [
@@ -31,13 +33,15 @@ defmodule Deft.Type do
     Type.FixedTuple,
     Type.Float,
     Type.Fn,
+    Type.Forall,
     Type.Integer,
     Type.Intersection,
     Type.List,
     Type.Number,
     Type.Top,
     Type.Tuple,
-    Type.Union
+    Type.Union,
+    Type.Var
   ]
 
   def alias(name, context) do
@@ -94,6 +98,14 @@ defmodule Deft.Type do
 
   def fixed_tuple(elements) do
     Type.FixedTuple.new(elements)
+  end
+
+  def var(name) do
+    Type.Var.new(name)
+  end
+
+  def forall(vars, body) do
+    Type.Forall.new(vars, body)
   end
 
   def adt(name, variants) do

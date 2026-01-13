@@ -203,3 +203,15 @@ defimpl Walkable, for: Type.Variant do
   def children(node), do: [node.columns]
   def rebuild(node, [columns]), do: %{node | columns: columns}
 end
+
+defimpl Walkable, for: Type.Var do
+  # Type variables are leaf nodes with no children.
+  def children(_node), do: []
+  def rebuild(node, []), do: node
+end
+
+defimpl Walkable, for: Type.Forall do
+  # The body is the only child; vars are just atom names.
+  def children(node), do: [node.body]
+  def rebuild(node, [body]), do: %{node | body: body}
+end
