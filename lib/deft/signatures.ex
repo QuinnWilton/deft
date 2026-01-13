@@ -21,9 +21,14 @@ defmodule Deft.Signatures do
 
   ## Signature Format
 
-  Signatures are represented as `Deft.Type.Fn` structs:
+  Signatures are represented as `Deft.Type.Fn` structs, or `Deft.Type.Forall`
+  for polymorphic functions:
 
+      # Monomorphic
       Type.fun([Type.integer(), Type.integer()], Type.integer())
+
+      # Polymorphic
+      Type.forall([:a], Type.fun([Type.fixed_list(Type.var(:a))], Type.var(:a)))
   """
 
   alias Deft.Type
@@ -145,15 +150,32 @@ defmodule Deft.Signatures do
   @doc """
   Registers a function signature.
 
+  Signatures can be either a direct function type (`Type.Fn`) or a
+  polymorphic function type (`Type.Forall` wrapping a `Type.Fn`).
+
   ## Example
 
+      # Monomorphic function
       Deft.Signatures.register(
         {MyModule, :my_fun, 2},
         Type.fun([Type.integer(), Type.integer()], Type.boolean())
       )
+
+      # Polymorphic function
+      Deft.Signatures.register(
+        {Enum, :map, 2},
+        Type.forall([:a, :b], Type.fun([Type.fixed_list(Type.var(:a)), ...], ...))
+      )
   """
-  @spec register({module(), atom(), non_neg_integer()}, Type.Fn.t()) :: :ok
+  @spec register({module(), atom(), non_neg_integer()}, Type.Fn.t() | Type.Forall.t()) :: :ok
   def register({module, function, arity} = mfa, %Type.Fn{} = type)
+      when is_atom(module) and is_atom(function) and is_integer(arity) and arity >= 0 do
+    ensure_initialized()
+    :ets.insert(@table_name, {mfa, type})
+    :ok
+  end
+
+  def register({module, function, arity} = mfa, %Type.Forall{} = type)
       when is_atom(module) and is_atom(function) and is_integer(arity) and arity >= 0 do
     ensure_initialized()
     :ets.insert(@table_name, {mfa, type})
@@ -169,7 +191,7 @@ defmodule Deft.Signatures do
 
       {:ok, sig} = Deft.Signatures.lookup({Kernel, :+, 2})
   """
-  @spec lookup({module(), atom(), non_neg_integer()}) :: {:ok, Type.Fn.t()} | :error
+  @spec lookup({module(), atom(), non_neg_integer()}) :: {:ok, Type.Fn.t() | Type.Forall.t()} | :error
   def lookup({module, function, arity} = mfa)
       when is_atom(module) and is_atom(function) and is_integer(arity) do
     ensure_initialized()
@@ -183,7 +205,7 @@ defmodule Deft.Signatures do
   @doc """
   Looks up a function signature, returning the type or nil.
   """
-  @spec get({module(), atom(), non_neg_integer()}) :: Type.Fn.t() | nil
+  @spec get({module(), atom(), non_neg_integer()}) :: Type.Fn.t() | Type.Forall.t() | nil
   def get(mfa) do
     case lookup(mfa) do
       {:ok, type} -> type
@@ -212,7 +234,7 @@ defmodule Deft.Signatures do
   @doc """
   Returns all registered signatures as a list of `{mfa, type}` tuples.
   """
-  @spec all() :: [{{module(), atom(), non_neg_integer()}, Type.Fn.t()}]
+  @spec all() :: [{{module(), atom(), non_neg_integer()}, Type.Fn.t() | Type.Forall.t()}]
   def all do
     ensure_initialized()
     :ets.tab2list(@table_name)

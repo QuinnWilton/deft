@@ -67,13 +67,30 @@ defmodule Deft.Declare do
     # Resolve the module at compile time
     resolved_module = resolve_module(module)
 
+    # Collect type variables from all types
+    all_types = arg_types ++ [return_type]
+    type_vars = collect_type_vars(all_types)
+
     # Build the type list properly
     arg_types_list = quote do: [unquote_splicing(arg_types)]
+
+    # Create function type, wrapped in forall if polymorphic
+    fn_type =
+      if type_vars == [] do
+        quote do: Deft.Type.fun(unquote(arg_types_list), unquote(return_type))
+      else
+        quote do
+          Deft.Type.forall(
+            unquote(type_vars),
+            Deft.Type.fun(unquote(arg_types_list), unquote(return_type))
+          )
+        end
+      end
 
     quote do
       Deft.Signatures.register(
         {unquote(resolved_module), unquote(function), unquote(length(arg_types))},
-        Deft.Type.fun(unquote(arg_types_list), unquote(return_type))
+        unquote(fn_type)
       )
     end
   end
@@ -85,13 +102,30 @@ defmodule Deft.Declare do
 
     resolved_module = resolve_module(module)
 
+    # Collect type variables from all types
+    all_types = arg_types ++ [return_type_parsed]
+    type_vars = collect_type_vars(all_types)
+
     # Build the type list properly
     arg_types_list = quote do: [unquote_splicing(arg_types)]
+
+    # Create function type, wrapped in forall if polymorphic
+    fn_type =
+      if type_vars == [] do
+        quote do: Deft.Type.fun(unquote(arg_types_list), unquote(return_type_parsed))
+      else
+        quote do
+          Deft.Type.forall(
+            unquote(type_vars),
+            Deft.Type.fun(unquote(arg_types_list), unquote(return_type_parsed))
+          )
+        end
+      end
 
     quote do
       Deft.Signatures.register(
         {unquote(resolved_module), unquote(function), unquote(length(arg_types))},
-        Deft.Type.fun(unquote(arg_types_list), unquote(return_type_parsed))
+        unquote(fn_type)
       )
     end
   end
@@ -141,14 +175,13 @@ defmodule Deft.Declare do
   defp parse_type({:binary, _, _}), do: quote(do: Deft.Type.binary())
   defp parse_type({nil, _, _}), do: quote(do: Deft.Type.atom())
 
-  # Type variable (single lowercase letter) - treated as top for now
-  # Future: implement proper polymorphism
+  # Type variable (single lowercase letter)
   defp parse_type({name, _, ctx}) when is_atom(name) and is_atom(ctx) do
     name_str = Atom.to_string(name)
 
     if String.length(name_str) == 1 and name_str =~ ~r/^[a-z]$/ do
-      # Type variable - use top type for now (polymorphism is Phase 5)
-      quote(do: Deft.Type.top())
+      # Type variable - create a Type.Var
+      quote(do: Deft.Type.var(unquote(name)))
     else
       raise ArgumentError, "Unknown type: #{name}"
     end
@@ -200,4 +233,36 @@ defmodule Deft.Declare do
   defp parse_type(other) do
     raise ArgumentError, "Unknown type syntax in declare: #{inspect(other)}"
   end
+
+  # Collects type variable names from parsed type AST.
+  # Returns a list of unique type variable atoms in order of first appearance.
+  defp collect_type_vars(type_asts) when is_list(type_asts) do
+    type_asts
+    |> Enum.flat_map(&extract_vars_from_ast/1)
+    |> Enum.uniq()
+  end
+
+  # Extracts type variable names from a single type AST node.
+  defp extract_vars_from_ast({:., _, [{:__aliases__, _, [:Deft, :Type]}, :var]}) do
+    # This matches `Deft.Type.var(name)` - we need to look at the call
+    []
+  end
+
+  defp extract_vars_from_ast({{:., _, [{:__aliases__, _, [:Deft, :Type]}, :var]}, _, [name]}) do
+    [name]
+  end
+
+  defp extract_vars_from_ast({:__block__, _, [inner]}) do
+    extract_vars_from_ast(inner)
+  end
+
+  defp extract_vars_from_ast({_, _, args}) when is_list(args) do
+    Enum.flat_map(args, &extract_vars_from_ast/1)
+  end
+
+  defp extract_vars_from_ast(list) when is_list(list) do
+    Enum.flat_map(list, &extract_vars_from_ast/1)
+  end
+
+  defp extract_vars_from_ast(_), do: []
 end

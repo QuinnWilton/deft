@@ -56,7 +56,7 @@ defmodule Deft.DeclareTest do
       assert %Type.FixedList{} = sig.output
     end
 
-    test "handles type variables as top type" do
+    test "handles polymorphic function with type variables" do
       defmodule TypeVarDeclarations do
         use Deft.Declare
 
@@ -64,8 +64,38 @@ defmodule Deft.DeclareTest do
       end
 
       assert {:ok, sig} = Signatures.lookup({List, :first, 1})
-      # Type variables currently map to Top
-      assert %Type.Top{} = sig.output
+      # Type variables are now wrapped in forall
+      assert %Type.Forall{vars: [:a], body: body} = sig
+      assert %Type.Fn{inputs: [%Type.FixedList{contents: %Type.Var{name: :a}}]} = body
+      assert %Type.Var{name: :a} = body.output
+    end
+
+    test "handles polymorphic function with multiple type variables" do
+      defmodule MultiTypeVarDeclarations do
+        use Deft.Declare
+
+        declare(Enum.map([a], (a -> b)) :: [b])
+      end
+
+      assert {:ok, sig} = Signatures.lookup({Enum, :map, 2})
+      # Should have forall with both type variables
+      assert %Type.Forall{vars: vars, body: body} = sig
+      assert :a in vars
+      assert :b in vars
+      assert %Type.Fn{} = body
+    end
+
+    test "monomorphic function has no forall wrapper" do
+      defmodule MonomorphicDeclarations do
+        use Deft.Declare
+
+        declare(String.upcase(string) :: string)
+      end
+
+      assert {:ok, sig} = Signatures.lookup({String, :upcase, 1})
+      # No type variables, so no forall wrapper
+      assert %Type.Fn{} = sig
+      refute match?(%Type.Forall{}, sig)
     end
 
     test "registers function with tuple types" do
