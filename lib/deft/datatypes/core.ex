@@ -5,6 +5,7 @@ defmodule Deft.Datatypes.Core do
   Provides common algebraic data types:
   - `option(a)` - Optional values (some/none)
   - `result(t, e)` - Success/error results (ok/err)
+  - `fetch_result(t)` - Success/bare-error results (ok/error)
 
   ## Usage
 
@@ -16,6 +17,16 @@ defmodule Deft.Datatypes.Core do
 
         include_datatypes Deft.Datatypes.Core
       end
+
+  ## Result Types
+
+  There are two result types for different Elixir conventions:
+
+  - `result(t, e)` - For functions returning `{:ok, t} | {:error, e}`
+    Examples: `File.read/1`, `GenServer.call/2`
+
+  - `fetch_result(t)` - For functions returning `{:ok, t} | :error`
+    Examples: `Enum.fetch/2`, `Integer.parse/1`
 
   ## Examples
 
@@ -31,11 +42,16 @@ defmodule Deft.Datatypes.Core do
         end
       end
 
-      # Using result
-      deft divide(x :: integer, y :: integer) :: result(integer, atom) do
-        case y do
-          0 -> err(:division_by_zero)
-          _ -> ok(div(x, y))
+      # Using result (for {:ok, t} | {:error, e} functions)
+      deft read_file(path :: binary) :: result(binary, atom) do
+        File.read(path)
+      end
+
+      # Using fetch_result (for {:ok, t} | :error functions)
+      deft safe_get(list :: [integer], idx :: integer) :: integer do
+        case Enum.fetch(list, idx) do
+          ok(v) -> v
+          error -> 0
         end
       end
   """
@@ -44,4 +60,5 @@ defmodule Deft.Datatypes.Core do
 
   defdata option(a) :: some(a) | none
   defdata result(t, e) :: ok(t) | err(e)
+  defdata fetch_result(t) :: ok(t) | error
 end
