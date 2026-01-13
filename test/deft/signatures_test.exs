@@ -11,9 +11,9 @@ defmodule Deft.SignaturesTest do
   end
 
   describe "init/0" do
-    test "creates ETS table and loads builtins" do
-      # Table should already exist from reset
-      assert :ets.whereis(:deft_signatures) != :undefined
+    test "initializes process-local registry with builtins" do
+      # Registry should be initialized from reset
+      assert Process.get(:deft_signatures) != nil
     end
 
     test "builtins are registered after init" do

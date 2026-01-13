@@ -7,9 +7,9 @@ defmodule Deft.Signatures do
   - Look up signatures for type checking
   - Store built-in Elixir function signatures
 
-  Signatures are stored in ETS at compile time for efficient lookup.
-  At runtime, the module is initialized with built-in signatures when
-  the application starts.
+  Signatures are stored in the process dictionary, giving each process its
+  own isolated registry. This avoids race conditions during parallel
+  compilation while ensuring signatures are always available.
 
   ## Usage
 
@@ -139,25 +139,15 @@ defmodule Deft.Signatures do
   # ============================================================================
 
   @doc """
-  Initializes the signature registry.
+  Initializes the signature registry for the current process.
 
-  This creates the ETS table and populates it with built-in signatures.
-  Called automatically when the Deft application starts.
+  This populates the process-local registry with built-in signatures.
+  Called automatically on first access via `ensure_initialized/0`.
   """
   @spec init() :: :ok
   def init do
-    # Create table if it doesn't exist, handling race condition
-    try do
-      :ets.new(@table_name, [:named_table, :set, :public, read_concurrency: true])
-    rescue
-      ArgumentError -> :ok
-    end
-
-    # Load built-in signatures
-    for {mfa, type} <- builtins() do
-      :ets.insert(@table_name, {mfa, type})
-    end
-
+    # Initialize the process-local registry with builtins
+    Process.put(@table_name, builtins())
     :ok
   end
 
@@ -185,14 +175,16 @@ defmodule Deft.Signatures do
   def register({module, function, arity} = mfa, %Type.Fn{} = type)
       when is_atom(module) and is_atom(function) and is_integer(arity) and arity >= 0 do
     ensure_initialized()
-    :ets.insert(@table_name, {mfa, type})
+    registry = Process.get(@table_name)
+    Process.put(@table_name, Map.put(registry, mfa, type))
     :ok
   end
 
   def register({module, function, arity} = mfa, %Type.Forall{} = type)
       when is_atom(module) and is_atom(function) and is_integer(arity) and arity >= 0 do
     ensure_initialized()
-    :ets.insert(@table_name, {mfa, type})
+    registry = Process.get(@table_name)
+    Process.put(@table_name, Map.put(registry, mfa, type))
     :ok
   end
 
@@ -209,11 +201,8 @@ defmodule Deft.Signatures do
   def lookup({module, function, arity} = mfa)
       when is_atom(module) and is_atom(function) and is_integer(arity) do
     ensure_initialized()
-
-    case :ets.lookup(@table_name, mfa) do
-      [{^mfa, type}] -> {:ok, type}
-      [] -> :error
-    end
+    registry = Process.get(@table_name)
+    Map.fetch(registry, mfa)
   end
 
   @doc """
@@ -241,7 +230,8 @@ defmodule Deft.Signatures do
   @spec unregister({module(), atom(), non_neg_integer()}) :: :ok
   def unregister(mfa) do
     ensure_initialized()
-    :ets.delete(@table_name, mfa)
+    registry = Process.get(@table_name)
+    Process.put(@table_name, Map.delete(registry, mfa))
     :ok
   end
 
@@ -251,7 +241,8 @@ defmodule Deft.Signatures do
   @spec all() :: [{{module(), atom(), non_neg_integer()}, Type.Fn.t() | Type.Forall.t()}]
   def all do
     ensure_initialized()
-    :ets.tab2list(@table_name)
+    registry = Process.get(@table_name)
+    Map.to_list(registry)
   end
 
   @doc """
@@ -259,13 +250,7 @@ defmodule Deft.Signatures do
   """
   @spec reset() :: :ok
   def reset do
-    ensure_initialized()
-    :ets.delete_all_objects(@table_name)
-
-    for {mfa, type} <- builtins() do
-      :ets.insert(@table_name, {mfa, type})
-    end
-
+    Process.put(@table_name, builtins())
     :ok
   end
 
@@ -274,7 +259,7 @@ defmodule Deft.Signatures do
   # ============================================================================
 
   defp ensure_initialized do
-    if :ets.whereis(@table_name) == :undefined do
+    if Process.get(@table_name) == nil do
       init()
     end
   end
