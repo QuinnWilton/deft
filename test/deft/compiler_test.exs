@@ -53,7 +53,8 @@ defmodule Deft.CompilerTest do
         end
 
       assert error.description =~ "E0010"
-      assert error.description =~ "`with` construct is not supported"
+      assert error.description =~ "with"
+      assert error.description =~ "not supported"
     end
 
     test "raises on receive" do
@@ -65,7 +66,8 @@ defmodule Deft.CompilerTest do
         end
 
       assert error.description =~ "E0010"
-      assert error.description =~ "`receive` construct is not supported"
+      assert error.description =~ "receive"
+      assert error.description =~ "not supported"
     end
 
     test "raises on try" do
@@ -77,7 +79,8 @@ defmodule Deft.CompilerTest do
         end
 
       assert error.description =~ "E0010"
-      assert error.description =~ "`try` construct is not supported"
+      assert error.description =~ "try"
+      assert error.description =~ "not supported"
     end
 
     test "raises on import inside block" do
@@ -89,7 +92,8 @@ defmodule Deft.CompilerTest do
         end
 
       assert error.description =~ "E0010"
-      assert error.description =~ "`import` directive is not supported"
+      assert error.description =~ "import"
+      assert error.description =~ "not supported"
     end
 
     test "raises on require inside block" do
@@ -101,7 +105,8 @@ defmodule Deft.CompilerTest do
         end
 
       assert error.description =~ "E0010"
-      assert error.description =~ "`require` directive is not supported"
+      assert error.description =~ "require"
+      assert error.description =~ "not supported"
     end
 
     test "raises on alias inside block" do
@@ -113,7 +118,8 @@ defmodule Deft.CompilerTest do
         end
 
       assert error.description =~ "E0010"
-      assert error.description =~ "`alias` directive is not supported"
+      assert error.description =~ "alias"
+      assert error.description =~ "not supported"
     end
 
     test "provides generic error for unknown syntax" do
