@@ -109,8 +109,8 @@ defmodule Deft.Type do
     Type.Forall.new(vars, body)
   end
 
-  def adt(name, variants) do
-    Type.ADT.new(name, variants)
+  def adt(name, variants, params \\ []) do
+    Type.ADT.new(name, variants, params)
   end
 
   def variant(name, adt_name, columns) do
