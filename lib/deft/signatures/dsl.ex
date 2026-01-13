@@ -40,6 +40,10 @@ defmodule Deft.Signatures.DSL do
   a map of `{module, function, arity} => type`.
   """
 
+  alias Deft.Error
+  alias Deft.TypeParser
+  alias Deft.TypeParser.Emitter
+
   @doc """
   Enables the signature DSL in a module.
 
@@ -148,12 +152,31 @@ defmodule Deft.Signatures.DSL do
   end
 
   defp build_signature(name, args, return_type) do
-    arg_types = Enum.map(args, &parse_type/1)
-    return_type_parsed = parse_type(return_type)
+    opts = [output: :ast, allow_variables: true]
 
-    # Collect type variables from all types
-    all_types = arg_types ++ [return_type_parsed]
-    type_vars = collect_type_vars(all_types)
+    # Parse all argument types
+    arg_asts =
+      Enum.map(args, fn arg ->
+        case TypeParser.parse(arg, opts) do
+          {:ok, ast} -> ast
+          {:error, error} -> raise ArgumentError, format_error(error)
+        end
+      end)
+
+    # Parse return type
+    return_ast =
+      case TypeParser.parse(return_type, opts) do
+        {:ok, ast} -> ast
+        {:error, error} -> raise ArgumentError, format_error(error)
+      end
+
+    # Collect type variables from all parsed ASTs
+    all_asts = arg_asts ++ [return_ast]
+    type_vars = Enum.flat_map(all_asts, &Emitter.collect_variables/1) |> Enum.uniq()
+
+    # Convert to quoted AST
+    arg_types = Enum.map(arg_asts, &Emitter.to_quoted/1)
+    return_type_quoted = Emitter.to_quoted(return_ast)
 
     arity = length(arg_types)
 
@@ -163,12 +186,12 @@ defmodule Deft.Signatures.DSL do
     # Create function type, wrapped in forall if polymorphic
     fn_type_ast =
       if type_vars == [] do
-        quote do: Deft.Type.fun(unquote(arg_types_list), unquote(return_type_parsed))
+        quote do: Deft.Type.fun(unquote(arg_types_list), unquote(return_type_quoted))
       else
         quote do
           Deft.Type.forall(
             unquote(type_vars),
-            Deft.Type.fun(unquote(arg_types_list), unquote(return_type_parsed))
+            Deft.Type.fun(unquote(arg_types_list), unquote(return_type_quoted))
           )
         end
       end
@@ -181,116 +204,7 @@ defmodule Deft.Signatures.DSL do
     end
   end
 
-  # ============================================================================
-  # Type Parsing (extracted from Deft.Declare)
-  # ============================================================================
-
-  # Base types
-  defp parse_type({:integer, _, _}), do: quote(do: Deft.Type.integer())
-  defp parse_type({:float, _, _}), do: quote(do: Deft.Type.float())
-  defp parse_type({:number, _, _}), do: quote(do: Deft.Type.number())
-  defp parse_type({:boolean, _, _}), do: quote(do: Deft.Type.boolean())
-  defp parse_type({:atom, _, _}), do: quote(do: Deft.Type.atom())
-  defp parse_type({:list, _, _}), do: quote(do: Deft.Type.list())
-  defp parse_type({:tuple, _, _}), do: quote(do: Deft.Type.tuple())
-  defp parse_type({:top, _, _}), do: quote(do: Deft.Type.top())
-  defp parse_type({:bottom, _, _}), do: quote(do: Deft.Type.bottom())
-  defp parse_type({:string, _, _}), do: quote(do: Deft.Type.binary())
-  defp parse_type({:binary, _, _}), do: quote(do: Deft.Type.binary())
-  defp parse_type({nil, _, _}), do: quote(do: Deft.Type.atom())
-
-  # Type variable (single lowercase letter)
-  defp parse_type({name, _, ctx}) when is_atom(name) and is_atom(ctx) do
-    name_str = Atom.to_string(name)
-
-    if String.length(name_str) == 1 and name_str =~ ~r/^[a-z]$/ do
-      # Type variable - create a Type.Var
-      quote(do: Deft.Type.var(unquote(name)))
-    else
-      raise ArgumentError, "Unknown type: #{name}"
-    end
+  defp format_error(%Error{} = error) do
+    Error.Formatter.format_simple(error)
   end
-
-  # Single-element list containing a function type: (a -> b) gets parsed as [{:-> ...}]
-  defp parse_type([{:->, _, _} = fn_type]) do
-    parse_type(fn_type)
-  end
-
-  # List type: [element_type]
-  defp parse_type([element_type]) do
-    quote do: Deft.Type.fixed_list(unquote(parse_type(element_type)))
-  end
-
-  # Empty list - generic list type
-  defp parse_type([]) do
-    quote do: Deft.Type.list()
-  end
-
-  # Tuple type: {type1, type2, ...}
-  defp parse_type({:{}, _, types}) do
-    parsed_types = Enum.map(types, &parse_type/1)
-    quote do: Deft.Type.fixed_tuple(unquote(parsed_types))
-  end
-
-  # 2-tuple: {type1, type2}
-  defp parse_type({type1, type2}) do
-    quote do: Deft.Type.fixed_tuple([unquote(parse_type(type1)), unquote(parse_type(type2))])
-  end
-
-  # Union type: type1 | type2
-  defp parse_type({:|, _, [left, right]}) do
-    quote do: Deft.Type.union(unquote(parse_type(left)), unquote(parse_type(right)))
-  end
-
-  # Function type: (arg_types -> return_type)
-  defp parse_type({:->, _, [args, return]}) do
-    arg_types = Enum.map(List.wrap(args), &parse_type/1)
-    return_type = parse_type(return)
-    quote do: Deft.Type.fun(unquote(arg_types), unquote(return_type))
-  end
-
-  # Parenthesized type
-  defp parse_type({:__block__, _, [inner]}) do
-    parse_type(inner)
-  end
-
-  defp parse_type(other) do
-    raise ArgumentError, "Unknown type syntax in sig: #{inspect(other)}"
-  end
-
-  # ============================================================================
-  # Type Variable Collection
-  # ============================================================================
-
-  # Collects type variable names from parsed type AST.
-  # Returns a list of unique type variable atoms in order of first appearance.
-  defp collect_type_vars(type_asts) when is_list(type_asts) do
-    type_asts
-    |> Enum.flat_map(&extract_vars_from_ast/1)
-    |> Enum.uniq()
-  end
-
-  # Extracts type variable names from a single type AST node.
-  defp extract_vars_from_ast({:., _, [{:__aliases__, _, [:Deft, :Type]}, :var]}) do
-    # This matches `Deft.Type.var(name)` - we need to look at the call
-    []
-  end
-
-  defp extract_vars_from_ast({{:., _, [{:__aliases__, _, [:Deft, :Type]}, :var]}, _, [name]}) do
-    [name]
-  end
-
-  defp extract_vars_from_ast({:__block__, _, [inner]}) do
-    extract_vars_from_ast(inner)
-  end
-
-  defp extract_vars_from_ast({_, _, args}) when is_list(args) do
-    Enum.flat_map(args, &extract_vars_from_ast/1)
-  end
-
-  defp extract_vars_from_ast(list) when is_list(list) do
-    Enum.flat_map(list, &extract_vars_from_ast/1)
-  end
-
-  defp extract_vars_from_ast(_), do: []
 end

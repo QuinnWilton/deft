@@ -85,6 +85,40 @@ defmodule Deft.Error.Formatter do
     |> Enum.join("\n")
   end
 
+  @doc """
+  Formats an error as a simple one-line string without source context.
+
+  Useful for `ArgumentError` messages in macros where full formatting
+  is not appropriate.
+
+  ## Example
+
+      iex> error = Error.malformed_type(expression: 42)
+      iex> Formatter.format_simple(error)
+      "[E0003] Malformed type expression"
+  """
+  @spec format_simple(Error.t()) :: String.t()
+  def format_simple(%Error{code: code, message: message, location: location}) do
+    code_str = Error.error_code_string(code)
+    loc_str = format_location_simple(location)
+
+    if loc_str do
+      "[#{code_str}] #{message} (#{loc_str})"
+    else
+      "[#{code_str}] #{message}"
+    end
+  end
+
+  defp format_location_simple({file, line, col}) when is_binary(file) do
+    cond do
+      line && col -> "#{file}:#{line}:#{col}"
+      line -> "#{file}:#{line}"
+      true -> file
+    end
+  end
+
+  defp format_location_simple(_), do: nil
+
   # Calculate the width needed for line numbers based on the error's context
   defp calculate_line_num_width(%Error{location: nil, spans: []}, _source_lines, _context_lines),
     do: 1
