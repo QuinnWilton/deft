@@ -31,7 +31,7 @@ defmodule Deft.Context do
     type_env: [],
     # ADT name -> Type.ADT mappings
     adt_env: [],
-    # Function signatures (for future use)
+    # Function signatures for type checking external function calls
     signature_env: %{},
     # Enabled features like :polymorphism, :strict_subtyping
     features: [],
@@ -76,7 +76,7 @@ defmodule Deft.Context do
   @doc """
   Creates a new context from a macro environment.
   """
-  @spec new(Macro.Env.t()) :: t()
+  @spec new(Macro.Env.t() | nil) :: t()
   def new(env) do
     %__MODULE__{env: env}
   end
@@ -91,7 +91,7 @@ defmodule Deft.Context do
   - `:error_mode` - Error handling mode: `:fail_fast` (default) or `:accumulate`
   - `:source_lines` - Source code lines for error context display
   """
-  @spec new(Macro.Env.t(), keyword()) :: t()
+  @spec new(Macro.Env.t() | nil, keyword()) :: t()
   def new(env, opts) when is_list(opts) do
     %__MODULE__{
       env: env,
@@ -161,6 +161,31 @@ defmodule Deft.Context do
   @spec feature_enabled?(t(), atom()) :: boolean()
   def feature_enabled?(%__MODULE__{features: features}, feature) do
     feature in features
+  end
+
+  # ============================================================================
+  # Signature Lookup
+  # ============================================================================
+
+  @doc """
+  Sets the signature environment for external function lookups.
+
+  The signature environment is a map of `{module, function, arity} => type`.
+  """
+  @spec with_signatures(t(), map()) :: t()
+  def with_signatures(%__MODULE__{} = ctx, signatures) when is_map(signatures) do
+    %{ctx | signature_env: signatures}
+  end
+
+  @doc """
+  Looks up a function signature by module, function name, and arity.
+
+  Returns `{:ok, type}` if found, `:error` otherwise.
+  """
+  @spec lookup_signature(t(), {module(), atom(), non_neg_integer()}) ::
+          {:ok, Type.t()} | :error
+  def lookup_signature(%__MODULE__{signature_env: signatures}, mfa) do
+    Map.fetch(signatures, mfa)
   end
 
   # ============================================================================
