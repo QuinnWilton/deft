@@ -149,22 +149,23 @@ defrule :literal, %AST.Literal{value: value} do
 end
 
 defrule :fn, %AST.Fn{args: args, body: body, fn_meta: fn_meta, arrow_meta: arrow_meta} do
-  args ~>> {erased_args, input_types}
-  bindings +++ body ~> {erased_body, output_type}
+  args ~>> {args_e, input_ts, arg_bs}
+  (arg_bs +++ body) ~> {body_e, output_t}
 
-  conclude Erased.fn_expr(fn_meta, arrow_meta, erased_args, erased_body)
-        ~> Type.fun(input_types, output_type)
+  conclude Erased.fn_expr(fn_meta, arrow_meta, args_e, body_e)
+        ~> Type.fun(input_ts, output_t)
 end
 ```
 
 DSL operators:
 - `~>` : Synthesis judgment (infer type)
-- `<~` : Checking judgment (check against type)
-- `>>>` : Bind erased result
-- `<<<` : Subtyping assertion
-- `+++` : Context extension (add bindings)
-- `~>>` : Synthesize all expressions
-- `<<~` : Check all expressions
+- `~>>` : Synthesize all expressions in a list
+- `<~` : Checking judgment (check against expected type)
+- `<<~` : Check all expressions (homogeneous if single type, heterogeneous if list)
+- `+++` : Context extension (add bindings for premise)
+- `&&&` : Scoped context (pass context to child rules)
+- `<~>` : Pattern judgment (check pattern against type)
+- `>>>` : Elaborates to (binds result of `<~` or `<~>`)
 
 ### 4. Walkable Protocol
 
