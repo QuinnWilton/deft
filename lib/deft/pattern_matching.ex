@@ -13,6 +13,7 @@ defmodule Deft.PatternMatching do
   alias Deft.Span
   alias Deft.Subtyping
   alias Deft.Type
+  alias Deft.Walker
 
   import Helpers, only: [is_literal_type: 1]
 
@@ -99,6 +100,46 @@ defmodule Deft.PatternMatching do
           |> Enum.map(fn {local, types} -> {local, Enum.reduce(types, &Type.union/2)} end)
 
         {:ok, {erased, pattern_type, bindings}}
+    end
+  end
+
+  # Type.Alias: resolve to ADT from registry and transform patterns
+  #
+  # IMPORTANT: This clause must come before pattern-specific handlers like AST.Local
+  # because otherwise `none` in `case x do none -> ... end` would be matched as a
+  # variable pattern rather than being recognized as an ADT variant.
+  #
+  # When pattern matching against a Type.Alias (e.g., option(integer) from FFI),
+  # we need to:
+  # 1. Look up the ADT definition from the context's adt_registry
+  # 2. Instantiate the ADT with the alias's type arguments
+  # 3. Transform LocalCall patterns (like some(x)) to TypeConstructorCall patterns
+  # 4. Delegate to regular ADT pattern matching
+  defp do_handle_pattern(pattern, %Type.Alias{name: name, args: args} = alias_type, ctx) do
+    case Context.lookup_adt(ctx, name) do
+      {:ok, %Type.ADT{} = adt} ->
+        # Instantiate the ADT with the alias's type arguments
+        instantiated_adt = Type.ADT.instantiate(adt, args)
+
+        # Transform LocalCall patterns to TypeConstructorCall for ADT variants
+        transformed_pattern = transform_adt_patterns(pattern, instantiated_adt)
+
+        # Delegate to ADT pattern matching
+        do_handle_pattern(transformed_pattern, instantiated_adt, ctx)
+
+      :error ->
+        # Alias doesn't resolve to an ADT - fall through to catch-all
+        {notes, suggestions} = unhandled_pattern_hints(pattern, alias_type)
+
+        error =
+          Error.unsupported_pattern(
+            expression: pattern,
+            location: Span.extract(pattern),
+            suggestions: suggestions,
+            notes: notes
+          )
+
+        Error.raise!(error, ctx)
     end
   end
 
@@ -334,6 +375,48 @@ defmodule Deft.PatternMatching do
       )
 
     Error.raise!(error, ctx)
+  end
+
+  # ============================================================================
+  # ADT Pattern Transformation
+  # ============================================================================
+
+  # Transforms LocalCall patterns (like some(x), none) to TypeConstructorCall patterns
+  # based on the ADT's variants. This is needed when pattern matching against types
+  # from the registry (e.g., FFI return types) where the local bindings weren't
+  # available during initial AST compilation.
+  defp transform_adt_patterns(pattern, %Type.ADT{variants: variants} = adt) do
+    # Build a map of variant name => variant for quick lookup
+    variant_map = Map.new(variants, fn %Type.Variant{name: name} = v -> {name, v} end)
+
+    Walker.postwalk(pattern, fn
+      # LocalCall with matching variant name - transform to TypeConstructorCall
+      %AST.LocalCall{name: name, args: args, meta: meta} ->
+        case Map.fetch(variant_map, name) do
+          {:ok, variant} ->
+            AST.TypeConstructorCall.new(name, args, adt, variant, meta)
+
+          :error ->
+            # Not a variant - leave unchanged
+            %AST.LocalCall{name: name, args: args, meta: meta}
+        end
+
+      # Local (variable) that matches a nullary variant name
+      # e.g., `none` in `case x do none -> ... end`
+      %AST.Local{name: name, meta: meta, context: context} ->
+        case Map.fetch(variant_map, name) do
+          {:ok, %Type.Variant{columns: []} = variant} ->
+            # Nullary variant - transform to TypeConstructorCall with no args
+            AST.TypeConstructorCall.new(name, [], adt, variant, meta)
+
+          _ ->
+            # Not a nullary variant - leave as variable
+            %AST.Local{name: name, meta: meta, context: context}
+        end
+
+      other ->
+        other
+    end)
   end
 
   # ============================================================================

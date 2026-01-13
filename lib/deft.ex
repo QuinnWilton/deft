@@ -59,8 +59,9 @@ defmodule Deft do
     source_lines = read_source_lines(__CALLER__.file)
     block = Compiler.compile(block)
 
-    # Get signatures from the default type system
+    # Get signatures and datatypes from the default type system
     signatures = Deft.TypeSystem.Default.all_signatures()
+    datatypes = Deft.TypeSystem.Default.all_datatypes()
 
     ctx =
       Context.new(__CALLER__,
@@ -68,6 +69,7 @@ defmodule Deft do
         error_mode: :accumulate
       )
       |> Context.with_signatures(signatures)
+      |> Context.with_adt_registry(datatypes)
 
     # Initialize error accumulator.
     Process.put(:deft_accumulated_errors, [])
@@ -97,8 +99,9 @@ defmodule Deft do
     source_lines = read_source_lines(__CALLER__.file)
     block = Compiler.compile(block)
 
-    # Get signatures from the default type system
+    # Get signatures and datatypes from the default type system
     signatures = Deft.TypeSystem.Default.all_signatures()
+    datatypes = Deft.TypeSystem.Default.all_datatypes()
 
     ctx =
       Context.new(__CALLER__,
@@ -106,6 +109,7 @@ defmodule Deft do
         error_mode: :accumulate
       )
       |> Context.with_signatures(signatures)
+      |> Context.with_adt_registry(datatypes)
 
     # Initialize error accumulator.
     Process.put(:deft_accumulated_errors, [])
@@ -420,6 +424,9 @@ defmodule Deft do
         # Compile and type-check the body
         compiled_body = Compiler.compile(expanded_body)
 
+        # Get type system's global ADT registry (option, result, etc.)
+        type_system_adts = type_system.all_datatypes()
+
         ctx =
           Context.new(caller,
             source_lines: source_lines,
@@ -427,8 +434,9 @@ defmodule Deft do
             features: features
           )
           |> Context.with_signatures(all_signatures)
+          |> Context.with_adt_registry(type_system_adts)
 
-        # Add ADT bindings to context
+        # Add local ADT bindings to context
         ctx = Context.bind_all(ctx, adt_bindings)
 
         # Build parameter bindings with resolved types

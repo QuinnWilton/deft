@@ -89,6 +89,25 @@ defmodule Deft.Rules.ControlFlow do
     exhaustive_check!(subject_type.snd, pattern_types, opts)
   end
 
+  # Type.Alias: resolve to ADT from registry and delegate
+  def exhaustive_check!(%Type.Alias{name: name, args: args}, pattern_types, opts)
+      when is_list(opts) do
+    ctx = Keyword.fetch!(opts, :ctx)
+
+    case Deft.Context.lookup_adt(ctx, name) do
+      {:ok, %Type.ADT{} = adt} ->
+        # Instantiate the ADT with the alias's type arguments
+        instantiated_adt = Type.ADT.instantiate(adt, args)
+        exhaustive_check!(instantiated_adt, pattern_types, opts)
+
+      :error ->
+        # Alias doesn't resolve to an ADT - fall through to generic check
+        unless Enum.any?(pattern_types, &Subtyping.subtype_of?(&1, %Type.Alias{name: name, args: args})) do
+          raise_inexhaustive_error(%Type.Alias{name: name, args: args}, %Type.Alias{name: name, args: args}, [], opts)
+        end
+    end
+  end
+
   def exhaustive_check!(%Type.ADT{} = subject_type, pattern_types, nil) do
     # Find which variants are covered
     {covered, missing} =
