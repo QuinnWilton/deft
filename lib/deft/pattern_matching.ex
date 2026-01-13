@@ -42,7 +42,10 @@ defmodule Deft.PatternMatching do
       {:error, pattern_type} ->
         # Fall back to scoped context if opts not provided
         subject = Keyword.get(opts, :subject) || Context.get_scoped(ctx, :subj)
-        subject_type = Keyword.get(opts, :subject_type) || Context.get_scoped(ctx, :subj_t) || type
+
+        subject_type =
+          Keyword.get(opts, :subject_type) || Context.get_scoped(ctx, :subj_t) || type
+
         branch_meta = Keyword.get(opts, :branch_meta)
 
         pattern_location = Span.extract(pattern) || Span.extract(branch_meta)

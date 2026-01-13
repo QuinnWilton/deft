@@ -111,18 +111,26 @@ defmodule Deft.Type.Intersection do
   defp tuple_arity(%Deft.Type.Tuple{}), do: :any
 
   # Check if two types in the same group are disjoint by examining their components.
-  defp same_group_disjoint?(:list, %Deft.Type.FixedList{contents: a}, %Deft.Type.FixedList{contents: b}) do
+  defp same_group_disjoint?(:list, %Deft.Type.FixedList{contents: a}, %Deft.Type.FixedList{
+         contents: b
+       }) do
     disjoint?(a, b)
   end
 
-  defp same_group_disjoint?(:tuple, %Deft.Type.FixedTuple{elements: a_elems}, %Deft.Type.FixedTuple{elements: b_elems})
+  defp same_group_disjoint?(
+         :tuple,
+         %Deft.Type.FixedTuple{elements: a_elems},
+         %Deft.Type.FixedTuple{elements: b_elems}
+       )
        when length(a_elems) == length(b_elems) do
     # Tuples are disjoint if any corresponding element types are disjoint.
     Enum.zip(a_elems, b_elems)
     |> Enum.any?(fn {a, b} -> disjoint?(a, b) end)
   end
 
-  defp same_group_disjoint?(:function, %Deft.Type.Fn{inputs: a_inputs}, %Deft.Type.Fn{inputs: b_inputs})
+  defp same_group_disjoint?(:function, %Deft.Type.Fn{inputs: a_inputs}, %Deft.Type.Fn{
+         inputs: b_inputs
+       })
        when length(a_inputs) == length(b_inputs) do
     # Functions with same arity are disjoint if any corresponding parameter types are disjoint.
     # This is because the intersection would require handling both parameter type signatures.

@@ -449,9 +449,7 @@ defmodule Deft.Rules.DSL do
   # Checking with type binding: expr <~ expected_type >>> {erased, type}
   # Checks expression against expected type, binds erased form and actual type.
   # NOTE: More specific patterns must come BEFORE the general `>>> erased_var` pattern.
-  defp generate_premise_code(
-         {:>>>, _, [{:<~, _, [expr, expected_type]}, {erased_var, type_var}]}
-       ) do
+  defp generate_premise_code({:>>>, _, [{:<~, _, [expr, expected_type]}, {erased_var, type_var}]}) do
     generate_check_with_type_code(expr, expected_type, erased_var, type_var)
   end
 
@@ -1028,5 +1026,4 @@ defmodule Deft.Rules.DSL.Helpers do
 
     {erased_list, bindings_list}
   end
-
 end

@@ -24,7 +24,7 @@ defmodule Deft.Rules.ControlFlow do
 
   defrule :if, %AST.If{predicate: pred, do: do_, else: else_, meta: meta} do
     # Check predicate against boolean
-    pred <~ Type.boolean() >>> pred_e
+    (pred <~ Type.boolean()) >>> pred_e
 
     # Synthesize branches
     do_ ~> {do_e, do_t}
@@ -185,7 +185,7 @@ defmodule Deft.Rules.ControlFlow do
     val ~> {val_e, val_t}
 
     # Handle pattern matching using pattern judgment
-    pat <~> val_t >>> {pat_e, _pat_t, pat_bs}
+    (pat <~> val_t) >>> {pat_e, _pat_t, pat_bs}
 
     conclude(Erased.match(meta, pat_e, val_e) ~> val_t, bind: pat_bs)
   end
@@ -205,10 +205,10 @@ defmodule Deft.Rules.ControlFlow do
     subj_t = scoped(:subj_t)
 
     # Pattern judgment - handle_pattern reads subj/subj_t from scoped context for errors
-    pat <~> subj_t >>> {pat_e, pat_t, pat_bs}
+    (pat <~> subj_t) >>> {pat_e, pat_t, pat_bs}
 
     # Synthesize body with pattern bindings in scope
-    pat_bs +++ body ~> {body_e, body_t}
+    (pat_bs +++ body) ~> {body_e, body_t}
 
     # Return {pat_t, body_t} for parent to collect and unzip
     conclude(
@@ -226,7 +226,7 @@ defmodule Deft.Rules.ControlFlow do
   # Returns body_t as its synthesized type.
   defrule :cond_branch, %AST.CondBranch{predicate: pred, body: body, meta: meta} do
     # Check predicate against boolean
-    pred <~ Type.boolean() >>> pred_e
+    (pred <~ Type.boolean()) >>> pred_e
 
     # Synthesize body
     body ~> {body_e, body_t}

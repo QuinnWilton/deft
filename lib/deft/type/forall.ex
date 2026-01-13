@@ -63,7 +63,7 @@ defmodule Deft.Type.Forall do
 
   # Custom subtyping for polymorphic types (both are Forall).
   # Check body compatibility with alpha-renaming.
-  structural_rule fn sub, super ->
+  structural_rule(fn sub, super ->
     if length(sub.vars) == length(super.vars) do
       # Rename sub's vars to match super's for comparison.
       rename = Enum.zip(sub.vars, Enum.map(super.vars, &Deft.Type.Var.new/1)) |> Map.new()
@@ -72,7 +72,7 @@ defmodule Deft.Type.Forall do
     else
       false
     end
-  end
+  end)
 
   defimpl Inspect do
     import Inspect.Algebra

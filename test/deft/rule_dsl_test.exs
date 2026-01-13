@@ -333,7 +333,7 @@ defmodule Deft.RulesDSLTest do
         use Deft.Rules.DSL
 
         defrule :pattern_judgment, %{pattern: pat, expected_type: exp_t} do
-          pat <~> exp_t >>> {pat_e, pat_t, pat_bs}
+          (pat <~> exp_t) >>> {pat_e, pat_t, pat_bs}
 
           conclude(pat_e ~> pat_t, bind: pat_bs)
         end
@@ -364,7 +364,7 @@ defmodule Deft.RulesDSLTest do
         use Deft.Rules.DSL
 
         defrule :check_test, %{expr: expr, expected: expected} do
-          expr <~ expected >>> expr_e
+          (expr <~ expected) >>> expr_e
 
           conclude(expr_e ~> expected)
         end
@@ -386,7 +386,7 @@ defmodule Deft.RulesDSLTest do
         use Deft.Rules.DSL
 
         defrule :check_with_type, %{expr: expr, expected: expected} do
-          expr <~ expected >>> {expr_e, actual_t}
+          (expr <~ expected) >>> {expr_e, actual_t}
 
           conclude(expr_e ~> actual_t)
         end
@@ -410,7 +410,7 @@ defmodule Deft.RulesDSLTest do
         use Deft.Rules.DSL
 
         defrule :check_fail, %{expr: expr, expected: expected} do
-          expr <~ expected >>> expr_e
+          (expr <~ expected) >>> expr_e
 
           conclude(expr_e ~> expected)
         end
@@ -439,7 +439,7 @@ defmodule Deft.RulesDSLTest do
         use Deft.Rules.DSL
 
         defrule :check_all_homog, %{exprs: exprs, expected: expected} do
-          exprs <<~ expected >>> exprs_e
+          (exprs <<~ expected) >>> exprs_e
 
           conclude(exprs_e ~> Type.fixed_list(expected))
         end
@@ -461,7 +461,7 @@ defmodule Deft.RulesDSLTest do
         use Deft.Rules.DSL
 
         defrule :check_all_hetero, %{exprs: exprs, types: types} do
-          exprs <<~ types >>> exprs_e
+          (exprs <<~ types) >>> exprs_e
 
           conclude(exprs_e ~> Type.fixed_tuple(types))
         end
@@ -484,7 +484,7 @@ defmodule Deft.RulesDSLTest do
         use Deft.Rules.DSL
 
         defrule :check_all_homog_fail, %{exprs: exprs, expected: expected} do
-          exprs <<~ expected >>> exprs_e
+          (exprs <<~ expected) >>> exprs_e
 
           conclude(exprs_e ~> Type.fixed_list(expected))
         end
@@ -507,7 +507,7 @@ defmodule Deft.RulesDSLTest do
         use Deft.Rules.DSL
 
         defrule :check_all_hetero_fail, %{exprs: exprs, types: types} do
-          exprs <<~ types >>> exprs_e
+          (exprs <<~ types) >>> exprs_e
 
           conclude(exprs_e ~> Type.fixed_tuple(types))
         end
@@ -515,7 +515,8 @@ defmodule Deft.RulesDSLTest do
 
       ctx = Context.new(__ENV__)
       exprs = [%AST.Literal{value: 42, meta: []}, %AST.Literal{value: :atom, meta: []}]
-      types = [Type.integer(), Type.integer()]  # second should fail
+      # second should fail
+      types = [Type.integer(), Type.integer()]
 
       assert_raise CompileError, fn ->
         apply(TestCheckAllHeteroFailRule.Rule_check_all_hetero_fail, :apply, [

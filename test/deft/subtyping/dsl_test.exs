@@ -19,9 +19,9 @@ defmodule Deft.Subtyping.DSLTest do
     use Deft.Subtyping.DSL
 
     # Custom structural rule: subtyping holds if values are within a threshold
-    structural_rule fn sub, super ->
+    structural_rule(fn sub, super ->
       abs(sub.value - super.value) <= super.tolerance
-    end
+    end)
 
     defstruct [:value, :tolerance]
   end

@@ -169,6 +169,7 @@ defmodule Deft.UnificationTest do
       a = Type.var(:a)
       b = Type.var(:b)
       templates = [Type.fixed_list(a), Type.fun([a], b)]
+
       actuals = [
         Type.fixed_list(Type.integer()),
         Type.fun([Type.integer()], Type.boolean())
@@ -185,6 +186,7 @@ defmodule Deft.UnificationTest do
       # Called with ([integer], (integer -> boolean))
       a = Type.var(:a)
       templates = [Type.fixed_list(a), Type.fun([a], Type.boolean())]
+
       actuals = [
         Type.fixed_list(Type.integer()),
         Type.fun([Type.integer()], Type.boolean())
