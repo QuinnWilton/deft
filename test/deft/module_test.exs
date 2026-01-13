@@ -1,5 +1,5 @@
 defmodule Deft.ModuleTest do
-  use ExUnit.Case, async: false
+  use ExUnit.Case, async: true
 
   alias Deft.Type
 
