@@ -46,7 +46,9 @@ defmodule Deft.Context do
     # Current file being processed (for error locations)
     current_file: nil,
     # Source code lines (for error context display)
-    source_lines: nil
+    source_lines: nil,
+    # Scoped attributes passed from parent rules to child rules
+    scoped: %{}
   ]
 
   @type error_mode :: :fail_fast | :accumulate
@@ -62,7 +64,8 @@ defmodule Deft.Context do
           error_mode: error_mode(),
           errors: [Error.t()],
           current_file: String.t() | nil,
-          source_lines: [String.t()] | nil
+          source_lines: [String.t()] | nil,
+          scoped: map()
         }
 
   @type binding ::
@@ -158,6 +161,41 @@ defmodule Deft.Context do
   @spec feature_enabled?(t(), atom()) :: boolean()
   def feature_enabled?(%__MODULE__{features: features}, feature) do
     feature in features
+  end
+
+  # ============================================================================
+  # Scoped Attributes (Parent-to-Child Rule Communication)
+  # ============================================================================
+
+  @doc """
+  Creates a new context with additional scoped attributes.
+
+  Scoped attributes are used to pass information from parent rules to child
+  rules during type checking. For example, a `:case` rule can pass the subject
+  type to `:case_branch` rules via scoped attributes.
+
+  ## Example
+
+      scoped_ctx = Context.with_scoped(ctx, subject_type: subject_type)
+      # Child rules can now read subject_type via get_scoped/2
+  """
+  @spec with_scoped(t(), keyword()) :: t()
+  def with_scoped(%__MODULE__{scoped: scoped} = ctx, attrs) when is_list(attrs) do
+    %{ctx | scoped: Map.merge(scoped, Map.new(attrs))}
+  end
+
+  @doc """
+  Gets a scoped attribute set by a parent rule.
+
+  Returns `nil` if the attribute is not set.
+
+  ## Example
+
+      subject_type = Context.get_scoped(ctx, :subject_type)
+  """
+  @spec get_scoped(t(), atom()) :: term() | nil
+  def get_scoped(%__MODULE__{scoped: scoped}, key) when is_atom(key) do
+    Map.get(scoped, key)
   end
 
   @doc """
