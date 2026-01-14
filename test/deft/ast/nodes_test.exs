@@ -241,7 +241,7 @@ defmodule Deft.AST.NodesTest do
 
   describe "Local" do
     test "new/3 creates local variable reference" do
-      result = AST.Local.new(:x, nil, [line: 1])
+      result = AST.Local.new(:x, nil, line: 1)
 
       assert result.name == :x
       assert result.context == nil

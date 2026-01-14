@@ -57,7 +57,10 @@ defmodule Deft.FFI do
   def conversion_kind(%Type.Alias{name: :result}), do: {:result, :tuple_error}
 
   def conversion_kind(%Type.ADT{name: %AST.Local{name: :option}}), do: :option
-  def conversion_kind(%Type.ADT{name: %AST.Local{name: :fetch_result}}), do: {:result, :bare_error}
+
+  def conversion_kind(%Type.ADT{name: %AST.Local{name: :fetch_result}}),
+    do: {:result, :bare_error}
+
   def conversion_kind(%Type.ADT{name: %AST.Local{name: :result}}), do: {:result, :tuple_error}
 
   def conversion_kind(_), do: :none

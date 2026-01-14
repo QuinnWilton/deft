@@ -122,5 +122,4 @@ defmodule Deft.Property.TypeAlgebraTest do
       end
     end
   end
-
 end

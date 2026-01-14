@@ -671,7 +671,11 @@ defmodule Deft do
 
   # 2-tuple: {type1, type2}
   defp parse_type({type1, type2}, file) do
-    quote do: Deft.Type.fixed_tuple([unquote(parse_type(type1, file)), unquote(parse_type(type2, file))])
+    quote do:
+            Deft.Type.fixed_tuple([
+              unquote(parse_type(type1, file)),
+              unquote(parse_type(type2, file))
+            ])
   end
 
   # Union type: type1 | type2

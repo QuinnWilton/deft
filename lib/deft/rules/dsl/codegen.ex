@@ -25,16 +25,12 @@ defmodule Deft.Rules.DSL.Codegen do
   """
   # Synthesis with context extension: bindings +++ expr ~> {erased, type}
   # MUST come before the generic 2-tuple synth pattern
-  def generate_premise_code(
-        {:~>, _, [{:+++, _, [extra_bindings, expr]}, {erased_var, type_var}]}
-      ) do
+  def generate_premise_code({:~>, _, [{:+++, _, [extra_bindings, expr]}, {erased_var, type_var}]}) do
     generate_synth_with_context_code(extra_bindings, expr, erased_var, type_var)
   end
 
   # Synthesis with context extension: {:synth, {:extend_ctx, bindings, expr}, result} (expanded form)
-  def generate_premise_code(
-        {:synth, {:extend_ctx, extra_bindings, expr}, {erased_var, type_var}}
-      ) do
+  def generate_premise_code({:synth, {:extend_ctx, extra_bindings, expr}, {erased_var, type_var}}) do
     generate_synth_with_context_code(extra_bindings, expr, erased_var, type_var)
   end
 

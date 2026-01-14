@@ -63,9 +63,14 @@ defmodule Deft.Type.Alias do
         string(Atom.to_string(t.name))
       else
         args_doc =
-          container_doc("(", t.args, ")", opts, fn arg, _opts ->
-            Inspect.inspect(arg, opts)
-          end, separator: ",")
+          container_doc(
+            "(",
+            t.args,
+            ")",
+            opts,
+            fn arg, _opts ->
+              Inspect.inspect(arg, opts)
+            end, separator: ",")
 
         concat([
           string(Atom.to_string(t.name)),

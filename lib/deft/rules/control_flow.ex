@@ -105,8 +105,16 @@ defmodule Deft.Rules.ControlFlow do
 
       :error ->
         # Alias doesn't resolve to an ADT - fall through to generic check
-        unless Enum.any?(pattern_types, &Subtyping.subtype_of?(&1, %Type.Alias{name: name, args: args})) do
-          raise_inexhaustive_error(%Type.Alias{name: name, args: args}, %Type.Alias{name: name, args: args}, [], opts)
+        unless Enum.any?(
+                 pattern_types,
+                 &Subtyping.subtype_of?(&1, %Type.Alias{name: name, args: args})
+               ) do
+          raise_inexhaustive_error(
+            %Type.Alias{name: name, args: args},
+            %Type.Alias{name: name, args: args},
+            [],
+            opts
+          )
         end
     end
   end
