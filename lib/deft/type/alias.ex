@@ -56,16 +56,21 @@ defmodule Deft.Type.Alias do
   end
 
   defimpl Inspect do
+    import Inspect.Algebra
+
     def inspect(t, opts) do
       if t.args == [] do
-        Atom.to_string(t.name)
+        string(Atom.to_string(t.name))
       else
-        args_str =
-          t.args
-          |> Enum.map(&Inspect.inspect(&1, opts))
-          |> Enum.join(", ")
+        args_doc =
+          container_doc("(", t.args, ")", opts, fn arg, _opts ->
+            Inspect.inspect(arg, opts)
+          end, separator: ",")
 
-        "#{t.name}(#{args_str})"
+        concat([
+          string(Atom.to_string(t.name)),
+          args_doc
+        ])
       end
     end
   end
