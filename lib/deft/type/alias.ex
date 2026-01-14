@@ -7,6 +7,7 @@ defmodule Deft.Type.Alias do
   - `name` - The alias name (atom)
   - `context` - The context from the AST (usually nil or Elixir)
   - `args` - List of type arguments for parameterized aliases (default: [])
+  - `location` - Source location where this alias was referenced (default: nil)
 
   ## Usage
 
@@ -15,6 +16,9 @@ defmodule Deft.Type.Alias do
 
   For parameterized aliases like `option(integer)`:
       Type.Alias.new(:option, nil, [Type.integer()])
+
+  With location for error reporting:
+      Type.Alias.new(:option, nil, [Type.integer()], {"lib/my_file.ex", 10, 5})
   """
 
   use Deft.Subtyping.DSL
@@ -24,11 +28,12 @@ defmodule Deft.Type.Alias do
   @type t :: %__MODULE__{
           name: atom(),
           context: atom() | nil,
-          args: [Type.t()]
+          args: [Type.t()],
+          location: Deft.Span.location() | nil
         }
 
   @enforce_keys [:name]
-  defstruct [:name, :context, args: []]
+  defstruct [:name, :context, args: [], location: nil]
 
   @doc """
   Creates a new type alias.
@@ -38,13 +43,15 @@ defmodule Deft.Type.Alias do
   - `name` - The alias name
   - `context` - The AST context (usually nil)
   - `args` - Optional list of type arguments for parameterized aliases
+  - `location` - Optional source location for error reporting
   """
-  @spec new(atom(), atom() | nil, [Type.t()]) :: t()
-  def new(name, context \\ nil, args \\ []) do
+  @spec new(atom(), atom() | nil, [Type.t()], Deft.Span.location() | nil) :: t()
+  def new(name, context \\ nil, args \\ [], location \\ nil) do
     %__MODULE__{
       name: name,
       context: context,
-      args: args
+      args: args,
+      location: location
     }
   end
 
