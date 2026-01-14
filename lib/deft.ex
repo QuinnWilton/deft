@@ -291,9 +291,11 @@ defmodule Deft do
   an integer. The implementation is type-checked at compile time.
   """
   defmacro deft({:"::", _, [{name, meta, args}, return_type]}, do: body) when is_atom(name) do
+    file = __CALLER__.file
+
     # Parse arguments and extract types
-    {params, param_types} = parse_typed_params(args)
-    return_type_parsed = parse_type(return_type)
+    {params, param_types} = parse_typed_params(args, file)
+    return_type_parsed = parse_type(return_type, file)
 
     # Extract location of the return type annotation for error reporting
     return_type_location = extract_return_type_location(return_type)
@@ -609,11 +611,11 @@ defmodule Deft do
   # ============================================================================
 
   # Parses typed parameters like `a :: integer` into parameter names and types
-  defp parse_typed_params(args) when is_list(args) do
+  defp parse_typed_params(args, file) when is_list(args) do
     {params, types} =
       Enum.map(args, fn
         {:"::", _, [{name, _, ctx}, type]} when is_atom(name) and is_atom(ctx) ->
-          {{name, [], ctx}, parse_type(type)}
+          {{name, [], ctx}, parse_type(type, file)}
 
         {name, _, ctx} = var when is_atom(name) and is_atom(ctx) ->
           # Untyped parameter - use Top type
@@ -629,66 +631,71 @@ defmodule Deft do
     {params, types}
   end
 
-  defp parse_typed_params(nil), do: {[], []}
+  defp parse_typed_params(nil, _file), do: {[], []}
 
   # Parses type expressions into Deft.Type constructors
-  defp parse_type({:integer, _, _}), do: quote(do: Deft.Type.integer())
-  defp parse_type({:float, _, _}), do: quote(do: Deft.Type.float())
-  defp parse_type({:number, _, _}), do: quote(do: Deft.Type.number())
-  defp parse_type({:boolean, _, _}), do: quote(do: Deft.Type.boolean())
-  defp parse_type({:atom, _, _}), do: quote(do: Deft.Type.atom())
-  defp parse_type({:binary, _, _}), do: quote(do: Deft.Type.binary())
+  defp parse_type({:integer, _, _}, _file), do: quote(do: Deft.Type.integer())
+  defp parse_type({:float, _, _}, _file), do: quote(do: Deft.Type.float())
+  defp parse_type({:number, _, _}, _file), do: quote(do: Deft.Type.number())
+  defp parse_type({:boolean, _, _}, _file), do: quote(do: Deft.Type.boolean())
+  defp parse_type({:atom, _, _}, _file), do: quote(do: Deft.Type.atom())
+  defp parse_type({:binary, _, _}, _file), do: quote(do: Deft.Type.binary())
 
-  defp parse_type({:list, _, [elem_type]}) do
-    quote do: Deft.Type.fixed_list(unquote(parse_type(elem_type)))
+  defp parse_type({:list, _, [elem_type]}, file) do
+    quote do: Deft.Type.fixed_list(unquote(parse_type(elem_type, file)))
   end
 
-  defp parse_type({:list, _, _}), do: quote(do: Deft.Type.list())
-  defp parse_type({:tuple, _, _}), do: quote(do: Deft.Type.tuple())
-  defp parse_type({:top, _, _}), do: quote(do: Deft.Type.top())
-  defp parse_type({:bottom, _, _}), do: quote(do: Deft.Type.bottom())
+  defp parse_type({:list, _, _}, _file), do: quote(do: Deft.Type.list())
+  defp parse_type({:tuple, _, _}, _file), do: quote(do: Deft.Type.tuple())
+  defp parse_type({:top, _, _}, _file), do: quote(do: Deft.Type.top())
+  defp parse_type({:bottom, _, _}, _file), do: quote(do: Deft.Type.bottom())
 
   # Single-element list containing a function type: (a -> b) gets parsed as [{:-> ...}]
-  defp parse_type([{:->, _, _} = fn_type]) do
-    parse_type(fn_type)
+  defp parse_type([{:->, _, _} = fn_type], file) do
+    parse_type(fn_type, file)
   end
 
   # List type: [element_type]
-  defp parse_type([element_type]) do
-    quote do: Deft.Type.fixed_list(unquote(parse_type(element_type)))
+  defp parse_type([element_type], file) do
+    quote do: Deft.Type.fixed_list(unquote(parse_type(element_type, file)))
   end
 
   # Tuple type: {type1, type2, ...}
-  defp parse_type({:{}, _, types}) do
-    parsed_types = Enum.map(types, &parse_type/1)
+  defp parse_type({:{}, _, types}, file) do
+    parsed_types = Enum.map(types, &parse_type(&1, file))
     quote do: Deft.Type.fixed_tuple(unquote(parsed_types))
   end
 
   # 2-tuple: {type1, type2}
-  defp parse_type({type1, type2}) do
-    quote do: Deft.Type.fixed_tuple([unquote(parse_type(type1)), unquote(parse_type(type2))])
+  defp parse_type({type1, type2}, file) do
+    quote do: Deft.Type.fixed_tuple([unquote(parse_type(type1, file)), unquote(parse_type(type2, file))])
   end
 
   # Union type: type1 | type2
-  defp parse_type({:|, _, [left, right]}) do
-    quote do: Deft.Type.union(unquote(parse_type(left)), unquote(parse_type(right)))
+  defp parse_type({:|, _, [left, right]}, file) do
+    quote do: Deft.Type.union(unquote(parse_type(left, file)), unquote(parse_type(right, file)))
   end
 
   # Function type: (arg_types -> return_type)
-  defp parse_type({:->, _, [args, return]}) do
-    arg_types = Enum.map(List.wrap(args), &parse_type/1)
-    return_type = parse_type(return)
+  defp parse_type({:->, _, [args, return]}, file) do
+    arg_types = Enum.map(List.wrap(args), &parse_type(&1, file))
+    return_type = parse_type(return, file)
     quote do: Deft.Type.fun(unquote(arg_types), unquote(return_type))
   end
 
   # ADT type reference (simple identifier like `shape`)
-  defp parse_type({name, _, context}) when is_atom(name) and is_atom(context) do
+  defp parse_type({name, meta, context}, file) when is_atom(name) and is_atom(context) do
+    # Extract line/column from AST metadata for error reporting
+    line = Keyword.get(meta, :line)
+    column = Keyword.get(meta, :column)
+    location = if line, do: {file, line, column}, else: nil
+
     # This is a reference to a module-level ADT type
-    quote do: Deft.Type.alias(unquote(name), nil)
+    quote do: Deft.Type.Alias.new(unquote(name), nil, [], unquote(Macro.escape(location)))
   end
 
   # Fallback for unknown types
-  defp parse_type(other) do
+  defp parse_type(other, _file) do
     raise ArgumentError, "Unknown type syntax: #{Macro.to_string(other)}"
   end
 
@@ -704,10 +711,24 @@ defmodule Deft do
   end
 
   # Recursively resolve Type.Alias references to actual ADT types
-  defp resolve_aliases(%Deft.Type.Alias{name: name}, alias_map) do
+  defp resolve_aliases(%Deft.Type.Alias{name: name, location: location}, alias_map) do
     case Map.get(alias_map, name) do
-      nil -> raise CompileError, description: "Unknown type: #{name}"
-      adt_type -> adt_type
+      nil ->
+        available = Map.keys(alias_map)
+        similar = Deft.AST.Utils.find_similar(name, available)
+
+        error =
+          Deft.Error.unknown_type_alias(
+            name: name,
+            location: location,
+            similar: similar,
+            available: Enum.take(available, 5)
+          )
+
+        Deft.Error.raise!(error)
+
+      adt_type ->
+        adt_type
     end
   end
 
