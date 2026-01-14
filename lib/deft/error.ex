@@ -23,6 +23,11 @@ defmodule Deft.Error do
   - `E0007` - No matching rule
   - `E0008` - Missing features
   - `E0009` - Subtype constraint violated
+  - `E0010` - Unsupported syntax
+  - `E0011` - Unsupported pattern
+  - `E0012` - Unsupported function form
+  - `E0013` - Conflicting type definition
+  - `E0014` - Unknown type alias
 
   ## Usage
 
