@@ -530,19 +530,17 @@ defmodule Deft.Generators.Code do
   end
 
   def consume_exprs(exprs) do
-    # TODO: Slow.
-    exprs = Enum.shuffle(exprs)
+    consume_exprs(Enum.shuffle(exprs), length(exprs))
+  end
 
-    if length(exprs) > 2 do
-      {[fst, snd], exprs} = Enum.split(exprs, 2)
-      expr = choose_fn(fst, snd)
+  defp consume_exprs(exprs, count) when count > 2 do
+    [fst, snd | rest] = exprs
+    expr = choose_fn(fst, snd)
+    consume_exprs([expr | rest], count - 1)
+  end
 
-      consume_exprs([expr | exprs])
-    else
-      term = Enum.random(exprs)
-
-      choose_fn(term)
-    end
+  defp consume_exprs(exprs, _count) do
+    exprs |> Enum.random() |> choose_fn()
   end
 
   def choose_fn({term, %Type.Boolean{}}) do
