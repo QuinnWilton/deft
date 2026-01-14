@@ -1,4 +1,11 @@
 defmodule Deft.AST.CondBranch do
+  @moduledoc """
+  Represents a single branch in a cond expression.
+
+  Each branch contains a predicate expression and a body expression.
+  The body is evaluated if the predicate evaluates to true.
+  """
+
   use Deft.AST.Node, fields: [:predicate, :body], children: [:predicate, :body]
 
   alias Deft.AST

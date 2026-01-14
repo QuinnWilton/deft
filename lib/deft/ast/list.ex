@@ -1,4 +1,11 @@
 defmodule Deft.AST.List do
+  @moduledoc """
+  Represents a list literal in the AST.
+
+  List literals contain zero or more elements. Type checking infers
+  a FixedList type with the unified element type.
+  """
+
   use Deft.AST.Node, fields: [:elements], children: [:elements]
 
   alias Deft.AST

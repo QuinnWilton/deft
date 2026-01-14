@@ -1,4 +1,11 @@
 defmodule Deft.AST.Local do
+  @moduledoc """
+  Represents a local variable reference in the AST.
+
+  Local variables are identified by name and context. They can
+  appear in both expression and pattern positions.
+  """
+
   use Deft.AST.Node, fields: [:name, :context], children: []
 
   alias Deft.AST

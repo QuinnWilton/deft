@@ -1,4 +1,12 @@
 defmodule Deft.AST.LocalCall do
+  @moduledoc """
+  Represents a local function call in the AST.
+
+  Local calls invoke functions by name without a module qualifier.
+  In pattern contexts, these may be rewritten to TypeConstructorCall
+  when the name matches an ADT variant.
+  """
+
   use Deft.AST.Node, fields: [:name, :args], children: [:args]
 
   alias Deft.AST

@@ -1,4 +1,11 @@
 defmodule Deft.AST.Annotation do
+  @moduledoc """
+  Represents a type annotation expression in the AST.
+
+  Annotations attach type information to patterns using the `::` operator.
+  For example, `x :: integer` annotates variable `x` with the integer type.
+  """
+
   use Deft.AST.Node, fields: [:pattern, :type], children: [:pattern, :type]
 
   alias Deft.AST

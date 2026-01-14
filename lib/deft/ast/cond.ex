@@ -1,4 +1,11 @@
 defmodule Deft.AST.Cond do
+  @moduledoc """
+  Represents a cond expression in the AST.
+
+  Cond expressions evaluate boolean predicates in order, executing
+  the body of the first branch whose predicate evaluates to true.
+  """
+
   use Deft.AST.Node, fields: [:branches], children: [:branches]
 
   alias Deft.AST

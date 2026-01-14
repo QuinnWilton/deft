@@ -1,4 +1,12 @@
 defmodule Deft.AST.Match do
+  @moduledoc """
+  Represents a pattern match expression in the AST.
+
+  Match expressions bind pattern variables to the corresponding
+  parts of the matched value. Type checking ensures the pattern
+  is compatible with the value's type.
+  """
+
   use Deft.AST.Node, fields: [:pattern, :value], children: [:pattern, :value]
 
   alias Deft.AST

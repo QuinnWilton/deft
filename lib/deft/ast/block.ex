@@ -1,4 +1,11 @@
 defmodule Deft.AST.Block do
+  @moduledoc """
+  Represents a sequence of expressions in the AST.
+
+  Blocks contain multiple expressions that are evaluated in order,
+  with the final expression's value becoming the block's value.
+  """
+
   use Deft.AST.Node, fields: [:exprs], children: [:exprs]
 
   alias Deft.AST

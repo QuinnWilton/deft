@@ -1,4 +1,12 @@
 defmodule Deft.AST.If do
+  @moduledoc """
+  Represents an if expression in the AST.
+
+  If expressions evaluate a boolean predicate and execute either
+  the do branch or else branch. The result type is the union of
+  both branch types.
+  """
+
   use Deft.AST.Node, fields: [:predicate, :do, :else], children: [:predicate, :do, :else]
 
   alias Deft.AST

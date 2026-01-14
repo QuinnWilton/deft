@@ -1,4 +1,11 @@
 defmodule Deft.AST.CaseBranch do
+  @moduledoc """
+  Represents a single branch in a case expression.
+
+  Each branch contains a pattern to match against and a body expression
+  to evaluate when the pattern matches.
+  """
+
   use Deft.AST.Node, fields: [:pattern, :body], children: [:pattern, :body]
 
   alias Deft.AST

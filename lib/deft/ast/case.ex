@@ -1,4 +1,11 @@
 defmodule Deft.AST.Case do
+  @moduledoc """
+  Represents a case expression in the AST.
+
+  Case expressions match a subject value against multiple patterns,
+  executing the body of the first matching branch.
+  """
+
   use Deft.AST.Node, fields: [:subject, :branches], children: [:subject, :branches]
 
   alias Deft.AST

@@ -1,4 +1,11 @@
 defmodule Deft.AST.Cons do
+  @moduledoc """
+  Represents a cons cell pattern in the AST.
+
+  Cons cells match list head and tail using the `|` operator.
+  For example, `[head | rest]` matches a non-empty list.
+  """
+
   use Deft.AST.Node, fields: [:head, :rest], children: [:head, :rest]
 
   alias Deft.AST

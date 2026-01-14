@@ -1,4 +1,11 @@
 defmodule Deft.AST.Pair do
+  @moduledoc """
+  Represents a two-element tuple (pair) in the AST.
+
+  Pairs are the base case for tuple construction and are used
+  internally for keyword lists and two-tuples like `{:ok, value}`.
+  """
+
   use Deft.AST.Node, fields: [:fst, :snd], children: [:fst, :snd]
 
   alias Deft.AST

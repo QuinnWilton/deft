@@ -1,4 +1,12 @@
 defmodule Deft.AST.Fn do
+  @moduledoc """
+  Represents an anonymous function in the AST.
+
+  Anonymous functions have typed arguments and a body expression.
+  Type checking ensures the body's type is consistent with any
+  declared return type annotation.
+  """
+
   use Deft.AST.Node,
     fields: [:body, :args, :fn_meta, :arrow_meta],
     children: [:body, :args],

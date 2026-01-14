@@ -1,4 +1,12 @@
 defmodule Deft.AST.FnApplication do
+  @moduledoc """
+  Represents a function application (call) in the AST.
+
+  Function applications invoke a function value with arguments.
+  Type checking verifies that argument types match the function's
+  parameter types.
+  """
+
   use Deft.AST.Node,
     fields: [:fun, :args, :fun_meta, :args_meta],
     children: [:fun, :args],

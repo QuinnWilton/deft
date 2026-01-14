@@ -1,4 +1,13 @@
 defmodule Deft.AST.Variant do
+  @moduledoc """
+  Represents a variant definition in an ADT declaration.
+
+  Variants define the constructors of an algebraic data type,
+  specifying the name and typed columns. For example, in
+  `defdata option(a) :: some(a) | none`, both `some` and `none`
+  are variants.
+  """
+
   use Deft.AST.Node, fields: [:name, :adt_name, :columns], children: [:columns]
 
   alias Deft.AST

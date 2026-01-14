@@ -1,4 +1,12 @@
 defmodule Deft.AST.Tuple do
+  @moduledoc """
+  Represents a tuple literal in the AST.
+
+  Tuples contain a fixed number of elements with potentially
+  different types. Type checking infers a FixedTuple type with
+  each element's type.
+  """
+
   use Deft.AST.Node, fields: [:elements], children: [:elements]
 
   alias Deft.AST

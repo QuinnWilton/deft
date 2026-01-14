@@ -1,4 +1,12 @@
 defmodule Deft.AST.TypeConstructorCall do
+  @moduledoc """
+  Represents an ADT variant constructor call in the AST.
+
+  TypeConstructorCall is created when a LocalCall in pattern position
+  matches an ADT variant name. It carries the resolved type and variant
+  information for type checking.
+  """
+
   use Deft.AST.Node, fields: [:name, :args, :type, :variant], children: [:args]
 
   alias Deft.AST

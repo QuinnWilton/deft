@@ -1,4 +1,11 @@
 defmodule Deft.AST.Pin do
+  @moduledoc """
+  Represents a pin operator in the AST.
+
+  The pin operator `^` matches against an existing variable's value
+  rather than rebinding it. Used in patterns to assert equality.
+  """
+
   use Deft.AST.Node, fields: [:expr], children: [:expr]
 
   alias Deft.AST
