@@ -410,7 +410,13 @@ defmodule Deft.Error.Formatter do
         column || 1
       end
 
-    pointer_width = estimate_span_width(source_line, col, type)
+    # Use explicit length if provided, otherwise estimate from source
+    pointer_width =
+      case Map.get(span, :length) do
+        nil -> estimate_span_width(source_line, col, type)
+        length when is_integer(length) and length > 0 -> length
+        _ -> estimate_span_width(source_line, col, type)
+      end
 
     # Build the underline with tee at center: ───┬───
     {underline, tee_position} = build_underline_with_tee(pointer_width)
