@@ -6,6 +6,7 @@ defmodule Deft.TypeParser.Parser do
   preserving span information for error reporting.
   """
 
+  alias Deft.AST.Utils, as: ASTUtils
   alias Deft.Error
   alias Deft.TypeParser.AST
 
@@ -234,18 +235,7 @@ defmodule Deft.TypeParser.Parser do
   # ============================================================================
 
   defp parse_all(asts, opts) do
-    results =
-      Enum.reduce_while(asts, {:ok, []}, fn ast, {:ok, acc} ->
-        case parse(ast, opts) do
-          {:ok, parsed} -> {:cont, {:ok, [parsed | acc]}}
-          {:error, _} = err -> {:halt, err}
-        end
-      end)
-
-    case results do
-      {:ok, list} -> {:ok, Enum.reverse(list)}
-      error -> error
-    end
+    ASTUtils.map_ok(asts, &parse(&1, opts))
   end
 
   defp extract_span(meta) when is_list(meta) do
@@ -323,11 +313,6 @@ defmodule Deft.TypeParser.Parser do
   end
 
   defp find_similar(name, known_types) do
-    name_str = Atom.to_string(name)
-
-    Enum.find(known_types, fn known ->
-      known_str = Atom.to_string(known)
-      String.jaro_distance(name_str, known_str) > 0.8
-    end)
+    ASTUtils.find_similar(name, known_types)
   end
 end
