@@ -27,3 +27,6 @@ deft-*.tar
 
 # Dialyzer PLT files.
 /priv/plts/
+
+# Claude Code settings.
+.claude/
