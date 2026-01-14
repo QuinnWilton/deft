@@ -266,7 +266,6 @@ defmodule Deft.Generators.Code do
   end
 
   def if_node(child_data \\ literal_node()) do
-    # TODO: Limited predicate generation
     map(tuple({predicate(child_data), child_data, child_data}), fn
       {
         {predicate, _},
@@ -519,7 +518,38 @@ defmodule Deft.Generators.Code do
   end
 
   def predicate(child_data \\ literal_node()) do
-    local_call_node(child_data)
+    one_of([
+      # Boolean literals.
+      boolean_literal(),
+      # Guard checks and comparisons.
+      local_call_node(child_data),
+      # Negation.
+      not_predicate(child_data),
+      # Boolean operators (non-recursive to avoid infinite generation).
+      boolean_operator(child_data)
+    ])
+  end
+
+  defp boolean_literal do
+    map(boolean(), fn value ->
+      {AST.Literal.new(value), Type.boolean()}
+    end)
+  end
+
+  defp not_predicate(child_data) do
+    map(local_call_node(child_data), fn {inner, _type} ->
+      {AST.LocalCall.new(:not, [inner]), Type.boolean()}
+    end)
+  end
+
+  defp boolean_operator(child_data) do
+    # Use local_call_node for operands to avoid infinite recursion.
+    bind(tuple({local_call_node(child_data), local_call_node(child_data)}), fn
+      {{p1, _}, {p2, _}} ->
+        map(one_of([constant(:and), constant(:or)]), fn op ->
+          {AST.LocalCall.new(op, [p1, p2]), Type.boolean()}
+        end)
+    end)
   end
 
   def number() do
