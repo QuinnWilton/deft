@@ -1,4 +1,12 @@
 defmodule Deft.Generators.Code do
+  @moduledoc """
+  Generators for well-typed Deft AST expressions.
+
+  Generates type-directed code where each expression is paired with
+  its type, ensuring generated code is well-typed by construction.
+  Used for property testing the type checker and compiler.
+  """
+
   import StreamData
 
   alias Deft.AST

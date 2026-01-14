@@ -1,4 +1,11 @@
 defmodule Deft.Generators do
+  @moduledoc """
+  Entry point for Deft's property-based test generators.
+
+  Provides generators for types and well-typed code expressions,
+  used in property tests to verify type system invariants.
+  """
+
   alias Deft.Generators
 
   def code() do
