@@ -85,13 +85,7 @@ defmodule Deft.Unification do
     initial = Map.new(type_vars, &{&1, nil})
 
     # Match each template against its corresponding actual type.
-    Enum.zip(templates, actuals)
-    |> Enum.reduce_while({:ok, initial}, fn {template, actual}, {:ok, subst} ->
-      case unify(template, actual, subst) do
-        {:ok, new_subst} -> {:cont, {:ok, new_subst}}
-        {:error, _} = err -> {:halt, err}
-      end
-    end)
+    unify_all(templates, actuals, initial)
   end
 
   def infer(_type_vars, templates, actuals) do
