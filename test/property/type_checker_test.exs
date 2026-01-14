@@ -9,26 +9,6 @@ defmodule Deft.Property.TypeCheckerTest do
 
   alias Deft.Generators.Types
 
-  describe "well-formedness" do
-    property "synthesized types are always well-formed" do
-      check all(type <- Types.primitive_type(), max_shrinking_steps: 0) do
-        assert Type.well_formed?(type)
-      end
-    end
-
-    property "compound types are well-formed" do
-      check all(type <- Types.compound_type(), max_shrinking_steps: 0) do
-        assert Type.well_formed?(type)
-      end
-    end
-
-    property "union types are well-formed" do
-      check all(type <- Types.union_type(), max_shrinking_steps: 0) do
-        assert Type.well_formed?(type)
-      end
-    end
-  end
-
   describe "literal type synthesis" do
     property "integer literals have Integer type" do
       check all(n <- integer(), max_shrinking_steps: 0) do

@@ -160,26 +160,6 @@ defmodule Deft.Property.SubtypingLawsTest do
     end
   end
 
-  describe "well-formedness" do
-    property "generated types are well-formed" do
-      check all(type <- Types.type(), max_shrinking_steps: 0) do
-        assert Type.well_formed?(type)
-      end
-    end
-
-    property "generated primitive types are well-formed" do
-      check all(type <- Types.primitive_type(), max_shrinking_steps: 0) do
-        assert Type.well_formed?(type)
-      end
-    end
-
-    property "generated compound types are well-formed" do
-      check all(type <- Types.compound_type(), max_shrinking_steps: 0) do
-        assert Type.well_formed?(type)
-      end
-    end
-  end
-
   describe "transitivity (limited)" do
     # Full transitivity is expensive to test with generators,
     # so we test specific chains that we know should hold.

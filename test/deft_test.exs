@@ -33,7 +33,6 @@ defmodule DeftTest do
     check all({expr, expected} <- Generators.Code.expression(), max_shrinking_steps: 0) do
       ctx = context_with_signatures(env)
       {:ok, _erased, actual, _bindings, _ctx} = TypeChecker.check(expr, ctx)
-      assert Type.well_formed?(actual)
       assert Subtyping.subtype_of?(expected, actual)
     end
   end
@@ -198,36 +197,6 @@ defmodule DeftTest do
       # subtype_of?(super, sub) - is sub a subtype of super?
       assert Subtyping.subtype_of?(a, intersection)
       assert Subtyping.subtype_of?(b, intersection)
-    end
-  end
-
-  # ============================================================================
-  # Type Well-formedness
-  # ============================================================================
-
-  property "generated types are well-formed" do
-    check all(type <- Generators.Types.type()) do
-      assert Type.well_formed?(type)
-    end
-  end
-
-  property "unions of well-formed types are well-formed" do
-    check all(
-            a <- Generators.Types.type(),
-            b <- Generators.Types.type()
-          ) do
-      union = Type.union(a, b)
-      assert Type.well_formed?(union)
-    end
-  end
-
-  property "intersections of well-formed types are well-formed" do
-    check all(
-            a <- Generators.Types.type(),
-            b <- Generators.Types.type()
-          ) do
-      intersection = Type.intersection(a, b)
-      assert Type.well_formed?(intersection)
     end
   end
 

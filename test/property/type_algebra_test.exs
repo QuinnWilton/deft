@@ -123,28 +123,4 @@ defmodule Deft.Property.TypeAlgebraTest do
     end
   end
 
-  describe "type well-formedness" do
-    property "primitive types are well-formed" do
-      check all(type <- Types.primitive_type(), max_shrinking_steps: 0) do
-        assert Type.well_formed?(type)
-      end
-    end
-
-    property "compound types are well-formed" do
-      check all(type <- Types.compound_type(), max_shrinking_steps: 0) do
-        assert Type.well_formed?(type)
-      end
-    end
-
-    property "union types are well-formed" do
-      check all(type <- Types.union_type(), max_shrinking_steps: 0) do
-        assert Type.well_formed?(type)
-      end
-    end
-
-    property "Top and Bottom are well-formed" do
-      assert Type.well_formed?(Type.top())
-      assert Type.well_formed?(Type.bottom())
-    end
-  end
 end

@@ -141,18 +141,6 @@ defmodule Deft.TestHelpers.TypeAssertions do
   end
 
   @doc """
-  Asserts that a type is well-formed.
-
-  ## Examples
-
-      assert_well_formed(Type.integer())
-  """
-  def assert_well_formed(type) do
-    assert Type.well_formed?(type),
-           "Expected #{inspect(type)} to be well-formed"
-  end
-
-  @doc """
   Asserts that type checking produces specific bindings.
 
   ## Examples

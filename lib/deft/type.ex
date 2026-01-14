@@ -25,26 +25,6 @@ defmodule Deft.Type do
           | Type.Var.t()
           | Type.Variant.t()
 
-  @types [
-    Type.Atom,
-    Type.Binary,
-    Type.Boolean,
-    Type.Bottom,
-    Type.FixedList,
-    Type.FixedTuple,
-    Type.Float,
-    Type.Fn,
-    Type.Forall,
-    Type.Integer,
-    Type.Intersection,
-    Type.List,
-    Type.Number,
-    Type.Top,
-    Type.Tuple,
-    Type.Union,
-    Type.Var
-  ]
-
   def alias(name, context) do
     Type.Alias.new(name, context)
   end
@@ -149,13 +129,5 @@ defmodule Deft.Type do
       true ->
         Type.Intersection.new(fst, snd)
     end
-  end
-
-  def well_formed?(type) when is_struct(type) do
-    type.__struct__ in @types
-  end
-
-  def well_formed?(_) do
-    false
   end
 end
