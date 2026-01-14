@@ -364,6 +364,38 @@ defmodule Deft.PatternMatching do
     end
   end
 
+  # LocalCall patterns that weren't rewritten to TypeConstructorCall.
+  # This happens when a pattern like `foo(x)` is used but `foo` is not
+  # a recognized variant constructor for the type being matched.
+  defp do_handle_pattern(%AST.LocalCall{name: name} = pattern, type, ctx) do
+    type_str = Error.format_type(type)
+
+    notes = [
+      "Pattern `#{name}(...)` looks like a type constructor, but `#{name}` " <>
+        "is not a recognized variant for type #{type_str}."
+    ]
+
+    suggestions =
+      case type do
+        %Type.ADT{variants: variants} ->
+          variant_names = Enum.map(variants, & &1.name) |> Enum.join(", ")
+          ["Available variants for this ADT: #{variant_names}"]
+
+        _ ->
+          ["Constructor patterns can only match algebraic data types (ADTs)."]
+      end
+
+    error =
+      Error.unsupported_pattern(
+        expression: pattern,
+        location: Span.extract(pattern),
+        suggestions: suggestions,
+        notes: notes
+      )
+
+    Error.raise!(error, ctx)
+  end
+
   # Catch-all for unhandled pattern/type combinations.
   defp do_handle_pattern(pattern, type, ctx) do
     {notes, suggestions} = unhandled_pattern_hints(pattern, type)

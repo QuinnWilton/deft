@@ -338,8 +338,9 @@ defmodule Deft.Compiler do
   end
 
   def compile_pattern({name, meta, args}) when is_list(args) do
-    # TODO: Risky to allow LocalCall nodes in patterns, even though
-    #       they should get rewritten in the case of type constructors.
+    # LocalCall nodes in patterns get rewritten to TypeConstructorCall when
+    # they match ADT variant names. If not rewritten, pattern_matching.ex
+    # provides explicit error handling with helpful messages.
     args = Enum.map(args, &compile_pattern/1)
 
     AST.LocalCall.new(name, args, meta)
