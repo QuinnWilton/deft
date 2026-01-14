@@ -222,6 +222,20 @@ defmodule Deft.Context do
     end
   end
 
+  @doc """
+  Returns a list of all ADT names available in the context.
+
+  This includes both locally defined ADTs (from the current deft block)
+  and registered ADTs (from the adt_registry). Used for error messages
+  to suggest available types.
+  """
+  @spec available_adt_names(t()) :: [atom()]
+  def available_adt_names(%__MODULE__{adt_env: adt_env, adt_registry: registry}) do
+    local_names = Enum.map(adt_env, fn {:adt, name, _} -> name end)
+    registry_names = Map.keys(registry || %{})
+    Enum.uniq(local_names ++ registry_names)
+  end
+
   # ============================================================================
   # Scoped Attributes (Parent-to-Child Rule Communication)
   # ============================================================================
