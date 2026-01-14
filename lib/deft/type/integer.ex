@@ -1,4 +1,10 @@
 defmodule Deft.Type.Integer do
+  @moduledoc """
+  Represents the integer type in Deft's type system.
+
+  Integer is a subtype of Number. Integer literals like `42` have this type.
+  """
+
   use Deft.Subtyping.DSL
 
   subtype_of(Deft.Type.Number)

@@ -1,4 +1,10 @@
 defmodule Deft.Type.Float do
+  @moduledoc """
+  Represents the float type in Deft's type system.
+
+  Float is a subtype of Number. Float literals like `3.14` have this type.
+  """
+
   use Deft.Subtyping.DSL
 
   subtype_of(Deft.Type.Number)

@@ -1,4 +1,11 @@
 defmodule Deft.Type.Atom do
+  @moduledoc """
+  Represents the atom type in Deft's type system.
+
+  Atom literals like `:ok` and `:error` have this type. Note that `true`
+  and `false` are typed as Boolean, not Atom.
+  """
+
   use Deft.Subtyping.DSL
 
   alias Deft.AST

@@ -1,4 +1,11 @@
 defmodule Deft.Type.Number do
+  @moduledoc """
+  Represents the number type in Deft's type system.
+
+  Number is the supertype of both Integer and Float. It represents any
+  numeric value and is used for arithmetic operations that work on both.
+  """
+
   use Deft.Subtyping.DSL
 
   alias Deft.AST

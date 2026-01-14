@@ -1,4 +1,23 @@
 defmodule Deft.Type.Fn do
+  @moduledoc """
+  Represents a function type in Deft's type system.
+
+  A function type `fn(A, B) -> C` describes functions that take arguments of
+  types A and B and return a value of type C. Function types follow standard
+  variance rules:
+
+  - **Inputs are contravariant**: `fn(Number) -> T <: fn(Integer) -> T` because
+    a function accepting any Number can safely be used where a function accepting
+    only Integers is expected.
+
+  - **Output is covariant**: `fn(T) -> Integer <: fn(T) -> Number` because a
+    function returning an Integer can be used where a function returning any
+    Number is expected.
+
+  Subtyping also requires matching arities: `fn(A) -> B` is never a subtype of
+  `fn(A, C) -> B` regardless of the individual type relationships.
+  """
+
   use Deft.Subtyping.DSL
 
   # Contravariant inputs with arity check: fn(Number) -> T <: fn(Integer) -> T

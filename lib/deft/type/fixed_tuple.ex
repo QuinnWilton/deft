@@ -1,4 +1,15 @@
 defmodule Deft.Type.FixedTuple do
+  @moduledoc """
+  Represents a tuple type with known element types in Deft's type system.
+
+  FixedTuple is a subtype of Tuple. It tracks the type of each element
+  position. For example, `{integer, boolean}` represents a 2-tuple where
+  the first element is an integer and the second is a boolean.
+
+  Subtyping is covariant with arity matching: `{Integer, String}` is a
+  subtype of `{Number, Binary}` only if they have the same arity.
+  """
+
   use Deft.Subtyping.DSL
 
   subtype_of(Deft.Type.Tuple)

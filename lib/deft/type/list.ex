@@ -1,4 +1,11 @@
 defmodule Deft.Type.List do
+  @moduledoc """
+  Represents the generic list type in Deft's type system.
+
+  This is the supertype of all specific list types (FixedList).
+  It represents "any list" without specifying the element type.
+  """
+
   use Deft.Subtyping.DSL
 
   @type t :: %__MODULE__{}

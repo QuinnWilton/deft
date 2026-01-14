@@ -1,4 +1,11 @@
 defmodule Deft.Type.Tuple do
+  @moduledoc """
+  Represents the generic tuple type in Deft's type system.
+
+  This is the supertype of all specific tuple types (FixedTuple).
+  It represents "any tuple" without specifying the element types or arity.
+  """
+
   use Deft.Subtyping.DSL
 
   @type t :: %__MODULE__{}

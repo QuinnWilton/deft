@@ -1,4 +1,22 @@
 defmodule Deft.Type.Intersection do
+  @moduledoc """
+  Represents an intersection type (product type) in Deft's type system.
+
+  An intersection type `A & B` represents values that satisfy both type A and
+  type B simultaneously. Unlike union types, intersection types are relatively
+  rare in practice but useful for expressing constraints.
+
+  The `new/2` constructor automatically normalizes intersection types by:
+  1. Flattening nested intersections
+  2. Detecting uninhabited intersections (disjoint types) and simplifying to Bottom
+  3. Removing redundant components (if A <: B, keep only A)
+  4. Sorting for canonical ordering
+
+  For example, `Integer & Number` normalizes to just `Integer` since Integer is
+  already a subtype of Number. And `Integer & Boolean` normalizes to Bottom since
+  no value can be both an integer and a boolean.
+  """
+
   use Deft.Subtyping.DSL
 
   parameter(:fst, variance: :covariant)

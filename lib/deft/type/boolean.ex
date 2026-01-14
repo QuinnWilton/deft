@@ -1,4 +1,11 @@
 defmodule Deft.Type.Boolean do
+  @moduledoc """
+  Represents the boolean type in Deft's type system.
+
+  Values `true` and `false` have this type. Guard functions like
+  `is_integer/1` and comparison operators return booleans.
+  """
+
   use Deft.Subtyping.DSL
 
   alias Deft.AST

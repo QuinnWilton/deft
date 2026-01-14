@@ -1,4 +1,15 @@
 defmodule Deft.Type.Union do
+  @moduledoc """
+  Represents a union type (sum type) in Deft's type system.
+
+  A union type `A | B` represents values that can be either type A or type B.
+  Union types are covariant in both components: `Integer | Boolean` is a subtype
+  of `Number | Boolean` because `Integer <: Number`.
+
+  Union types are useful for representing values that can take multiple forms,
+  such as function return types that may succeed or fail.
+  """
+
   use Deft.Subtyping.DSL
 
   parameter(:fst, variance: :covariant)

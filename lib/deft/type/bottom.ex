@@ -1,4 +1,12 @@
 defmodule Deft.Type.Bottom do
+  @moduledoc """
+  Represents the bottom type (⊥) in Deft's type system.
+
+  Bottom is the subtype of all types. It represents an uninhabited type -
+  no values have this type. It appears as the result type of functions
+  that never return (e.g., functions that always raise).
+  """
+
   use Deft.Subtyping.DSL
 
   alias Deft.AST

@@ -1,4 +1,16 @@
 defmodule Deft.Type.Variant do
+  @moduledoc """
+  Represents a single variant (constructor) of an algebraic data type.
+
+  Each variant belongs to an ADT and carries zero or more typed columns. For example,
+  in `defdata option(a) :: some(a) | none`, both `some` and `none` are variants:
+  - `some` has columns `[a]`
+  - `none` has columns `[]`
+
+  Variants are created by the ADT compilation process and used for pattern matching
+  and type checking of constructor calls.
+  """
+
   use Deft.Subtyping.DSL
 
   @type t :: %__MODULE__{}

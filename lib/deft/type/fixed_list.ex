@@ -1,4 +1,14 @@
 defmodule Deft.Type.FixedList do
+  @moduledoc """
+  Represents a homogeneous list type in Deft's type system.
+
+  FixedList is a subtype of List. It specifies that all elements have
+  the same type. For example, `[integer]` represents a list where every
+  element is an integer.
+
+  Subtyping is covariant: `[Integer]` is a subtype of `[Number]`.
+  """
+
   use Deft.Subtyping.DSL
 
   subtype_of(Deft.Type.List)
