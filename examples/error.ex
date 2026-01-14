@@ -9,6 +9,7 @@
 #   inexhaustive   - E0005: Inexhaustive patterns
 #   unreachable    - E0006: Unreachable branch
 #   unsupported    - E0004: Unsupported call
+#   unknown_type   - E0014: Unknown type alias
 
 error_type = List.first(System.argv()) || "return_type"
 
@@ -125,6 +126,33 @@ case error_type do
 
     Examples.UnsupportedCallError.main()
 
+  "unknown_type" ->
+    defmodule Examples.UnknownTypeError do
+      @moduledoc """
+      E0014: Unknown type alias
+
+      Using a type that hasn't been defined in this scope.
+      """
+      use Deft
+
+      defdata(option :: some(integer) | none())
+
+      deft process(x :: optin) :: integer do
+        # 'optin' is a typo - should be 'option'
+        # The error will suggest: "Did you mean `option`?"
+        case x do
+          some(n) -> n
+          none() -> 0
+        end
+      end
+
+      deft main() :: atom do
+        IO.puts(process(some(42)))
+      end
+    end
+
+    Examples.UnknownTypeError.main()
+
   other ->
     IO.puts("Unknown error type: #{other}")
     IO.puts("")
@@ -134,4 +162,5 @@ case error_type do
     IO.puts("  inexhaustive   - E0005: Inexhaustive patterns")
     IO.puts("  unreachable    - E0006: Unreachable branch")
     IO.puts("  unsupported    - E0004: Unsupported call")
+    IO.puts("  unknown_type   - E0014: Unknown type alias")
 end
