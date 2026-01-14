@@ -78,7 +78,7 @@ defmodule Deft.TypeParser do
     with {:ok, type_ast} <- Parser.parse(ast, parser_opts) do
       case output do
         :ast -> {:ok, type_ast}
-        :type -> {:ok, Emitter.to_type(type_ast)}
+        :type -> {:ok, Emitter.to_type(type_ast, file)}
         :quoted -> {:ok, Emitter.to_quoted(type_ast)}
       end
     end

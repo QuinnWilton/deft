@@ -11,53 +11,65 @@ defmodule Deft.TypeParser.Emitter do
   alias Deft.TypeParser.AST
 
   # ============================================================================
-  # to_type/1 - Convert AST to runtime Type structs
+  # to_type/1,2 - Convert AST to runtime Type structs
   # ============================================================================
 
   @doc """
   Converts a TypeParser.AST struct to a runtime Deft.Type struct.
+
+  ## Parameters
+
+  - `ast` - The TypeParser.AST struct to convert
+  - `file` - Optional file path for location tracking on type aliases
   """
-  @spec to_type(AST.t()) :: Type.t()
-  def to_type(%AST.Primitive{kind: :integer}), do: Type.integer()
-  def to_type(%AST.Primitive{kind: :float}), do: Type.float()
-  def to_type(%AST.Primitive{kind: :number}), do: Type.number()
-  def to_type(%AST.Primitive{kind: :boolean}), do: Type.boolean()
-  def to_type(%AST.Primitive{kind: :atom}), do: Type.atom()
-  def to_type(%AST.Primitive{kind: :binary}), do: Type.binary()
-  def to_type(%AST.Primitive{kind: :top}), do: Type.top()
-  def to_type(%AST.Primitive{kind: :bottom}), do: Type.bottom()
+  @spec to_type(AST.t(), String.t() | nil) :: Type.t()
+  def to_type(ast, file \\ nil)
 
-  def to_type(%AST.Abstract{kind: :list}), do: Type.list()
-  def to_type(%AST.Abstract{kind: :tuple}), do: Type.tuple()
+  def to_type(%AST.Primitive{kind: :integer}, _file), do: Type.integer()
+  def to_type(%AST.Primitive{kind: :float}, _file), do: Type.float()
+  def to_type(%AST.Primitive{kind: :number}, _file), do: Type.number()
+  def to_type(%AST.Primitive{kind: :boolean}, _file), do: Type.boolean()
+  def to_type(%AST.Primitive{kind: :atom}, _file), do: Type.atom()
+  def to_type(%AST.Primitive{kind: :binary}, _file), do: Type.binary()
+  def to_type(%AST.Primitive{kind: :top}, _file), do: Type.top()
+  def to_type(%AST.Primitive{kind: :bottom}, _file), do: Type.bottom()
 
-  def to_type(%AST.Tuple{elements: elems}) do
-    Type.fixed_tuple(Enum.map(elems, &to_type/1))
+  def to_type(%AST.Abstract{kind: :list}, _file), do: Type.list()
+  def to_type(%AST.Abstract{kind: :tuple}, _file), do: Type.tuple()
+
+  def to_type(%AST.Tuple{elements: elems}, file) do
+    Type.fixed_tuple(Enum.map(elems, &to_type(&1, file)))
   end
 
-  def to_type(%AST.Union{left: l, right: r}) do
-    Type.union(to_type(l), to_type(r))
+  def to_type(%AST.Union{left: l, right: r}, file) do
+    Type.union(to_type(l, file), to_type(r, file))
   end
 
-  def to_type(%AST.List{element: elem}) do
-    Type.fixed_list(to_type(elem))
+  def to_type(%AST.List{element: elem}, file) do
+    Type.fixed_list(to_type(elem, file))
   end
 
-  def to_type(%AST.Function{inputs: inputs, output: output}) do
-    Type.fun(Enum.map(inputs, &to_type/1), to_type(output))
+  def to_type(%AST.Function{inputs: inputs, output: output}, file) do
+    Type.fun(Enum.map(inputs, &to_type(&1, file)), to_type(output, file))
   end
 
-  def to_type(%AST.Variable{name: name}) do
+  def to_type(%AST.Variable{name: name}, _file) do
     Type.var(name)
   end
 
-  def to_type(%AST.Alias{name: name, context: context}) do
-    Type.alias(name, context)
+  def to_type(%AST.Alias{name: name, context: context, span: span}, file) do
+    location = build_location(span, file)
+    Type.Alias.new(name, context, [], location)
   end
 
-  def to_type(%AST.Application{name: name, args: args}) do
-    arg_types = Enum.map(args, &to_type/1)
-    Type.Alias.new(name, nil, arg_types)
+  def to_type(%AST.Application{name: name, args: args, span: span}, file) do
+    arg_types = Enum.map(args, &to_type(&1, file))
+    location = build_location(span, file)
+    Type.Alias.new(name, nil, arg_types, location)
   end
+
+  defp build_location(nil, _file), do: nil
+  defp build_location({line, column}, file), do: {file, line, column}
 
   # ============================================================================
   # to_quoted/1 - Convert AST to quoted Elixir AST

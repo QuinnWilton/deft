@@ -428,4 +428,91 @@ defmodule Deft.TypeParser.EmitterTest do
       assert type_result == quoted_result
     end
   end
+
+  # ============================================================================
+  # to_type/2 - Location Preservation
+  # ============================================================================
+
+  describe "to_type/2 with file context" do
+    test "preserves location on Type.Alias" do
+      ast = %AST.Alias{name: :my_type, context: nil, span: {10, 5}}
+
+      type = Emitter.to_type(ast, "lib/example.ex")
+
+      assert %Type.Alias{
+               name: :my_type,
+               location: {"lib/example.ex", 10, 5}
+             } = type
+    end
+
+    test "preserves location on Type.Alias from Application" do
+      ast = %AST.Application{
+        name: :option,
+        args: [%AST.Primitive{kind: :integer, span: nil}],
+        span: {15, 3}
+      }
+
+      type = Emitter.to_type(ast, "lib/example.ex")
+
+      assert %Type.Alias{
+               name: :option,
+               args: [%Type.Integer{}],
+               location: {"lib/example.ex", 15, 3}
+             } = type
+    end
+
+    test "handles nil file gracefully" do
+      ast = %AST.Alias{name: :my_type, context: nil, span: {10, 5}}
+
+      type = Emitter.to_type(ast, nil)
+
+      # Location is still set, but file is nil
+      assert %Type.Alias{location: {nil, 10, 5}} = type
+    end
+
+    test "handles nil span gracefully" do
+      ast = %AST.Alias{name: :my_type, context: nil, span: nil}
+
+      type = Emitter.to_type(ast, "lib/example.ex")
+
+      assert %Type.Alias{name: :my_type, location: nil} = type
+    end
+
+    test "to_type/1 without file defaults to nil location" do
+      ast = %AST.Alias{name: :my_type, context: nil, span: {10, 5}}
+
+      type = Emitter.to_type(ast)
+
+      # Without file, location has nil for file
+      assert %Type.Alias{location: {nil, 10, 5}} = type
+    end
+
+    test "threads file through nested structures" do
+      # A union containing an alias should preserve its location
+      ast = %AST.Union{
+        left: %AST.Alias{name: :my_type, context: nil, span: {10, 5}},
+        right: %AST.Primitive{kind: :integer, span: nil}
+      }
+
+      type = Emitter.to_type(ast, "lib/example.ex")
+
+      assert %Type.Union{
+               fst: %Type.Alias{location: {"lib/example.ex", 10, 5}}
+             } = type
+    end
+
+    test "threads file through function types" do
+      ast = %AST.Function{
+        inputs: [%AST.Alias{name: :my_input, context: nil, span: {5, 10}}],
+        output: %AST.Alias{name: :my_output, context: nil, span: {5, 25}}
+      }
+
+      type = Emitter.to_type(ast, "lib/example.ex")
+
+      assert %Type.Fn{
+               inputs: [%Type.Alias{location: {"lib/example.ex", 5, 10}}],
+               output: %Type.Alias{location: {"lib/example.ex", 5, 25}}
+             } = type
+    end
+  end
 end
