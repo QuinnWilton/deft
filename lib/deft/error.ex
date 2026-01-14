@@ -41,6 +41,7 @@ defmodule Deft.Error do
           :type_mismatch
           | :missing_annotation
           | :malformed_type
+          | :unknown_type_alias
           | :unsupported_call
           | :inexhaustive_patterns
           | :unreachable_branch
@@ -105,6 +106,7 @@ defmodule Deft.Error do
     type_mismatch: "E0001",
     missing_annotation: "E0002",
     malformed_type: "E0003",
+    unknown_type_alias: "E0014",
     unsupported_call: "E0004",
     inexhaustive_patterns: "E0005",
     unreachable_branch: "E0006",
@@ -263,6 +265,68 @@ defmodule Deft.Error do
       suggestions: Keyword.get(opts, :suggestions, []),
       notes: Keyword.get(opts, :notes, [])
     }
+  end
+
+  @doc """
+  Creates an unknown type alias error.
+
+  Used when a type annotation references a type alias that cannot be resolved.
+
+  ## Options
+
+  - `:name` - The unresolved type alias name (required)
+  - `:location` - Source location where the alias was referenced
+  - `:similar` - A similar type name for "did you mean" suggestions
+  - `:available` - List of available type names in scope
+  - `:notes` - Additional context notes
+  """
+  @spec unknown_type_alias(keyword()) :: t()
+  def unknown_type_alias(opts) do
+    name = Keyword.fetch!(opts, :name)
+    similar = Keyword.get(opts, :similar)
+    available = Keyword.get(opts, :available, [])
+    location = Keyword.get(opts, :location)
+
+    suggestions = build_alias_suggestions(similar, available)
+
+    # Build a span for the type name if we have location
+    spans =
+      if location do
+        [
+          %{
+            location: location,
+            label: "Unknown type `#{name}`",
+            type: nil,
+            kind: :primary,
+            # Provide explicit length for the type name
+            length: String.length(Atom.to_string(name))
+          }
+        ]
+      else
+        []
+      end
+
+    %__MODULE__{
+      code: :unknown_type_alias,
+      message: "Unknown type `#{name}`",
+      location: location,
+      spans: spans,
+      suggestions: suggestions,
+      notes: Keyword.get(opts, :notes, ["The type `#{name}` is not defined in this scope."])
+    }
+  end
+
+  defp build_alias_suggestions(similar, available) do
+    cond do
+      similar ->
+        ["Did you mean `#{similar}`?"]
+
+      available != [] ->
+        ["Available types: #{Enum.join(available, ", ")}"]
+
+      true ->
+        ["Define the type with `defdata` or check for typos."]
+    end
   end
 
   @doc """
