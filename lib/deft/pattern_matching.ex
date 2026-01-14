@@ -7,6 +7,7 @@ defmodule Deft.PatternMatching do
   """
 
   alias Deft.AST
+  alias Deft.AST.Utils, as: ASTUtils
   alias Deft.Context
   alias Deft.Error
   alias Deft.Helpers
@@ -128,15 +129,16 @@ defmodule Deft.PatternMatching do
         do_handle_pattern(transformed_pattern, instantiated_adt, ctx)
 
       :error ->
-        # Alias doesn't resolve to an ADT - fall through to catch-all
-        {notes, suggestions} = unhandled_pattern_hints(pattern, alias_type)
+        # Alias doesn't resolve to an ADT - report unknown type error
+        available = Context.available_adt_names(ctx)
+        similar = ASTUtils.find_similar(name, available)
 
         error =
-          Error.unsupported_pattern(
-            expression: pattern,
-            location: Span.extract(pattern),
-            suggestions: suggestions,
-            notes: notes
+          Error.unknown_type_alias(
+            name: name,
+            location: alias_type.location,
+            similar: similar,
+            available: Enum.take(available, 5)
           )
 
         Error.raise!(error, ctx)
