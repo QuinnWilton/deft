@@ -11,6 +11,8 @@ defmodule Deft.MixProject do
       deps: deps(),
       dialyzer: [
         plt_add_apps: [:ex_unit],
+        plt_local_path: "priv/plts/project.plt",
+        plt_core_path: "priv/plts/core.plt",
         flags: [:error_handling, :unknown]
       ]
     ]
