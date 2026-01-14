@@ -748,65 +748,11 @@ defmodule Deft.Error do
 
   @doc """
   Formats a type for display in error messages.
+
+  Delegates to `Deft.Error.TypeFormat.format/1`.
   """
   @spec format_type(Type.t() | nil) :: String.t()
-  def format_type(nil), do: "unknown"
-  def format_type(%Type.Top{}), do: "any"
-  def format_type(%Type.Bottom{}), do: "never"
-  def format_type(%Type.Integer{}), do: "integer"
-  def format_type(%Type.Float{}), do: "float"
-  def format_type(%Type.Number{}), do: "number"
-  def format_type(%Type.Boolean{}), do: "boolean"
-  def format_type(%Type.Atom{}), do: "atom"
-
-  def format_type(%Type.Fn{inputs: inputs, output: output}) do
-    input_strs = Enum.map(inputs, &format_type/1)
-    "(#{Enum.join(input_strs, ", ")} -> #{format_type(output)})"
-  end
-
-  def format_type(%Type.Union{fst: fst, snd: snd}) do
-    "#{format_type(fst)} | #{format_type(snd)}"
-  end
-
-  def format_type(%Type.Intersection{fst: fst, snd: snd}) do
-    "#{format_type(fst)} & #{format_type(snd)}"
-  end
-
-  def format_type(%Type.FixedTuple{elements: elements}) do
-    elem_strs = Enum.map(elements, &format_type/1)
-    "{#{Enum.join(elem_strs, ", ")}}"
-  end
-
-  def format_type(%Type.FixedList{contents: contents}) do
-    "[#{format_type(contents)}]"
-  end
-
-  def format_type(%Type.List{}), do: "list"
-  def format_type(%Type.Tuple{}), do: "tuple"
-
-  def format_type(%Type.ADT{name: name}) do
-    format_adt_name(name)
-  end
-
-  def format_type(%Type.Variant{name: name, columns: columns}) do
-    col_strs = Enum.map(columns, &format_type/1)
-
-    if columns == [] do
-      "#{name}"
-    else
-      "#{name}(#{Enum.join(col_strs, ", ")})"
-    end
-  end
-
-  def format_type(%Type.Alias{name: name}) do
-    "#{name}"
-  end
-
-  def format_type(other), do: inspect(other)
-
-  defp format_adt_name(%{name: name}), do: "#{name}"
-  defp format_adt_name(name) when is_atom(name), do: "#{name}"
-  defp format_adt_name(other), do: inspect(other)
+  defdelegate format_type(type), to: __MODULE__.TypeFormat, as: :format
 
   # ============================================================================
   # Exception Protocol Implementation
