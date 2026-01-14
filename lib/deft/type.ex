@@ -1,4 +1,35 @@
 defmodule Deft.Type do
+  @moduledoc """
+  Type factory module providing constructors for all Deft types.
+
+  This module serves as the primary interface for creating type values.
+  Each function returns a struct representing that type, which can be
+  used in type checking, subtyping comparisons, and error messages.
+
+  ## Primitive Types
+
+      Type.integer()    # Integer type
+      Type.float()      # Float type
+      Type.number()     # Number (Integer | Float)
+      Type.boolean()    # Boolean type
+      Type.atom()       # Atom type
+      Type.binary()     # Binary/string type
+
+  ## Composite Types
+
+      Type.fun([input_types], output_type)  # Function type
+      Type.fixed_tuple([element_types])     # Fixed-size tuple
+      Type.fixed_list(element_type)         # Homogeneous list
+      Type.union(type1, type2)              # Union type
+      Type.intersection(type1, type2)       # Intersection type
+
+  ## Special Types
+
+      Type.top()        # Supertype of all types
+      Type.bottom()     # Subtype of all types (uninhabited)
+      Type.var(name)    # Type variable for polymorphism
+  """
+
   alias Deft.Subtyping
   alias Deft.Type
 
