@@ -1,4 +1,7 @@
 defmodule Deft.Compiler do
+  # Intentional: these functions always raise, which is by design.
+  @dialyzer {:nowarn_function, [raise_unsupported_syntax: 1, raise_unsupported_pattern: 1]}
+
   @moduledoc """
   Compiles Elixir AST to Deft AST nodes.
 

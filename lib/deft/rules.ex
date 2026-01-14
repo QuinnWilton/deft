@@ -40,8 +40,10 @@ defmodule Deft.Rules do
   # Type definitions for rules
   @type judgment :: :synth | :check | :both
   @type binding :: {term(), Deft.Type.t()}
+  # Note: type is `term()` because some rules (e.g., :case_branch) return compound
+  # types like `{pat_t, body_t}` that get unpacked by parent rules.
   @type success ::
-          {:ok, erased_ast :: term(), type :: Deft.Type.t(), bindings :: [binding()], Context.t()}
+          {:ok, erased_ast :: term(), type :: term(), bindings :: [binding()], Context.t()}
   @type error :: {:error, term()}
   @type result :: success() | error()
 

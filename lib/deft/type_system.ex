@@ -43,8 +43,6 @@ defmodule Deft.TypeSystem do
 
   - `:exhaustiveness_checking` - Verify pattern matches cover all cases
   - `:strict_subtyping` - Require explicit type conversions
-  - `:polymorphism` - Enable parametric polymorphism (Phase 5)
-  - `:effect_tracking` - Track side effects in types (Phase 5)
 
   ## Rule Priority
 

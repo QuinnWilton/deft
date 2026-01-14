@@ -9,7 +9,6 @@ defmodule Deft.TestHelpers.TypeAssertions do
 
   alias Deft.Context
   alias Deft.Subtyping
-  alias Deft.Type
   alias Deft.TypeChecker
 
   @doc """

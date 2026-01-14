@@ -1,4 +1,7 @@
 defmodule Deft do
+  # Intentional: raise_type_errors/2 always raises, which is by design.
+  @dialyzer {:nowarn_function, raise_type_errors: 2}
+
   @moduledoc """
   Deft - Type Systems as Macros for Elixir.
 

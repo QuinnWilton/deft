@@ -1,4 +1,7 @@
 defmodule Deft.Error do
+  # Intentional: raise_with_synthetic_stacktrace/1 always raises, which is by design.
+  @dialyzer {:nowarn_function, raise_with_synthetic_stacktrace: 1}
+
   @moduledoc """
   Rich structured error type for Deft type checking.
 

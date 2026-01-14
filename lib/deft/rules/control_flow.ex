@@ -1,4 +1,7 @@
 defmodule Deft.Rules.ControlFlow do
+  # Intentional: raise_inexhaustive_error/4 always raises, which is by design.
+  @dialyzer {:nowarn_function, raise_inexhaustive_error: 4}
+
   @moduledoc """
   Control flow typing rules implemented using the declarative DSL.
 
