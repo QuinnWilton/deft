@@ -14,12 +14,60 @@ defmodule Deft.Generators.Code do
   alias Deft.Subtyping
   alias Deft.Type
 
-  def code() do
-    # TODO: propagate bindings
-    map(nonempty(list_of(expression())), fn children ->
-      {exprs, expr_types} = Enum.unzip(children)
+  @doc """
+  Generates a well-typed block of expressions.
 
-      {AST.Block.new(exprs), Enum.at(expr_types, -1)}
+  Propagates variable bindings through the block: variables bound via
+  match expressions in earlier statements are available to later
+  expressions. This ensures generated blocks reference bound variables
+  rather than unbound ones.
+  """
+  def code() do
+    # Generate initial bindings, then body expressions that can use them.
+    bind(list_of(binding_expr(), max_length: 3), fn bindings ->
+      {binding_exprs, env} = Enum.unzip(bindings)
+
+      map(nonempty(list_of(expression_with_env(env))), fn body_children ->
+        {body_exprs, body_types} = Enum.unzip(body_children)
+
+        all_exprs = binding_exprs ++ body_exprs
+        final_type = List.last(body_types)
+
+        {AST.Block.new(all_exprs), final_type}
+      end)
+    end)
+  end
+
+  # Generates a match expression that binds a variable, returning
+  # {match_expr, {local_node, type}} for the environment.
+  defp binding_expr do
+    bind(Generators.primitive_type(), fn type ->
+      bind(local_node(), fn local ->
+        map(literal_node(type), fn {value, _} ->
+          expr = AST.Match.new(local, value)
+          {expr, {local, type}}
+        end)
+      end)
+    end)
+  end
+
+  # Generates an expression that may reference bound variables from the environment.
+  defp expression_with_env([]) do
+    expression()
+  end
+
+  defp expression_with_env(env) do
+    # Mix fresh expressions with references to bound variables.
+    frequency([
+      {3, expression()},
+      {1, use_bound_variable(env)}
+    ])
+  end
+
+  # Generates a reference to a bound variable from the environment.
+  defp use_bound_variable(env) do
+    map(member_of(env), fn {local, type} ->
+      {local, type}
     end)
   end
 
