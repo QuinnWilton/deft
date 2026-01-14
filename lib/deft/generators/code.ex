@@ -243,7 +243,6 @@ defmodule Deft.Generators.Code do
 
   def fn_application_node(child_data \\ literal_node()) do
     bind(fn_node(child_data), fn {fn_node, fn_type} ->
-      # TODO: Generate non-literal arguments
       arg_nodes = Enum.map(fn_type.inputs, &argument_node/1)
 
       map(fixed_list(arg_nodes), fn children ->
