@@ -468,8 +468,10 @@ defmodule Deft.Generators.Code do
         constant(:>=)
       ])
 
+    # For type-aware call generation (arithmetic, list ops, tuple ops),
+    # see choose_fn/1 and choose_fn/2 which select operations based on
+    # argument types. This function focuses on guards and comparisons.
     bind(arguments, fn
-      # TODO: Generate more types of local calls
       {{fst, _}, {snd, _}} ->
         map(comparisons, fn comparison ->
           {AST.LocalCall.new(comparison, [fst, snd]), Type.boolean()}
